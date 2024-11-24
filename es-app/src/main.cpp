@@ -646,20 +646,23 @@ int main(int argc, char* argv[])
 		timeLimit = 0;
 #endif
 
-	int lastTime = SDL_GetTicks();
-	int ps_time = SDL_GetTicks();
+    auto lastTime = std::chrono::steady_clock::now();
+    auto ps_time = lastTime;
 
 	bool running = true;
 
 	while(running)
 	{
 #ifdef WIN32	
-		int processStart = SDL_GetTicks();
+		auto processStart = std::chrono::steady_clock::now();
 #endif
 
 		SDL_Event event;
 
-		bool ps_standby = PowerSaver::getState() && (int) SDL_GetTicks() - ps_time > PowerSaver::getMode();
+        auto now = std::chrono::steady_clock::now();
+		auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(now - ps_time);
+
+		bool ps_standby = PowerSaver::getState() && (int) delta.count() > PowerSaver::getMode();
 		if(ps_standby ? SDL_WaitEventTimeout(&event, PowerSaver::getTimeout()) : SDL_PollEvent(&event))
 		{
 			// PowerSaver can push events to exit SDL_WaitEventTimeout immediatly
@@ -681,10 +684,10 @@ int main(int argc, char* argv[])
 			// triggered if exiting from SDL_WaitEvent due to event
 			if (ps_standby)
 				// show as if continuing from last event
-				lastTime = SDL_GetTicks();
+				lastTime = std::chrono::steady_clock::now();
 
 			// reset counter
-			ps_time = SDL_GetTicks();
+			ps_time = std::chrono::steady_clock::now();
 		}
 		else if (ps_standby == false)
 		{
@@ -693,18 +696,19 @@ int main(int argc, char* argv[])
 
 		  // If exitting SDL_WaitEventTimeout due to timeout. Trail considering
 		  // timeout as an event
-		  //	ps_time = SDL_GetTicks();
+		  //	ps_time = std::chrono::steady_clock::now();
 		}
 
 		if (window.isSleeping())
 		{
-			lastTime = SDL_GetTicks();
+			lastTime = std::chrono::steady_clock::now();
 			SDL_Delay(1); // this doesn't need to be accurate, we're just giving up our CPU time until something wakes us up
 			continue;
 		}
 
-		int curTime = SDL_GetTicks();
-		int deltaTime = curTime - lastTime;
+		auto curTime = std::chrono::steady_clock::now();
+		int deltaTime = std::chrono::duration_cast<std::chrono::milliseconds>(curTime - ps_time).count();
+
 		lastTime = curTime;
 
 		// cap deltaTime if it ever goes negative
