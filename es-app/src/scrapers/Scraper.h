@@ -10,6 +10,7 @@
 #include <queue>
 #include <utility>
 #include <set>
+#include <chrono>
 #include <assert.h>
 #include "FileData.h"
 
@@ -101,7 +102,8 @@ private:
 	HttpReqOptions mOptions;
 	int	mRetryCount;
 
-	int mOverQuotaPendingTime;
+	std::chrono::steady_clock::time_point mOverQuotaPendingTime;
+    bool mOverQuotaPending = false;
 	int mOverQuotaRetryDelay;
 	int mOverQuotaRetryCount;
 };
@@ -141,13 +143,14 @@ private:
 	HttpReq* mRequest;
 
 	int	mRetryCount;
-	int mOverQuotaPendingTime;
+	std::chrono::steady_clock::time_point mOverQuotaPendingTime;
 	int mOverQuotaRetryDelay;
 	int mOverQuotaRetryCount;
 
 	std::string mSavePath;
 	int mMaxWidth;
 	int mMaxHeight;
+    bool mOverQuotaPending=false;
 };
 
 
