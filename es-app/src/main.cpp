@@ -382,7 +382,7 @@ void playVideo()
 	vid.onShow();
 	vid.topWindow(true);
 
-	int lastTime = SDL_GetTicks();
+    auto lastTime = std::chrono::steady_clock::now();
 	int totalTime = 0;
 
 	while (!exitLoop)
@@ -399,19 +399,16 @@ void playVideo()
 			while (SDL_PollEvent(&event));
 		}
 
-		int curTime = SDL_GetTicks();
-		int deltaTime = curTime - lastTime;
+        auto deltaTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - lastTime);
 
 		if (vid.isPlaying())
 		{
-			totalTime += deltaTime;
-
-			if (gPlayVideoDuration > 0 && totalTime > gPlayVideoDuration * 100)
+			if (gPlayVideoDuration > 0 && deltaTime.count() > gPlayVideoDuration * 100)
 				break;
 		}
 
 		Transform4x4f transform = Transform4x4f::Identity();
-		vid.update(deltaTime);
+		vid.update(deltaTime.count());
 		vid.render(transform);
 
 		Renderer::swapBuffers();
