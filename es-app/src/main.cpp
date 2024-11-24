@@ -707,7 +707,7 @@ int main(int argc, char* argv[])
 		}
 
 		auto curTime = std::chrono::steady_clock::now();
-		int deltaTime = std::chrono::duration_cast<std::chrono::milliseconds>(curTime - ps_time).count();
+		int deltaTime = std::chrono::duration_cast<std::chrono::milliseconds>(curTime - lastTime).count();
 
 		lastTime = curTime;
 
