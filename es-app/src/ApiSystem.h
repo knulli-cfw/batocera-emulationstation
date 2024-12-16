@@ -166,7 +166,7 @@ public:
     bool enableWifi(std::string ssid, std::string key);
     bool disableWifi();
 
-	virtual std::string getIpAdress();
+	virtual std::string getIpAddress();
 
 #ifdef KNULLI
 	bool runDiskCheck(const std::function<void(const std::string)>& func = nullptr);
