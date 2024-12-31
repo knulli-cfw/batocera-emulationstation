@@ -1,5 +1,6 @@
 #include "guis/knulli/GuiTools.h"
 #include "guis/knulli/GuiPowerManagementSettings.h"
+#include "guis/knulli/GuiRgbSettings.h"
 #include "guis/knulli/Pico8Installer.h"
 #include "components/OptionListComponent.h"
 #include "components/SliderComponent.h"
@@ -20,6 +21,7 @@ GuiTools::GuiTools(Window* window) : GuiSettings(window, _("TOOLS").c_str())
 {
 	addGroup(_("DEVICE SETTINGS"));
 	addEntry(_("POWER MANAGEMENT"), true, [this] { openPowerManagementSettings(); });
+	addEntry(_("RGB LED SETTINGS"), true, [this] { openRgbLedSettings(); });
 	addGroup(_("THIRD PARTY SOFTWARE"));
 	addEntry(_("INSTALL PICO-8"), true, [this] { installPico8(); });
 }
@@ -28,6 +30,11 @@ GuiTools::GuiTools(Window* window) : GuiSettings(window, _("TOOLS").c_str())
 void GuiTools::openPowerManagementSettings()
 {
 	mWindow->pushGui(new GuiPowerManagementSettings(mWindow));
+}
+
+void GuiTools::openRgbLedSettings()
+{
+	mWindow->pushGui(new GuiRgbSettings(mWindow));
 }
 
 void GuiTools::installPico8()
