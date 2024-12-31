@@ -78,6 +78,7 @@ set(ES_HEADERS
     # Knulli-related GUIs
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiTools.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiPowerManagementSettings.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/Pico8Installer.h
 
     # Scrapers
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scrapers/Scraper.h
@@ -183,6 +184,7 @@ set(ES_SOURCES
     # Knulli-related GUIs
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiPowerManagementSettings.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/Pico8Installer.cpp
 
     # Scrapers
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scrapers/Scraper.cpp
