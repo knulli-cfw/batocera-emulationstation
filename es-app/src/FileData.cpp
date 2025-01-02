@@ -696,6 +696,8 @@ bool FileData::launchGame(Window* window, LaunchGameOptions options)
 	if (command.empty())
 		return false;
 
+	std::string quickResumeCommand = getlaunchCommand(false);
+
 	AudioManager::getInstance()->deinit();
 	VolumeControl::getInstance()->deinit();
 
@@ -704,6 +706,13 @@ bool FileData::launchGame(Window* window, LaunchGameOptions options)
 	
 	const std::string rom = Utils::FileSystem::getEscapedPath(getPath());
 	const std::string basename = Utils::FileSystem::getStem(getPath());
+
+	if (!quickResumeCommand.empty() && SystemConf::getInstance()->getBool("global.quickresumemode") == true)
+	{
+		SystemConf::getInstance()->set("global.bootgame.path", getFullPath());
+		SystemConf::getInstance()->set("global.bootgame.cmd", quickResumeCommand);
+		SystemConf::getInstance()->saveSystemConf();
+	}
 
 	Scripting::fireEvent("game-start", rom, basename, getName());
 
