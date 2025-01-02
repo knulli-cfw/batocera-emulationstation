@@ -41,7 +41,11 @@ void GuiTools::installPico8()
 {
 	int result = Pico8Installer::install();
 	if(result == 0) {
-		mWindow->pushGui(new GuiMsgBox(mWindow, "Native Pico-8 was successfully installed.", "OK", nullptr));
+
+		mWindow->pushGui(new GuiMsgBox(mWindow, _("Native Pico-8 was successfully installed."), _("OK"), [this]
+			{
+				ViewController::reloadAllGames(this->mWindow, true, true);
+			}));
 	} else if(result == 1) {
 		mWindow->pushGui(new GuiMsgBox(mWindow, "Unable to install: An unknown error occurred. If the error persists, try installing Pico-8 manually.", "OK", nullptr));
 	} else if(result == 2) {
