@@ -4,6 +4,7 @@
 #include "components/OptionListComponent.h"
 #include "components/SwitchComponent.h"
 #include <array>
+#include <memory>
 
 class GuiRgbSettings : public GuiSettings
 {
@@ -17,4 +18,14 @@ private:
     std::shared_ptr<OptionListComponent<std::string>> createSwitch(std::string label, std::string variable, std::string description);
     std::array<float, 3> getRgbValues();
     void setRgbValues(float red, float green, float blue);
+
+    std::shared_ptr<OptionListComponent<std::string>> optionListMode;
+    std::shared_ptr<SliderComponent> sliderLedBrightness;
+    std::shared_ptr<SliderComponent> sliderLedSpeed;
+    std::shared_ptr<SliderComponent> sliderLedRed;
+    std::shared_ptr<SliderComponent> sliderLedGreen;
+    std::shared_ptr<SliderComponent> sliderLedBlue;
+    std::shared_ptr<SliderComponent> sliderLowBatteryThreshold;
+    std::shared_ptr<OptionListComponent<std::string>> optionListBatteryCharging;
+    std::shared_ptr<OptionListComponent<std::string>> optionListRetroAchievements;
 };
