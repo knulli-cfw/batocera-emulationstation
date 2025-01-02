@@ -22,12 +22,7 @@ int Pico8Installer::install()
 {
 	if (hasInstaller()) {
 		int result = system("/usr/bin/install-pico8.sh");
-		if (WEXITSTATUS(result) == 0x10) {
-			// Installation was successful
-			return 0;
-		}
-		// Something went wrong
-		return 1;
+		return WEXITSTATUS(result);
 	}
 	// Installer is missing
 	return 2;
