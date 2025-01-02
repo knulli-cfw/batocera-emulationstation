@@ -14,53 +14,76 @@
 #include <algorithm>
 #include <memory>
 #include <string>
+#include <array>
+#include "GuiRgbSettings.h"
+
+constexpr char RGB_DELIMITER = ' ';
+constexpr const char* DEFAULT_LED_MODE = "1";
+constexpr float DEFAULT_COLOR_RED = 148;
+constexpr float DEFAULT_COLOR_GREEN = 255;
+constexpr float DEFAULT_COLOR_BLUE = 0;
+constexpr float DEFAULT_BRIGHTNESS = 100;
+constexpr float DEFAULT_SPEED = 15;
+constexpr float DEFAULT_LOW_BATTERY_THRESHOLD = 20;
+constexpr const char* DEFAULT_SWITCH_ON = "1";
 
 GuiRgbSettings::GuiRgbSettings(Window* window) : GuiSettings(window, _("RGB LED SETTINGS").c_str())
 {
     addGroup(_("REGULAR LED MODE AND COLOR"));
 
     // LED Mode Options
-    auto optionsLedMode = std::make_shared<OptionListComponent<std::string>>(mWindow, _("MODE"), false);
-
-    std::string selectedLedMode = SystemConf::getInstance()->get("led.mode");
-    if (selectedLedMode.empty())
-        selectedLedMode = "1";
-
-    optionsLedMode->add(_("NONE"),               "0", selectedLedMode == "0");
-    optionsLedMode->add(_("STATIC"),             "1", selectedLedMode == "1");
-    optionsLedMode->add(_("BREATHING (FAST)"),   "2", selectedLedMode == "2");
-    optionsLedMode->add(_("BREATHING (MEDIUM)"), "3", selectedLedMode == "3");
-    optionsLedMode->add(_("BREATHING (SLOW)"),   "4", selectedLedMode == "4");
-    optionsLedMode->add(_("SINGLE RAINBOW"),     "5", selectedLedMode == "5");
-    optionsLedMode->add(_("MULTI RAINBOW"),      "6", selectedLedMode == "6");
-
-    addWithDescription(_("MODE"), _("Not every mode is available on every device."), optionsLedMode);
+    std::shared_ptr<OptionListComponent<std::string>> modeOptionList = createModeOptionList();
 
     // LED Brightness Slider
     auto sliderLedBrightness = createSlider("BRIGHTNESS", 0.f, 255.f, 1.f, "", "");
-    setDefaultValueForSlider(sliderLedBrightness, 100.f, "led.brightness");
+    setConfigValueForSlider(sliderLedBrightness, DEFAULT_BRIGHTNESS, "led.brightness");
 
     // LED Speed Slider
     auto sliderLedSpeed = createSlider("SPEED", 1.f, 255.f, 1.f, "", "Not applicable for all devices/modes. Warning: High speed may cause seizures for people with photosensitive epilepsy.");
-    setDefaultValueForSlider(sliderLedSpeed, 15.f, "led.speed");
+    setConfigValueForSlider(sliderLedSpeed, DEFAULT_SPEED, "led.speed");
 
     // LED Colour Sliders
-    auto sliderLedRed = createSlider("RED", 1.f, 255.f, 1.f, "", "");
-    auto sliderLedGreen = createSlider("GREEN", 1.f, 255.f, 1.f, "", "");
-    auto sliderLedBlue = createSlider("BLUE", 1.f, 255.f, 1.f, "", "");
+    std::array<float, 3> rgbValues = getRgbValues();
+    auto sliderLedRed = createSlider("RED", 0.f, 255.f, 1.f, "", "");
+    sliderLedRed->setValue(rgbValues[0]);
+    auto sliderLedGreen = createSlider("GREEN", 0.f, 255.f, 1.f, "", "");
+    sliderLedGreen->setValue(rgbValues[1]);
+    auto sliderLedBlue = createSlider("BLUE", 0.f, 255.f, 1.f, "", "");
+    sliderLedBlue->setValue(rgbValues[2]);
 
     addGroup(_("BATTERY CHARGE INDICATION"));
 
     // Low battery threshold slider
     auto sliderLowBatteryThreshold = createSlider("LOW BATTERY THRESHOLD", 1.f, 100.f, 5.f, "%", "Show yellow/red breathing when battery is below this threshold. Set to 0 to disable.");
-    setDefaultValueForSlider(sliderLowBatteryThreshold, 15.f, "led.battery.low");
+    setConfigValueForSlider(sliderLowBatteryThreshold, DEFAULT_LOW_BATTERY_THRESHOLD, "led.battery.low");
     createSwitch("BATTERY CHARGING", "led.battery.charging", "Show green breathing while device is charging.");
 
     addGroup(_("RETRO ACHIEVEMENT INDICATION"));
     createSwitch("ACHIEVEMENT EFFECT", "led.retroachievements", "Honor your retro achievements with a LED effect.");
 }
 
-std::shared_ptr<SliderComponent> GuiRgbSettings::createSlider(std::string label, float min, float max, float step, std::string unit, std::string description) {
+std::shared_ptr<OptionListComponent<std::string>> GuiRgbSettings::createModeOptionList()
+{
+    auto optionsLedMode = std::make_shared<OptionListComponent<std::string>>(mWindow, _("MODE"), false);
+
+    std::string selectedLedMode = SystemConf::getInstance()->get("led.mode");
+    if (selectedLedMode.empty())
+        selectedLedMode = DEFAULT_LED_MODE;
+
+    optionsLedMode->add(_("NONE"), "0", selectedLedMode == "0");
+    optionsLedMode->add(_("STATIC"), "1", selectedLedMode == "1");
+    optionsLedMode->add(_("BREATHING (FAST)"), "2", selectedLedMode == "2");
+    optionsLedMode->add(_("BREATHING (MEDIUM)"), "3", selectedLedMode == "3");
+    optionsLedMode->add(_("BREATHING (SLOW)"), "4", selectedLedMode == "4");
+    optionsLedMode->add(_("SINGLE RAINBOW"), "5", selectedLedMode == "5");
+    optionsLedMode->add(_("MULTI RAINBOW"), "6", selectedLedMode == "6");
+
+    addWithDescription(_("MODE"), _("Not every mode is available on every device."), optionsLedMode);
+    return optionsLedMode;
+}
+
+std::shared_ptr<SliderComponent> GuiRgbSettings::createSlider(std::string label, float min, float max, float step, std::string unit, std::string description)
+{
     std::shared_ptr<SliderComponent> slider = std::make_shared<SliderComponent>(mWindow, min, max, step, unit);
     if (description.empty()) {
         addWithLabel(label, slider);
@@ -70,7 +93,7 @@ std::shared_ptr<SliderComponent> GuiRgbSettings::createSlider(std::string label,
     return slider;
 }
 
-void GuiRgbSettings::setDefaultValueForSlider(std::shared_ptr<SliderComponent> slider, float defaultValue, std::string variable) {
+void GuiRgbSettings::setConfigValueForSlider(std::shared_ptr<SliderComponent> slider, float defaultValue, std::string variable) {
     float selectedValue = defaultValue;
     std::string configuredValue = SystemConf::getInstance()->get(variable);
     if (!configuredValue.empty()) {
@@ -84,7 +107,7 @@ std::shared_ptr<OptionListComponent<std::string>> GuiRgbSettings::createSwitch(s
 
     std::string selected = SystemConf::getInstance()->get(variable);
     if (selected.empty())
-        selected = "1";
+        selected = DEFAULT_SWITCH_ON;
 
     optionList->add(_("OFF"), "0", selected == "0");
     optionList->add(_("ON"), "1", selected == "1");
@@ -92,4 +115,31 @@ std::shared_ptr<OptionListComponent<std::string>> GuiRgbSettings::createSwitch(s
     addWithDescription(label, description, optionList);
 
     return optionList;
+}
+
+std::array<float, 3> GuiRgbSettings::getRgbValues() {
+
+    std::string colour = SystemConf::getInstance()->get("led.colour");
+    if (colour.empty()) {
+        return {0, 0, 0};
+    }
+
+    std::vector<std::string> rgbValues;
+    std::stringstream stringStream (colour);
+    std::string item;
+
+    while (getline (stringStream, item, RGB_DELIMITER)) {
+        rgbValues.push_back (item);
+    }
+
+    int red = std::stof(rgbValues[0]);
+    int green = std::stof(rgbValues[1]);
+    int blue = std::stof(rgbValues[2]);
+
+    return {red, green, blue};
+}
+
+void GuiRgbSettings::setRgbValues(float red, float green, float blue) {
+    std::string colour = std::to_string((int) red) + RGB_DELIMITER + std::to_string((int) green) + RGB_DELIMITER + std::to_string((int) blue);
+    SystemConf::getInstance()->set("led.colour", colour);
 }
