@@ -2743,11 +2743,11 @@ void GuiMenu::openGamesSettings()
 	s->addWithDescription(_("SHOW SAVESTATE MANAGER"), _("Display savestate manager before launching a game."), showSaveStates);
 	s->addSaveFunc([showSaveStates] { SystemConf::getInstance()->set("global.savestates", showSaveStates->getSelected()); });
 
-	// // QUICK RESUME MODE
-	// auto quickResumeMode = std::make_shared<SwitchComponent>(mWindow);
-	// quickResumeMode->setState(SystemConf::getInstance()->get("global.quickresumemode") == "1");
-	// s->addWithDescription(_("QUICK RESUME MODE"), _("Boots directly from the last played game if shutdown during gameplay. Works with auto save/load. Reduces boot time by scanning games, laoding ES, after game exit."), quickResumeMode);
-	// s->addSaveFunc([quickResumeMode] { SystemConf::getInstance()->set("global.quickresumemode", quickResumeMode->getState() ? "1" : ""); });
+	// QUICK RESUME MODE
+	auto quickResumeMode = std::make_shared<SwitchComponent>(mWindow);
+	quickResumeMode->setState(SystemConf::getInstance()->get("global.quickresumemode") == "1");
+	s->addWithDescription(_("QUICK RESUME MODE"), _("Boots directly from the last played game if shutdown during gameplay. Works with auto save/load. Reduces boot time by scanning games, laoding ES, after game exit."), quickResumeMode);
+	s->addSaveFunc([quickResumeMode] { SystemConf::getInstance()->set("global.quickresumemode", quickResumeMode->getState() ? "1" : ""); });
 
 	s->addGroup(_("DEFAULT GLOBAL SETTINGS"));
 
