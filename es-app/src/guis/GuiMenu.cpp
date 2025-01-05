@@ -2746,7 +2746,7 @@ void GuiMenu::openGamesSettings()
 	// QUICK RESUME MODE
 	auto quickResumeMode = std::make_shared<SwitchComponent>(mWindow);
 	quickResumeMode->setState(SystemConf::getInstance()->get("global.quickresumemode") == "1");
-	s->addWithDescription(_("QUICK RESUME MODE"), _("If a shutdown occurs during gameplay, next boot skips loading of ES and proceeds directly into the game. Works with auto save/load if supported by the emulator."), quickResumeMode);
+	s->addWithDescription(_("QUICK RESUME MODE"), _("Boots directly from the last played game if shutdown during gameplay. Works with auto save/load. Reduces boot time by scanning games, laoding ES, after game exit."), quickResumeMode);
 	s->addSaveFunc([quickResumeMode] { SystemConf::getInstance()->set("global.quickresumemode", quickResumeMode->getState() ? "1" : ""); });
 
 	s->addGroup(_("DEFAULT GLOBAL SETTINGS"));

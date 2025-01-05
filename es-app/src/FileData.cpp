@@ -680,13 +680,6 @@ std::string FileData::getMessageFromExitCode(int exitCode)
 	return _("UKNOWN ERROR") + " : " + std::to_string(exitCode);
 }
 
-bool FileData::setQuickResumeCommand(std::string quickResumeCommand)
-{
-			SystemConf::getInstance()->set("global.bootgame.path", getFullPath());
-			SystemConf::getInstance()->set("global.bootgame.cmd", quickResumeCommand);
-			return SystemConf::getInstance()->saveSystemConf();
-}
-
 bool FileData::launchGame(Window* window, LaunchGameOptions options)
 {
 	LOG(LogInfo) << "Attempting to launch game...";
@@ -703,17 +696,7 @@ bool FileData::launchGame(Window* window, LaunchGameOptions options)
 	if (command.empty())
 		return false;
 
-#if Knulli
-	if (SystemConf::getInstance()->getBool("global.quickresumemode") == true)
-	{
-		std::string quickResumeCommand = getlaunchCommand(false);
-		if (!quickResumeCommand.empty())
-			if (!setQuickResumeCommand(quickResumeCommand))
-				LOG(LogWarning) << "...quick resume command was not saved in batocera.conf!";
-		else
-			LOG(LogWarning) << "...quick resume command was empty!";
-	}
-#endif
+	std::string quickResumeCommand = getlaunchCommand(false);
 
 	AudioManager::getInstance()->deinit();
 	VolumeControl::getInstance()->deinit();
@@ -723,6 +706,13 @@ bool FileData::launchGame(Window* window, LaunchGameOptions options)
 	
 	const std::string rom = Utils::FileSystem::getEscapedPath(getPath());
 	const std::string basename = Utils::FileSystem::getStem(getPath());
+
+	if (!quickResumeCommand.empty() && SystemConf::getInstance()->getBool("global.quickresumemode") == true)
+	{
+		SystemConf::getInstance()->set("global.bootgame.path", getFullPath());
+		SystemConf::getInstance()->set("global.bootgame.cmd", quickResumeCommand);
+		SystemConf::getInstance()->saveSystemConf();
+	}
 
 	Scripting::fireEvent("game-start", rom, basename, getName());
 
