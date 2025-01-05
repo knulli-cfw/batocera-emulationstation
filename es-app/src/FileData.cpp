@@ -703,6 +703,7 @@ bool FileData::launchGame(Window* window, LaunchGameOptions options)
 	if (command.empty())
 		return false;
 
+#if Knulli
 	if (SystemConf::getInstance()->getBool("global.quickresumemode") == true)
 	{
 		std::string quickResumeCommand = getlaunchCommand(false);
@@ -712,6 +713,7 @@ bool FileData::launchGame(Window* window, LaunchGameOptions options)
 		else
 			LOG(LogWarning) << "...quick resume command was empty!";
 	}
+#endif
 
 	AudioManager::getInstance()->deinit();
 	VolumeControl::getInstance()->deinit();
