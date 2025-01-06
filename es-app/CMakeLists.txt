@@ -75,6 +75,12 @@ set(ES_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiSaveState.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiFileBrowser.h	
 	
+    # Knulli-related GUIs
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiTools.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiPowerManagementSettings.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/Pico8Installer.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiRgbSettings.h
+
     # Scrapers
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scrapers/Scraper.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scrapers/GamesDBJSONScraper.h
@@ -175,6 +181,12 @@ set(ES_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiGameAchievements.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiSaveState.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiFileBrowser.cpp
+	
+    # Knulli-related GUIs
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiTools.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiPowerManagementSettings.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiRgbSettings.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/Pico8Installer.cpp
 
     # Scrapers
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scrapers/Scraper.cpp
