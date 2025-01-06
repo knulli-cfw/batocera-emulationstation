@@ -3,6 +3,7 @@
 #include "guis/GuiSettings.h"
 #include "components/OptionListComponent.h"
 #include "components/SliderComponent.h"
+#include "components/SwitchComponent.h"
 #include "views/UIModeController.h"
 #include "views/ViewController.h"
 #include "SystemConf.h"
@@ -56,10 +57,10 @@ GuiRgbSettings::GuiRgbSettings(Window* window) : GuiSettings(window, _("RGB LED 
     // Low battery threshold slider
     sliderLowBatteryThreshold = createSlider("LOW BATTERY THRESHOLD", 1.f, 100.f, 5.f, "%", "Show yellow/red breathing when battery is below this threshold. Set to 0 to disable.");
     setConfigValueForSlider(sliderLowBatteryThreshold, DEFAULT_LOW_BATTERY_THRESHOLD, "led.battery.low");
-    optionListBatteryCharging = createSwitch("BATTERY CHARGING", "led.battery.charging", "Show green breathing while device is charging.");
+    switchBatteryCharging = createSwitch("BATTERY CHARGING", "led.battery.charging", "Show green breathing while device is charging.");
 
     addGroup(_("RETRO ACHIEVEMENT INDICATION"));
-    optionListRetroAchievements = createSwitch("ACHIEVEMENT EFFECT", "led.retroachievements", "Honor your retro achievements with a LED effect.");
+    switchRetroAchievements = createSwitch("ACHIEVEMENT EFFECT", "led.retroachievements", "Honor your retro achievements with a LED effect.");
 
     addSaveFunc([this] {
         SystemConf::getInstance()->set("led.mode", optionListMode->getSelected());
@@ -67,8 +68,8 @@ GuiRgbSettings::GuiRgbSettings(Window* window) : GuiSettings(window, _("RGB LED 
         SystemConf::getInstance()->set("led.speed", std::to_string((int) sliderLedSpeed->getValue()));
         setRgbValues(sliderLedRed->getValue(), sliderLedGreen->getValue(), sliderLedBlue->getValue());
         SystemConf::getInstance()->set("led.battery.low", std::to_string((int) sliderLowBatteryThreshold->getValue()));
-        SystemConf::getInstance()->set("led.battery.charging", optionListBatteryCharging->getSelected());
-        SystemConf::getInstance()->set("led.retroachievements", optionListRetroAchievements->getSelected());
+        SystemConf::getInstance()->set("led.battery.charging", (switchBatteryCharging->getState() ? DEFAULT_SWITCH_ON : "0"));
+        SystemConf::getInstance()->set("led.retroachievements", (switchRetroAchievements->getState() ? DEFAULT_SWITCH_ON : "0"));
 		SystemConf::getInstance()->saveSystemConf();
 		Scripting::fireEvent(MENU_EVENT_NAME);
     });
@@ -105,7 +106,8 @@ std::shared_ptr<SliderComponent> GuiRgbSettings::createSlider(std::string label,
     return slider;
 }
 
-void GuiRgbSettings::setConfigValueForSlider(std::shared_ptr<SliderComponent> slider, float defaultValue, std::string variable) {
+void GuiRgbSettings::setConfigValueForSlider(std::shared_ptr<SliderComponent> slider, float defaultValue, std::string variable)
+{
     float selectedValue = defaultValue;
     std::string configuredValue = SystemConf::getInstance()->get(variable);
     if (!configuredValue.empty()) {
@@ -114,22 +116,20 @@ void GuiRgbSettings::setConfigValueForSlider(std::shared_ptr<SliderComponent> sl
     slider->setValue(selectedValue);
 }
 
-std::shared_ptr<OptionListComponent<std::string>> GuiRgbSettings::createSwitch(std::string label, std::string variable, std::string description) {
-    std::shared_ptr<OptionListComponent<std::string>> optionList = std::make_shared<OptionListComponent<std::string>>(mWindow, label, false);
-
+std::shared_ptr<SwitchComponent> GuiRgbSettings::createSwitch(std::string label, std::string variable, std::string description)
+{
+    std::shared_ptr<SwitchComponent> switchComponent = std::make_shared<SwitchComponent>(mWindow);
     std::string selected = SystemConf::getInstance()->get(variable);
     if (selected.empty())
         selected = DEFAULT_SWITCH_ON;
 
-    optionList->add(_("OFF"), "0", selected == "0");
-    optionList->add(_("ON"), "1", selected == "1");
-
-    addWithDescription(label, description, optionList);
-
-    return optionList;
+    switchComponent->setState(selected == DEFAULT_SWITCH_ON);
+    addWithDescription(label, description, switchComponent);
+    return switchComponent;
 }
 
-std::array<float, 3> GuiRgbSettings::getRgbValues() {
+std::array<float, 3> GuiRgbSettings::getRgbValues()
+{
     std::string colour = SystemConf::getInstance()->get("led.colour");
     if (colour.empty()) {
         return {0, 0, 0};
@@ -150,7 +150,8 @@ std::array<float, 3> GuiRgbSettings::getRgbValues() {
     return {red, green, blue};
 }
 
-void GuiRgbSettings::setRgbValues(float red, float green, float blue) {
+void GuiRgbSettings::setRgbValues(float red, float green, float blue)
+{
     std::string colour = std::to_string((int) red) + RGB_DELIMITER + std::to_string((int) green) + RGB_DELIMITER + std::to_string((int) blue);
     SystemConf::getInstance()->set("led.colour", colour);
 }

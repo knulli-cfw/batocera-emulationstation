@@ -15,7 +15,7 @@ public:
 private:
     std::shared_ptr<SliderComponent> createSlider(std::string label, float min, float max, float step, std::string unit, std::string description);
     void setConfigValueForSlider(std::shared_ptr<SliderComponent> slider, float defaultValue, std::string settingsID);
-    std::shared_ptr<OptionListComponent<std::string>> createSwitch(std::string label, std::string variable, std::string description);
+    std::shared_ptr<SwitchComponent> createSwitch(std::string label, std::string variable, std::string description);
     std::array<float, 3> getRgbValues();
     void setRgbValues(float red, float green, float blue);
 
@@ -26,6 +26,6 @@ private:
     std::shared_ptr<SliderComponent> sliderLedGreen;
     std::shared_ptr<SliderComponent> sliderLedBlue;
     std::shared_ptr<SliderComponent> sliderLowBatteryThreshold;
-    std::shared_ptr<OptionListComponent<std::string>> optionListBatteryCharging;
-    std::shared_ptr<OptionListComponent<std::string>> optionListRetroAchievements;
+    std::shared_ptr<SwitchComponent> switchBatteryCharging;
+    std::shared_ptr<SwitchComponent> switchRetroAchievements;
 };
