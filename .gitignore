@@ -44,9 +44,13 @@ Makefile
 CPackConfig.cmake
 CPackSourceConfig.cmake
 
+# VS Code
+/.vscode
+*.code-workspace
+/.vs/
+
 # batocera
 # po backup
 *.po~
-/.vs/
 *.sqlite
 .DS_Store

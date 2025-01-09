@@ -696,6 +696,16 @@ bool FileData::launchGame(Window* window, LaunchGameOptions options)
 	if (command.empty())
 		return false;
 
+	// KNULLI - QUICK RESUME MODE >>>
+	std::string quickResumeCommand = getlaunchCommand(false);
+	if (!quickResumeCommand.empty() && SystemConf::getInstance()->getBool("global.quickresume") == true)
+	{
+		SystemConf::getInstance()->set("global.bootgame.path", getFullPath());
+		SystemConf::getInstance()->set("global.bootgame.cmd", quickResumeCommand);
+		SystemConf::getInstance()->saveSystemConf();
+	}
+	// KNULLI - QUICK RESUME MODE <<<
+
 	AudioManager::getInstance()->deinit();
 	VolumeControl::getInstance()->deinit();
 
