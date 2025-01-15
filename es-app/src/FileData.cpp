@@ -757,8 +757,8 @@ bool FileData::launchGame(Window* window, LaunchGameOptions options)
 	Scripting::fireEvent("game-end");
 	
 	// KNULLI: QUICK RESUME MODE >>>>>
-	logMessage.append("Now exiting game. processing quick resume settings.");
 	bool shuttingDown = Utils::FileSystem::exists("/var/run/shutdown.flag");
+	logMessage.append("Now exiting game. processing quick resume settings. shuttingDown is: " + shuttingDown);
 
 	if (quickResume && !shuttingDown)
 	{
