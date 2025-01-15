@@ -440,7 +440,10 @@ void launchStartupGame()
 
 void postLaunchStartupGame()
 {
-	if (SystemConf::getInstance()->getBool("global.quickresume") == true)
+	bool shutdownFlag = Utils::FileSystem::exists("/var/run/shutdown.flag");
+	bool quickResumeEnabled = SystemConf::getInstance()->getBool("global.quickresume") == true;
+
+	if (!shutdownFlag && quickResumeEnabled)
 	{
 		SystemConf::getInstance()->set("global.bootgame.path", "");
 		SystemConf::getInstance()->set("global.bootgame.cmd", "");
