@@ -37,7 +37,7 @@
 using namespace Utils::Platform;
 
 // KNULLI - QUICK RESUME MODE - logging will be cleaned up after testing >>>>>
-// const std::string logFile = "/userdata/system/logs/quick-resume.log";
+const std::string logFile = "/userdata/system/logs/quick-resume.log";
 // KNULLI - QUICK RESUME MODE <<<<<
 
 static std::map<std::string, std::function<BindableProperty(FileData*)>> properties =
@@ -700,7 +700,8 @@ bool FileData::launchGame(Window* window, LaunchGameOptions options)
 	if (command.empty())
 		return false;
 
-	// KNULLI - QUICK RESUME MODE - logging will be cleaned up after testing >>>>>
+	// KNULLI - QUICK RESUME MODE >>>>>
+	std::string logMessage;
 	bool quickResume = SystemConf::getInstance()->getBool("global.quickresume") == true;
 	std::string quickResumeCommand = getlaunchCommand(false);
 	std::string quickResumePath = getFullPath();
@@ -712,8 +713,6 @@ bool FileData::launchGame(Window* window, LaunchGameOptions options)
 		SystemConf::getInstance()->set("global.bootgame.cmd", quickResumeCommand);
 		SystemConf::getInstance()->saveSystemConf();
 	}
-
-	// Utils::FileSystem:: writeAllText("/var/run/game_running.flag");
 	// KNULLI - QUICK RESUME MODE <<<<<
 
 	AudioManager::getInstance()->deinit();
@@ -755,26 +754,13 @@ bool FileData::launchGame(Window* window, LaunchGameOptions options)
 	if (!p2kConv.empty()) // delete .keys file if it has been converted from p2k
 		Utils::FileSystem::removeFile(p2kConv);
 
-	// KNULLI: QUICK RESUME MODE - logging will be cleaned up after testing >>>
-	// Utils::FileSystem::removeFile("/var/run/game_running.flag");
-
-	std::string logFile = "/userdata/system/logs/quick-resume.log";
-	std::string logMessage = "";
+	Scripting::fireEvent("game-end");
+	
+	// KNULLI: QUICK RESUME MODE >>>>>
 	logMessage.append("Now exiting game. processing quick resume settings.");
+	bool shuttingDown = Utils::FileSystem::exists("/var/run/shutdown.flag");
 
-	if (!quickResume)
-	{
-		// quick resume is not enabled, not preserving  batocera.conf settings
-		LOG(LogInfo) << "Quick resume not enabled. Ignoring global.bootgame settings in batoecera.conf.";
-		logMessage.append("Quick resume not enabled. Ignoring global.bootgame settings in batoecera.conf.");
-	}
-	else if (Utils::FileSystem::exists("/var/run/shutdown.flag"))
-	{
-		// exiting due to power event - preserving batocera.conf settings for global.bootgame command and path
-		LOG(LogInfo) << "Quick Resume enabled and shutting down in-game. Preserved global.bootgame settings in batocera.conf.";
-		logMessage.append("Quick Resume enabled and shutting down in-game. Preserved global.bootgame settings in batocera.conf.");
-	}
-	else
+	if (quickResume && !shuttingDown)
 	{
 		// exiting game normally, reset the batocera.conf settings for global.bootgame command and path
 		SystemConf::getInstance()->set("global.bootgame.path", "");
@@ -782,17 +768,21 @@ bool FileData::launchGame(Window* window, LaunchGameOptions options)
 		SystemConf::getInstance()->saveSystemConf();
 
 		// log the output
-		LOG(LogInfo) << "Quick resume enabled and not shutting down in-game. Cleared global.bootgame settings from batocera.conf.";
-		logMessage.append("Quick resume enabled and not shutting down in-game. Cleared global.bootgame settings from batocera.conf.");
+		LOG(LogInfo) << "Quick resume enabled and not shutting down (in-game). Cleared global.bootgame settings from batocera.conf.";
+		logMessage.append("Quick resume enabled and not shutting down (in-game). Cleared global.bootgame settings from batocera.conf.");
 	}
+	else
+	{
+		LOG(LogInfo) << "Preserved global.bootgame settings in batocera.conf.";
+		logMessage.append("Preserved global.bootgame settings in batocera.conf.");
+	}
+
 
 	// write out the debug log to assist with testing
 	std::string existingLog = Utils::FileSystem::readAllText(logFile).append("\n");
 	Utils::FileSystem::writeAllText(logFile, existingLog.append(logMessage));
-	// KNULLI - QUICK RESUME MODE <<<
+	// KNULLI - QUICK RESUME MODE <<<<<
 
-	Scripting::fireEvent("game-end");
-	
 	if (!hideWindow && Settings::getInstance()->getBool("HideWindowFullReinit"))
 	{
 		ResourceManager::getInstance()->reloadAll();
