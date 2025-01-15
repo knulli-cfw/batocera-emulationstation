@@ -531,7 +531,7 @@ int main(int argc, char* argv[])
 	if(enable_startup_game) {
 	    // Run boot game, before Window Create for linux
 	    launchStartupGame();
-		postLauchStartupGame();
+		postLaunchStartupGame();
 	}
 #endif
 
