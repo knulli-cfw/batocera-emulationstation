@@ -1238,57 +1238,57 @@ void GuiMenu::openUpdatesSettings()
 		});
 	}
 
-	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::UPGRADE))
-	{
-		updateGui->addGroup(_("SOFTWARE UPDATES"));
+// 	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::UPGRADE))
+// 	{
+// 		updateGui->addGroup(_("SOFTWARE UPDATES"));
 
 		// Enable updates
-		updateGui->addSwitch(_("CHECK FOR UPDATES"), "updates.enabled", false);
+// 		updateGui->addSwitch(_("CHECK FOR UPDATES"), "updates.enabled", false);
 
-		auto updatesTypeList = std::make_shared<OptionListComponent<std::string> >(mWindow, _("UPDATE TYPE"), false);
+// 		auto updatesTypeList = std::make_shared<OptionListComponent<std::string> >(mWindow, _("UPDATE TYPE"), false);
 
-#if BATOCERA
-#define BETA_NAME "butterfly"
-#else
-#define BETA_NAME "beta"
-#endif
+// #if BATOCERA
+// #define BETA_NAME "butterfly"
+// #else
+// #define BETA_NAME "beta"
+// #endif
 
-		std::string updatesType = SystemConf::getInstance()->get("updates.type");
+// 		std::string updatesType = SystemConf::getInstance()->get("updates.type");
 
-#if WIN32
-		if (updatesType == "unstable")
-			updatesTypeList->add("unstable", "unstable", updatesType == "unstable");
-		else
-#endif
-			if (updatesType.empty() || updatesType != BETA_NAME)
-				updatesType = "stable";
+// #if WIN32
+// 		if (updatesType == "unstable")
+// 			updatesTypeList->add("unstable", "unstable", updatesType == "unstable");
+// 		else
+// #endif
+// 			if (updatesType.empty() || updatesType != BETA_NAME)
+// 				updatesType = "stable";
 
-		updatesTypeList->add("stable", "stable", updatesType == "stable");
-		updatesTypeList->add(BETA_NAME, BETA_NAME, updatesType == BETA_NAME);
+// 		updatesTypeList->add("stable", "stable", updatesType == "stable");
+// 		updatesTypeList->add(BETA_NAME, BETA_NAME, updatesType == BETA_NAME);
 
-		updateGui->addWithLabel(_("UPDATE TYPE"), updatesTypeList);
-		updatesTypeList->setSelectedChangedCallback([](std::string name)
-		{
-			if (SystemConf::getInstance()->set("updates.type", name))
-				SystemConf::getInstance()->saveSystemConf();
-		});
+// 		updateGui->addWithLabel(_("UPDATE TYPE"), updatesTypeList);
+// 		updatesTypeList->setSelectedChangedCallback([](std::string name)
+// 		{
+// 			if (SystemConf::getInstance()->set("updates.type", name))
+// 				SystemConf::getInstance()->saveSystemConf();
+// 		});
 
 		// Start update
-		updateGui->addEntry(GuiUpdate::state == GuiUpdateState::State::UPDATE_READY ? _("APPLY UPDATE") : _("START UPDATE"), true, [this]
-		{
-			if (GuiUpdate::state == GuiUpdateState::State::UPDATE_READY)
-				Utils::Platform::quitES(Utils::Platform::QuitMode::RESTART);
-			else if (GuiUpdate::state == GuiUpdateState::State::UPDATER_RUNNING)
-				mWindow->pushGui(new GuiMsgBox(mWindow, _("UPDATER IS ALREADY RUNNING")));
-			else
-			{
-				if (!checkNetwork())
-					return;
+// 		updateGui->addEntry(GuiUpdate::state == GuiUpdateState::State::UPDATE_READY ? _("APPLY UPDATE") : _("START UPDATE"), true, [this]
+// 		{
+// 			if (GuiUpdate::state == GuiUpdateState::State::UPDATE_READY)
+// 				Utils::Platform::quitES(Utils::Platform::QuitMode::RESTART);
+// 			else if (GuiUpdate::state == GuiUpdateState::State::UPDATER_RUNNING)
+// 				mWindow->pushGui(new GuiMsgBox(mWindow, _("UPDATER IS ALREADY RUNNING")));
+// 			else
+// 			{
+// 				if (!checkNetwork())
+// 					return;
 
-				mWindow->pushGui(new GuiUpdate(mWindow));
-			}
-		});
-	}
+// 				mWindow->pushGui(new GuiUpdate(mWindow));
+// 			}
+// 		});
+// 	}
 
 	mWindow->pushGui(updateGui);
 }
