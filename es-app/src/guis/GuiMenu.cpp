@@ -1674,46 +1674,46 @@ void GuiMenu::openSystemSettings()
 	});
 
 	// splash
-	auto optionsSplash = std::make_shared<OptionListComponent<std::string> >(mWindow, _("BOOT SPLASH"), false);
+	// auto optionsSplash = std::make_shared<OptionListComponent<std::string> >(mWindow, _("BOOT SPLASH"), false);
 
-	std::string enabledSplash = SystemConf::getInstance()->get("splash.screen.enabled");
-	std::string soundSplash   = SystemConf::getInstance()->get("splash.screen.sound");
+	// std::string enabledSplash = SystemConf::getInstance()->get("splash.screen.enabled");
+	// std::string soundSplash   = SystemConf::getInstance()->get("splash.screen.sound");
 
-	std::string selectedSplash = "auto";
-	if(enabledSplash == "1") {
-	  selectedSplash = "splash";
-	  if(soundSplash   == "0") selectedSplash = "silentsplash";
-	} else {
-	  if(enabledSplash == "0") selectedSplash = "nosplash";
-	}
+	// std::string selectedSplash = "auto";
+	// if(enabledSplash == "1") {
+	//   selectedSplash = "splash";
+	//   if(soundSplash   == "0") selectedSplash = "silentsplash";
+	// } else {
+	//   if(enabledSplash == "0") selectedSplash = "nosplash";
+	// }
 
-	optionsSplash->add(_("AUTO"), "auto", selectedSplash == "auto");
-	optionsSplash->add(_("DEFAULT VIDEO/USER SET SPLASH"), "splash",       selectedSplash == "splash");
-	optionsSplash->add(_("SILENT VIDEO/USER SET SPLASH"),  "silentsplash", selectedSplash == "silentsplash");
-	optionsSplash->add(_("BATOCERA SPLASH IMAGE"),         "nosplash",     selectedSplash == "nosplash");
+	// optionsSplash->add(_("AUTO"), "auto", selectedSplash == "auto");
+	// optionsSplash->add(_("DEFAULT VIDEO/USER SET SPLASH"), "splash",       selectedSplash == "splash");
+	// optionsSplash->add(_("SILENT VIDEO/USER SET SPLASH"),  "silentsplash", selectedSplash == "silentsplash");
+	// optionsSplash->add(_("BATOCERA SPLASH IMAGE"),         "nosplash",     selectedSplash == "nosplash");
 
-	s->addWithLabel(_("SPLASH SETTING"), optionsSplash);
+	// s->addWithLabel(_("SPLASH SETTING"), optionsSplash);
 
-	s->addSaveFunc([this, optionsSplash, selectedSplash]
-	{
-	  if (optionsSplash->changed()) {
-	    if(optionsSplash->getSelected() == "auto") {
-	      SystemConf::getInstance()->set("splash.screen.enabled", "");
-	    } else {
-	      if(optionsSplash->getSelected() == "nosplash") {
-		SystemConf::getInstance()->set("splash.screen.enabled", "0");
-	      } else {
-		SystemConf::getInstance()->set("splash.screen.enabled", "1");
-		if(optionsSplash->getSelected() == "silentsplash") {
-		  SystemConf::getInstance()->set("splash.screen.sound", "0");
-		} else {
-		  SystemConf::getInstance()->set("splash.screen.sound", "1");
-		}
-	      }
-	    }
-	    SystemConf::getInstance()->saveSystemConf();
-	  }
-	});
+	// s->addSaveFunc([this, optionsSplash, selectedSplash]
+	// {
+	//   if (optionsSplash->changed()) {
+	//     if(optionsSplash->getSelected() == "auto") {
+	//       SystemConf::getInstance()->set("splash.screen.enabled", "");
+	//     } else {
+	//       if(optionsSplash->getSelected() == "nosplash") {
+	// 	SystemConf::getInstance()->set("splash.screen.enabled", "0");
+	//       } else {
+	// 	SystemConf::getInstance()->set("splash.screen.enabled", "1");
+	// 	if(optionsSplash->getSelected() == "silentsplash") {
+	// 	  SystemConf::getInstance()->set("splash.screen.sound", "0");
+	// 	} else {
+	// 	  SystemConf::getInstance()->set("splash.screen.sound", "1");
+	// 	}
+	//       }
+	//     }
+	//     SystemConf::getInstance()->saveSystemConf();
+	//   }
+	// });
 #else
 	if (!ApiSystem::getInstance()->isScriptingSupported(ApiSystem::GAMESETTINGS))
 	{
