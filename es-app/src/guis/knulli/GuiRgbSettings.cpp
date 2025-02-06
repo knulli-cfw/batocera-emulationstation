@@ -116,17 +116,25 @@ std::shared_ptr<OptionListComponent<std::string>> GuiRgbSettings::createModeOpti
     optionsLedMode->add(_("NONE"), "0", selectedLedMode == "0");
     if (isH700 || isA133) {
         optionsLedMode->add(_("STATIC"), "1", selectedLedMode == "1");
+    } else if (selectedLedMode == "1") {
+        selectedLedMode = DEFAULT_LED_MODE;
     }
     if (isH700) {
         optionsLedMode->add(_("BREATHING (FAST)"), "2", selectedLedMode == "2");
+    } else if (selectedLedMode == "2") {
+        selectedLedMode = DEFAULT_LED_MODE;
     }
     if (isH700 || isA133) {
         optionsLedMode->add(_("BREATHING (MEDIUM)"), "3", selectedLedMode == "3");
+    } else if (selectedLedMode == "3") {
+        selectedLedMode = DEFAULT_LED_MODE;
     }
     if (isH700) {
         optionsLedMode->add(_("BREATHING (SLOW)"), "4", selectedLedMode == "4");
         optionsLedMode->add(_("SINGLE RAINBOW"), "5", selectedLedMode == "5");
         optionsLedMode->add(_("MULTI RAINBOW"), "6", selectedLedMode == "6");
+    } else  if (selectedLedMode == "4" || selectedLedMode == "5" || selectedLedMode == "6") {
+        selectedLedMode = DEFAULT_LED_MODE;
     }
 
     addWithDescription(_("MODE"), _("Set the default LED animation. (Not all of the settings below are applicable to every mode.)"), optionsLedMode);
