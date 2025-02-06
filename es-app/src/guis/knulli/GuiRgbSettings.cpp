@@ -203,7 +203,7 @@ std::array<float, 3> GuiRgbSettings::getRgbValues()
     int green = std::stoi(rgbValues[1]);
     int blue = std::stoi(rgbValues[2]);
 
-    return {red, green, blue};
+    return { static_cast<float>(red), static_cast<float>(green), static_cast<float>(blue) };
 }
 
 // Concatenates the RGB values and stores them in batocera.conf.
