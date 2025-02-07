@@ -1804,8 +1804,6 @@ std::vector<std::string> ApiSystem::extractPdfImages(const std::string& fileName
 		int hardWareCoreCount = std::thread::hardware_concurrency();
 		if (hardWareCoreCount > 1)
 		{
-			int lastTime = SDL_GetTicks();
-
 			int numberOfPagesToProcess = 1;
 			if (hardWareCoreCount < 8)
 				numberOfPagesToProcess = 2;
@@ -1819,9 +1817,6 @@ std::vector<std::string> ApiSystem::extractPdfImages(const std::string& fileName
 					pool.queueWorkItem([this, fileName, i, numberOfPagesToProcess] { extractPdfImages(fileName, i + 1, numberOfPagesToProcess); });
 
 				pool.wait();
-
-				int time = SDL_GetTicks() - lastTime;
-				std::string timeText = std::to_string(time) + "ms";
 
 				for (auto file : Utils::FileSystem::getDirContent(pdfFolder, false))
 				{
@@ -1838,8 +1833,6 @@ std::vector<std::string> ApiSystem::extractPdfImages(const std::string& fileName
 			return ret;
 		}
 	}
-
-	int lastTime = SDL_GetTicks();
 
 	std::string page;
 
@@ -1867,9 +1860,6 @@ std::vector<std::string> ApiSystem::extractPdfImages(const std::string& fileName
 	executeEnumerationScript("pdftoppm -jpeg -r "+ squality +" -cropbox" + page + " \"" + fileName + "\" \"" + pdfFolder + "/" + prefix + "\"");
 #endif
 
-	int time = SDL_GetTicks() - lastTime;
-	std::string text = std::to_string(time);
-	
 	for (auto file : Utils::FileSystem::getDirContent(pdfFolder, false))
 	{
 		auto ext = Utils::String::toLower(Utils::FileSystem::getExtension(file));
@@ -1885,7 +1875,6 @@ std::vector<std::string> ApiSystem::extractPdfImages(const std::string& fileName
 	std::sort(ret.begin(), ret.end());
 	return ret;
 }
-
 
 std::vector<PacmanPackage> ApiSystem::getBatoceraStorePackages()
 {

@@ -1200,7 +1200,7 @@ void ViewController::reloadAll(Window* window, bool reloadTheme)
 
 	if (gameListCount > 0)
 	{
-		int lastTime = SDL_GetTicks() - 50;
+        auto lastTime = std::chrono::system_clock::now() - std::chrono::milliseconds(50);
 
 		if (window)
 			window->renderSplashScreen(_("Loading gamelists"), 0.0f);
@@ -1222,10 +1222,11 @@ void ViewController::reloadAll(Window* window, bool reloadTheme)
 			
 			idx++;
 
-			int time = SDL_GetTicks();
-			if (window && time - lastTime >= 20)
+            auto now = std::chrono::system_clock::now();
+
+			if (window && std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTime).count() >= 20)
 			{
-				lastTime = time;
+				lastTime = now;
 				window->renderSplashScreen(_("Loading gamelists"), (float)idx / (float)gameListCount);
 			}
 		}

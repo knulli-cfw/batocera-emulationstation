@@ -358,7 +358,7 @@ void VideoComponent::handleStartDelay()
 		return;
 
 	// Timeout not yet completed
-	if (mStartTime > SDL_GetTicks())
+	if (mStartTime > std::chrono::steady_clock::now())
 		return;
 
 	// Completed
@@ -421,7 +421,7 @@ void VideoComponent::startVideoWithDelay()
 		// Configure the start delay
 		mStartDelayed = true;
 		mFadeIn = 0.0f;
-		mStartTime = SDL_GetTicks() + mConfig.startDelay;
+		mStartTime = std::chrono::steady_clock::now() + std::chrono::milliseconds(mConfig.startDelay);
 	}
 }
 
@@ -436,10 +436,10 @@ void VideoComponent::update(int deltaTime)
 
 		if (mStartDelayed)
 		{
-			Uint32 ticks = SDL_GetTicks();
-			if (mStartTime > ticks)
+            auto now = std::chrono::steady_clock::now();
+			if (mStartTime > now)
 			{
-				Uint32 diff = mStartTime - ticks;
+				Uint32 diff = std::chrono::duration_cast<std::chrono::milliseconds>(mStartTime - now).count();
 				if (diff < FADE_TIME_MS)
 				{
 					mFadeIn = (float)diff / (float)FADE_TIME_MS;
