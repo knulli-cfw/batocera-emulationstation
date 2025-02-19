@@ -202,6 +202,7 @@ GuiControllersSettings::GuiControllersSettings(Window* wnd, int autoSel) : GuiSe
 		addSwitch(_("SHOW CONTROLLER BATTERY LEVEL"), "ShowControllerBattery", true);
 
 #ifndef KNULLI
+	addSwitch(_("DRAW GUN CROSSHAIR"), "DrawGunCrosshair", true);
 	addGroup(controllers_group_label);
 
 	// Here we go; for each player
