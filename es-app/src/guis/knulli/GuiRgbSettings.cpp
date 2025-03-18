@@ -75,7 +75,7 @@ GuiRgbSettings::GuiRgbSettings(Window* window) : GuiSettings(window, _("RGB LED 
     addGroup(_("BATTERY CHARGE INDICATION"));
 
     // Low battery threshold slider
-    sliderLowBatteryThreshold = createSlider("LOW BATTERY THRESHOLD", 1.f, 100.f, 5.f, "%", "Show yellow/red breathing when battery is below this threshold. Set to 0 to disable.", (isH700 || isA133));
+    sliderLowBatteryThreshold = createSlider("LOW BATTERY THRESHOLD", 0.f, 100.f, 5.f, "%", "Show yellow/red breathing when battery is below this threshold. Set to 0 to disable.", (isH700 || isA133));
     setConfigValueForSlider(sliderLowBatteryThreshold, DEFAULT_LOW_BATTERY_THRESHOLD, "led.battery.low");
     switchBatteryCharging = createSwitch("BATTERY CHARGING", "led.battery.charging", "Show green breathing while device is charging.", (isH700 || isA133));
 

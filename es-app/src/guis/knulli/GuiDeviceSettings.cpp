@@ -17,8 +17,11 @@
 #include <algorithm>
 #include "utils/Platform.h"
 #include "BoardCheck.h"
+#include "UsbService.h"
 
 const std::vector<std::string> SUPPORTED_RGB_BOARDS = {"rg40xx-h", "rg40xx-v", "rg-cubexx", "trimui-smart-pro", "trimui-brick"};
+
+constexpr const char* DEFAULT_USB_MODE = "off";
 
 GuiDeviceSettings::GuiDeviceSettings(Window* window) : GuiSettings(window, _("DEVICE SETTINGS").c_str())
 {
@@ -32,8 +35,27 @@ GuiDeviceSettings::GuiDeviceSettings(Window* window) : GuiSettings(window, _("DE
 		addGroup(_("NATIVE PICO-8"));
 		addEntry(_("INSTALL PICO-8"), true, [this] { installPico8(); });
 	}
-}
+	// Only add USB MODE options if USB service is available on this device.
+	if (UsbService::hasService()) {
+		addGroup(_("USB MODE"));
+		optionsUsbMode = createUsbModeOptionList();
 
+		addSaveFunc([this] {		
+			// Set the USB mode in batocera.conf
+			SystemConf::getInstance()->set("system.usbmode", optionsUsbMode->getSelected());
+			SystemConf::getInstance()->saveSystemConf();
+
+			if (optionsUsbMode->getSelected() == "off") {
+				// Deactivate the USB Service
+				UsbService::stop();
+			} else {
+				// Reactivate the USB Service
+				UsbService::restart();	
+			}
+		});
+	}
+	
+}
 
 void GuiDeviceSettings::openPowerManagementSettings()
 {
@@ -55,4 +77,21 @@ void GuiDeviceSettings::installPico8()
 	} else if(result == 2) {
 		mWindow->pushGui(new GuiMsgBox(mWindow, "Unable to install: Pico-8 installer files missing. Please download the Raspberry Pi version of Pico-8 and place the ZIP file in the roms/pico8 folder and try again.", "OK", nullptr));
 	}
+}
+
+// Creates a new mode option list
+std::shared_ptr<OptionListComponent<std::string>> GuiDeviceSettings::createUsbModeOptionList()
+{
+    auto optionsUsbMode = std::make_shared<OptionListComponent<std::string>>(mWindow, _("USB MODE"), false);
+
+    std::string selectedUsbMode = SystemConf::getInstance()->get("system.usbmode");
+    if (selectedUsbMode.empty())
+        selectedUsbMode = DEFAULT_USB_MODE;
+
+	optionsUsbMode->add(_("OFF"), "off", selectedUsbMode == "off");
+	optionsUsbMode->add(_("ADB"), "adb", selectedUsbMode == "adb");
+	optionsUsbMode->add(_("MTP"), "mtp", selectedUsbMode == "mtp");
+
+    addWithDescription(_("USB MODE"), _("Set the USB mode to access your device."), optionsUsbMode);
+    return optionsUsbMode;
 }
