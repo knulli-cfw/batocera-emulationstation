@@ -14,9 +14,9 @@
 #include <SDL_events.h>
 #include <algorithm>
 #include "utils/Platform.h"
-#include "BoardCheck.h"
+#include "CapabilityCheck.h"
 
-const std::vector<std::string> SUPPORTED_LID_BOARDS = {"rg35xx-sp"};
+const std::string LID_CAPABILITY = "lid";
 
 GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSettings(window, _("POWER MANAGEMENT").c_str())
 {
@@ -88,7 +88,7 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 	// Lid close mode
 	auto optionsLidCloseMode = std::make_shared<OptionListComponent<std::string> >(mWindow, _("LID CLOSE MODE"), false);
 	// TODO: do not even instantiate if lid is not supported
-	if (BoardCheck::isBoard(SUPPORTED_LID_BOARDS)) {
+	if (CapabilityCheck::hasCapability(LID_CAPABILITY)) {
 		std::string selectedLidCloseMode = SystemConf::getInstance()->get("system.lid");
 		if (selectedLidCloseMode.empty())
 			selectedLidCloseMode = "suspend";
@@ -109,7 +109,7 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 		SystemConf::getInstance()->set("system.batterysaver.extendedtimer", std::to_string(newBatterySaverExtendedTimeSeconds));
 		SystemConf::getInstance()->set("system.batterysaver.extendedmode", optionsBatterySaveExtendedMode->getSelected());
 		SystemConf::getInstance()->setBool("system.batterysaver.aggressive", aggressiveBatterySaveMode->getState());
-		if (BoardCheck::isBoard(SUPPORTED_LID_BOARDS)) {
+		if (CapabilityCheck::hasCapability(LID_CAPABILITY)) {
 			SystemConf::getInstance()->set("system.lid", optionsLidCloseMode->getSelected());
 		}
 		SystemConf::getInstance()->saveSystemConf();

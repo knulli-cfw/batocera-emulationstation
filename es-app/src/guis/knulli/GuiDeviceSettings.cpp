@@ -16,18 +16,17 @@
 #include <SDL_events.h>
 #include <algorithm>
 #include "utils/Platform.h"
-#include "BoardCheck.h"
+#include "CapabilityCheck.h"
 #include "UsbService.h"
 
-const std::vector<std::string> SUPPORTED_RGB_BOARDS = {"rg40xx-h", "rg40xx-v", "rg-cubexx", "trimui-smart-pro", "trimui-brick"};
-
+const std::string RGB_CAPABILITY = "rgb";
 constexpr const char* DEFAULT_USB_MODE = "off";
 
 GuiDeviceSettings::GuiDeviceSettings(Window* window) : GuiSettings(window, _("DEVICE SETTINGS").c_str())
 {
 	addGroup(_("POWER SAVING AND BATTERY LIFE"));
 	addEntry(_("POWER MANAGEMENT"), true, [this] { openPowerManagementSettings(); });
-	if(BoardCheck::isBoard(SUPPORTED_RGB_BOARDS)) {
+	if(CapabilityCheck::hasCapability(RGB_CAPABILITY)) {
 		addGroup(_("DEVICE CUSTOMIZATION"));
 		addEntry(_("RGB LED SETTINGS"), true, [this] { openRgbLedSettings(); });
 	}
