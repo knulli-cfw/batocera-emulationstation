@@ -16,11 +16,19 @@
 #include <SDL_events.h>
 #include <algorithm>
 #include "utils/Platform.h"
+#include "BoardCheck.h"
 #include "CapabilityCheck.h"
 #include "UsbService.h"
 
 const std::string RGB_CAPABILITY = "rgb";
+const std::string ADB_CAPABILITY = "adb";
+const std::string MTP_CAPABILITY = "mtp";
+
+const std::vector<std::string> BOARD_TRIMUI_BRICK = {"trimui-brick"};
+
+
 constexpr const char* DEFAULT_USB_MODE = "off";
+constexpr const char* DEFAULT_BRICK_SWITCH_MODE = "mute";
 
 GuiDeviceSettings::GuiDeviceSettings(Window* window) : GuiSettings(window, _("DEVICE SETTINGS").c_str())
 {
@@ -35,7 +43,7 @@ GuiDeviceSettings::GuiDeviceSettings(Window* window) : GuiSettings(window, _("DE
 		addEntry(_("INSTALL PICO-8"), true, [this] { installPico8(); });
 	}
 	// Only add USB MODE options if USB service is available on this device.
-	if (UsbService::hasService()) {
+	if (UsbService::hasService() && (CapabilityCheck::hasCapability(ADB_CAPABILITY) || CapabilityCheck::hasCapability(MTP_CAPABILITY))) {
 		addGroup(_("USB MODE"));
 		optionsUsbMode = createUsbModeOptionList();
 
@@ -52,6 +60,17 @@ GuiDeviceSettings::GuiDeviceSettings(Window* window) : GuiSettings(window, _("DE
 				UsbService::restart();	
 			}
 		});
+	}
+	if(BoardCheck::isBoard(BOARD_TRIMUI_BRICK)) {
+		addGroup(_("TRIMUI BRICK OPTIONS"));
+		optionsBrickSwitchMode = createBrickSwitchModeOptionList();
+
+		addSaveFunc([this] {
+			// Set the Brick Switch mode in batocera.conf
+			SystemConf::getInstance()->set("system.brickswitch.mode", optionsBrickSwitchMode->getSelected());
+			SystemConf::getInstance()->saveSystemConf();
+		});
+
 	}
 	
 }
@@ -78,7 +97,7 @@ void GuiDeviceSettings::installPico8()
 	}
 }
 
-// Creates a new mode option list
+// Creates a new USB mode option list
 std::shared_ptr<OptionListComponent<std::string>> GuiDeviceSettings::createUsbModeOptionList()
 {
     auto optionsUsbMode = std::make_shared<OptionListComponent<std::string>>(mWindow, _("USB MODE"), false);
@@ -88,9 +107,30 @@ std::shared_ptr<OptionListComponent<std::string>> GuiDeviceSettings::createUsbMo
         selectedUsbMode = DEFAULT_USB_MODE;
 
 	optionsUsbMode->add(_("OFF"), "off", selectedUsbMode == "off");
-	optionsUsbMode->add(_("ADB"), "adb", selectedUsbMode == "adb");
-	optionsUsbMode->add(_("MTP"), "mtp", selectedUsbMode == "mtp");
+	if (CapabilityCheck::hasCapability(ADB_CAPABILITY)) {
+		optionsUsbMode->add(_("ADB"), "adb", selectedUsbMode == "adb");
+	}
+	if (CapabilityCheck::hasCapability(MTP_CAPABILITY)) {
+		optionsUsbMode->add(_("MTP"), "mtp", selectedUsbMode == "mtp");
+	}
 
     addWithDescription(_("USB MODE"), _("Set the USB mode to access your device."), optionsUsbMode);
     return optionsUsbMode;
+}
+
+// Creates a new Brick switch mode option list.
+std::shared_ptr<OptionListComponent<std::string>> GuiDeviceSettings::createBrickSwitchModeOptionList()
+{
+    auto optionsBrickSwitchMode = std::make_shared<OptionListComponent<std::string>>(mWindow, _("SWITCH MODE"), false);
+
+    std::string selectedBrickSwitchMode = SystemConf::getInstance()->get("system.brickswitch.mode");
+    if (selectedBrickSwitchMode.empty())
+        selectedBrickSwitchMode = DEFAULT_BRICK_SWITCH_MODE;
+
+	optionsBrickSwitchMode->add(_("MUTE/UNMUTE"), "mute", selectedBrickSwitchMode == "mute");
+	optionsBrickSwitchMode->add(_("RGB ON/OFF"), "rgboff", selectedBrickSwitchMode == "rgboff");
+	optionsBrickSwitchMode->add(_("AIRPLANE MODE ON/OFF"), "airplane", selectedBrickSwitchMode == "airplane");
+
+    addWithDescription(_("SWITCH MODE"), _("Decide what to use the switch of your device for."), optionsBrickSwitchMode);
+    return optionsBrickSwitchMode;
 }
