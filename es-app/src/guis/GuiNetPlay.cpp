@@ -38,6 +38,7 @@
 #endif
 
 #define WINDOW_WIDTH (float)Math::min(Renderer::getScreenHeight() * 1.125f, Renderer::getScreenWidth() * 0.90f)
+#define NETPLAY_LOBBY_FAIL_GRACE_MS	(100)
 
 // http://lobby.libretro.com/list/
 // Core list :
@@ -286,6 +287,7 @@ void GuiNetPlay::startRequest()
 		netPlayLobby = "http://lobby.libretro.com/list/";
 
 	mLobbyRequest = std::unique_ptr<HttpReq>(new HttpReq(netPlayLobby));
+	mLobbyGracePeriodElapsed = 0;
 }
 
 void GuiNetPlay::update(int deltaTime)
@@ -301,6 +303,10 @@ void GuiNetPlay::update(int deltaTime)
 	if (!mLobbyRequest)
 		return;
 
+	mLobbyGracePeriodElapsed += deltaTime;
+	if (mLobbyGracePeriodElapsed < NETPLAY_LOBBY_FAIL_GRACE_MS)
+		return;
+
 	auto status = mLobbyRequest->status();
 	if (status == HttpReq::REQ_IN_PROGRESS)
 	{
@@ -311,7 +317,7 @@ void GuiNetPlay::update(int deltaTime)
 	if (status == HttpReq::REQ_SUCCESS)
 		populateFromJson(mLobbyRequest->getContent());
 
-	if (status != HttpReq::REQ_SUCCESS)
+	if (status != HttpReq::REQ_SUCCESS && mList->size() == 0)
 		mWindow->pushGui(new GuiMsgBox(mWindow, _("FAILED") + std::string(" : ") + mLobbyRequest->getErrorMsg()));
 
 	if (mList->size() != 0)
@@ -964,7 +970,10 @@ bool GuiNetPlay::populateFromLan()
 		game.coreExists = coreExists(file, game.core_name);
 
 		if (!std::any_of(mLanEntries.cbegin(), mLanEntries.cend(), [game](const LobbyAppEntry& entry) { return entry.country == "lan" && entry.ip == game.ip && entry.port == game.port && entry.username == game.username && entry.game_crc == game.game_crc; }))
+		{
 			mLanEntries.push_back(std::move(game));
+			changed = true;
+		}
 	}
 
 	if (changed)

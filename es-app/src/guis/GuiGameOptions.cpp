@@ -175,7 +175,7 @@ GuiGameOptions::GuiGameOptions(Window* window, FileData* game) : GuiComponent(wi
 
 				msgBox->addEntry(_U("\uF144 ") + _("HOST A NETPLAY GAME"), false, [window, msgBox, game]
 				{
-					if (ApiSystem::getInstance()->getIpAdress() == "NOT CONNECTED")
+					if (ApiSystem::getInstance()->getIpAdress() == "NOT CONNECTED" && !SystemConf::getInstance()->getBool("global.netplay.hotspot"))
 					{
 						window->pushGui(new GuiMsgBox(window, _("YOU ARE NOT CONNECTED TO A NETWORK"), _("OK"), nullptr));
 						return;

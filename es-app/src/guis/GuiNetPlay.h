@@ -110,6 +110,7 @@ private:
 	BusyComponent					mBusyAnim;
 
 	std::unique_ptr<HttpReq>		mLobbyRequest;
+	int								mLobbyGracePeriodElapsed;
 
 	std::vector<LobbyAppEntry>		mLanEntries;
 	std::vector<LobbyAppEntry>		mLobbyEntries;
