@@ -24,19 +24,30 @@ const std::string RGB_CAPABILITY = "rgb";
 const std::string ADB_CAPABILITY = "adb";
 const std::string MTP_CAPABILITY = "mtp";
 
-const std::vector<std::string> BOARD_TRIMUI_BRICK = {"trimui-brick"};
-
+const std::vector<std::string> BOARDS_WITH_TOGGLE_SWITCH = {"trimui-brick", "trimui-smart-pro"};
 
 constexpr const char* DEFAULT_USB_MODE = "off";
-constexpr const char* DEFAULT_BRICK_SWITCH_MODE = "mute";
+constexpr const char* DEFAULT_SWITCH_MODE = "mute";
 
 GuiDeviceSettings::GuiDeviceSettings(Window* window) : GuiSettings(window, _("DEVICE SETTINGS").c_str())
 {
 	addGroup(_("POWER SAVING AND BATTERY LIFE"));
 	addEntry(_("POWER MANAGEMENT"), true, [this] { openPowerManagementSettings(); });
-	if(CapabilityCheck::hasCapability(RGB_CAPABILITY)) {
+	if(CapabilityCheck::hasCapability(RGB_CAPABILITY) || BoardCheck::isBoard(BOARDS_WITH_TOGGLE_SWITCH)) {
 		addGroup(_("DEVICE CUSTOMIZATION"));
-		addEntry(_("RGB LED SETTINGS"), true, [this] { openRgbLedSettings(); });
+		if(CapabilityCheck::hasCapability(RGB_CAPABILITY)) {
+			addEntry(_("RGB LED SETTINGS"), true, [this] { openRgbLedSettings(); });
+		}
+		if(BoardCheck::isBoard(BOARDS_WITH_TOGGLE_SWITCH)) {
+			optionsToggleSwitchMode = createToggleSwitchModeOptionList();
+	
+			addSaveFunc([this] {
+				// Set the toggle Switch mode in batocera.conf
+				SystemConf::getInstance()->set("system.toggleswitch.mode", optionsToggleSwitchMode->getSelected());
+				SystemConf::getInstance()->saveSystemConf();
+			});
+	
+		}
 	}
 	if(Pico8Installer::hasInstaller()) {
 		addGroup(_("NATIVE PICO-8"));
@@ -61,18 +72,6 @@ GuiDeviceSettings::GuiDeviceSettings(Window* window) : GuiSettings(window, _("DE
 			}
 		});
 	}
-	if(BoardCheck::isBoard(BOARD_TRIMUI_BRICK)) {
-		addGroup(_("TRIMUI BRICK OPTIONS"));
-		optionsBrickSwitchMode = createBrickSwitchModeOptionList();
-
-		addSaveFunc([this] {
-			// Set the Brick Switch mode in batocera.conf
-			SystemConf::getInstance()->set("system.brickswitch.mode", optionsBrickSwitchMode->getSelected());
-			SystemConf::getInstance()->saveSystemConf();
-		});
-
-	}
-	
 }
 
 void GuiDeviceSettings::openPowerManagementSettings()
@@ -118,19 +117,20 @@ std::shared_ptr<OptionListComponent<std::string>> GuiDeviceSettings::createUsbMo
     return optionsUsbMode;
 }
 
-// Creates a new Brick switch mode option list.
-std::shared_ptr<OptionListComponent<std::string>> GuiDeviceSettings::createBrickSwitchModeOptionList()
+// Creates a new toggle switch mode option list.
+std::shared_ptr<OptionListComponent<std::string>> GuiDeviceSettings::createToggleSwitchModeOptionList()
 {
-    auto optionsBrickSwitchMode = std::make_shared<OptionListComponent<std::string>>(mWindow, _("SWITCH MODE"), false);
+    auto optionsToggleSwitchMode = std::make_shared<OptionListComponent<std::string>>(mWindow, _("TOGGLE SWITCH MODE"), false);
 
-    std::string selectedBrickSwitchMode = SystemConf::getInstance()->get("system.brickswitch.mode");
-    if (selectedBrickSwitchMode.empty())
-        selectedBrickSwitchMode = DEFAULT_BRICK_SWITCH_MODE;
+    std::string selectedToggleSwitchMode = SystemConf::getInstance()->get("system.toggleswitch.mode");
+    if (selectedToggleSwitchMode.empty()) {
+		selectedToggleSwitchMode = DEFAULT_SWITCH_MODE;
+	}
 
-	optionsBrickSwitchMode->add(_("MUTE/UNMUTE"), "mute", selectedBrickSwitchMode == "mute");
-	optionsBrickSwitchMode->add(_("RGB ON/OFF"), "rgboff", selectedBrickSwitchMode == "rgboff");
-	optionsBrickSwitchMode->add(_("AIRPLANE MODE ON/OFF"), "airplane", selectedBrickSwitchMode == "airplane");
+	optionsToggleSwitchMode->add(_("MUTE/UNMUTE"), "mute", selectedToggleSwitchMode == "mute");
+	optionsToggleSwitchMode->add(_("RGB ON/OFF"), "rgboff", selectedToggleSwitchMode == "rgboff");
+	optionsToggleSwitchMode->add(_("AIRPLANE MODE ON/OFF"), "airplane", selectedToggleSwitchMode == "airplane");
 
-    addWithDescription(_("SWITCH MODE"), _("Decide what to use the switch of your device for."), optionsBrickSwitchMode);
-    return optionsBrickSwitchMode;
+    addWithDescription(_("TOGGLE SWITCH MODE"), _("Decide what to use the switch of your device for."), optionsToggleSwitchMode);
+    return optionsToggleSwitchMode;
 }
