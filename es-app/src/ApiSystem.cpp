@@ -1555,6 +1555,11 @@ std::vector<std::string> ApiSystem::getWifiNetworks(bool scan)
 	return executeEnumerationScript(scan ? "batocera-wifi scanlist" : "batocera-wifi list");
 }
 
+void ApiSystem::scanWifiNetworks()
+{
+	executeScript("batocera-wifi scanlist &");
+}
+
 std::string ApiSystem::getWifiRoute()
 {
 	std::vector<std::string> result = executeEnumerationScript("batocera-wifi getroute");
