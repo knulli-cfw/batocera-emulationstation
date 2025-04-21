@@ -131,9 +131,17 @@ std::shared_ptr<OptionListComponent<std::string>> GuiRgbSettings::createModeOpti
     }
     if (isH700) {
         optionsLedMode->add(_("BREATHING (SLOW)"), "4", selectedLedMode == "4");
+    } else if (selectedLedMode == "4") {
+        selectedLedMode = DEFAULT_LED_MODE;
+    }
+    if (isH700 || isA133) {
         optionsLedMode->add(_("SINGLE RAINBOW"), "5", selectedLedMode == "5");
+    } else if (selectedLedMode == "5") {
+        selectedLedMode = DEFAULT_LED_MODE;
+    }
+    if (isH700) {
         optionsLedMode->add(_("MULTI RAINBOW"), "6", selectedLedMode == "6");
-    } else  if (selectedLedMode == "4" || selectedLedMode == "5" || selectedLedMode == "6") {
+    } else if (selectedLedMode == "6") {
         selectedLedMode = DEFAULT_LED_MODE;
     }
 
