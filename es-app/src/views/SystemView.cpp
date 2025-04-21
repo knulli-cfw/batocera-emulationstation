@@ -28,7 +28,6 @@
 #include "BindingManager.h"
 #include "guis/GuiRetroAchievements.h"
 #include "components/CarouselComponent.h"
-#include "guis/GuiLoading.h"
 
 SystemView::SystemView(Window* window) : GuiComponent(window),
 	mViewNeedsReload(true),
@@ -376,45 +375,13 @@ void SystemView::showNetplay()
 	if (!SystemData::isNetplayActivated() && SystemConf::getInstance()->getBool("global.netplay"))
 		return;
 
-	if (ApiSystem::getInstance()->getIpAdress() != "NOT CONNECTED")
-	{
-		mWindow->pushGui(new GuiNetPlay(mWindow));
-		return;
-	}
-
-	if (!SystemConf::getInstance()->getBool("global.netplay.hotspot"))
+	if (ApiSystem::getInstance()->getIpAdress() == "NOT CONNECTED" && (!SystemConf::getInstance()->getBool("wifi.enabled") || !SystemConf::getInstance()->getBool("global.netplay.hotspot")))
 	{
 		mWindow->pushGui(new GuiMsgBox(mWindow, _("YOU ARE NOT CONNECTED TO A NETWORK"), _("OK"), nullptr));
 		return;
 	}
 
-	mWindow->pushGui(new GuiLoading<bool>(mWindow, _("SEARCHING FOR HOTSPOTS"),
-		[](auto gui)
-		{
-			ApiSystem::getInstance()->getWifiNetworks(true);
-
-			int retry = 200; // 20 seconds
-			do
-			{
-				if (ApiSystem::getInstance()->getWifiRoute() != "NOT CONNECTED")
-					return true;
-
-				std::this_thread::sleep_for(std::chrono::milliseconds(100));
-			} while (--retry > 0);
-
-			return false;
-		},
-		[this](bool connected)
-		{
-			if (!connected)
-			{
-				mWindow->pushGui(new GuiMsgBox(mWindow, _("NO HOTSPOTS FOUND"), _("OK"), nullptr));
-				return;
-			}
-
-			mWindow->pushGui(new GuiNetPlay(mWindow));
-		})
-	);
+	mWindow->pushGui(new GuiNetPlay(mWindow));
 }
 
 SystemData* SystemView::getSelected()

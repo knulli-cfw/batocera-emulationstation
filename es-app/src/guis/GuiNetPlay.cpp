@@ -164,6 +164,7 @@ static std::map<std::string, std::string> coreList =
 
 GuiNetPlay::GuiNetPlay(Window* window) 
 	: GuiComponent(window), 
+	mFindingHotspot(false),
 	mBusyAnim(window),
 	mBackground(window, ":/frame.png"),
 	mGrid(window, Vector2i(1, 3)),
@@ -198,7 +199,13 @@ GuiNetPlay::GuiNetPlay(Window* window)
 
 	// Buttons
 	std::vector< std::shared_ptr<ButtonComponent> > buttons;
-	buttons.push_back(std::make_shared<ButtonComponent>(mWindow, _("REFRESH"), _("REFRESH"), [this] { startRequest(); }));
+	buttons.push_back(std::make_shared<ButtonComponent>(mWindow, _("REFRESH"), _("REFRESH"), [this] 
+	{
+			if (ApiSystem::getInstance()->getIpAdress() != "NOT CONNECTED")
+				startRequest();
+			else if (SystemConf::getInstance()->getBool("wifi.enabled") && SystemConf::getInstance()->getBool("global.netplay.hotspot"))
+				findHotspot();
+	}));
 	buttons.push_back(std::make_shared<ButtonComponent>(mWindow, _("CLOSE"), _("CLOSE"), [this] { delete this; }));
 
 	mButtonGrid = makeButtonGrid(mWindow, buttons);
@@ -231,8 +238,11 @@ GuiNetPlay::GuiNetPlay(Window* window)
 
 	// Loading
     mBusyAnim.setSize(Vector2f(Renderer::getScreenWidth(), Renderer::getScreenHeight()));
-	mBusyAnim.setText(_("PLEASE WAIT"));
-	startRequest();
+	
+	if (ApiSystem::getInstance()->getIpAdress() != "NOT CONNECTED")
+		startRequest();
+	else if (SystemConf::getInstance()->getBool("wifi.enabled") && SystemConf::getInstance()->getBool("global.netplay.hotspot"))
+		findHotspot();
 }
 
 GuiNetPlay::~GuiNetPlay()
@@ -276,6 +286,8 @@ void GuiNetPlay::startRequest()
 	if (mLobbyRequest != nullptr)
 		return;
 
+	mBusyAnim.setText(_("PLEASE WAIT"));
+
 	mList->clear();
 	mLobbyEntries.clear();
 	mLanEntries.clear();
@@ -290,9 +302,28 @@ void GuiNetPlay::startRequest()
 	mLobbyGracePeriodElapsed = 0;
 }
 
+void GuiNetPlay::findHotspot()
+{
+	mBusyAnim.setText(_("SEARCHING FOR HOTSPOTS"));
+
+	ApiSystem::getInstance()->scanWifiNetworks();
+	mFindingHotspot = true;
+}
+
 void GuiNetPlay::update(int deltaTime)
 {
 	GuiComponent::update(deltaTime);
+
+	if (mFindingHotspot)
+	{
+		mBusyAnim.update(deltaTime);
+
+		if (ApiSystem::getInstance()->getWifiRoute() == "NOT CONNECTED")
+			return;
+
+		mFindingHotspot = false;
+		startRequest();
+	}
 
 	if (mLanLobbySocketTimeout < 20000) // allow receiving answers from the LAN for 20 seconds
 	{
@@ -986,7 +1017,7 @@ void GuiNetPlay::render(const Transform4x4f &parentTrans)
 {
 	GuiComponent::render(parentTrans);
 
-	if (mLobbyRequest)
+	if (mLobbyRequest || mFindingHotspot)
 		mBusyAnim.render(parentTrans);
 }
 
