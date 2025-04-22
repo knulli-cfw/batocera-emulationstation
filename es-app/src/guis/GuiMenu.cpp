@@ -1789,7 +1789,7 @@ void GuiMenu::openSystemSettings()
 	// Overclock choice
 	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::OVERCLOCK))
 	{
-		auto overclock_choice = std::make_shared<OptionListComponent<std::string>>(window, _("OVERCLOCK"), false);
+		auto overclock_choice = std::make_shared<OptionListComponent<std::string>>(window, _("CPU CLOCK RATE"), false);
 
 		std::string currentOverclock = Settings::getInstance()->getString("Overclock");
 		if (currentOverclock == "")
