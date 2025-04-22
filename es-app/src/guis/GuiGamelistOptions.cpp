@@ -156,10 +156,12 @@ GuiGamelistOptions::GuiGamelistOptions(Window* window, IGameListView* gamelist, 
 		}
 		mMenu.addWithLabel(_("SORT GAMES BY"), mListSort);
 
-		mMenu.addGroup(_("GAME DETECTION OPTIONS"));
-	    mSwitchUnlimitedRecursiveDepth = std::make_shared<SwitchComponent>(mWindow);
-	    mSwitchUnlimitedRecursiveDepth->setState(mSystem->isUnlimitedRecursiveDepth());
-	    mMenu.addWithDescription("UNLIMITED RECURSION DEPTH", "Might slow down gamelist updates significantly!", mSwitchUnlimitedRecursiveDepth);
+		if (!system->isCollection()) {
+			mMenu.addGroup(_("GAME DETECTION OPTIONS"));
+			mSwitchUnlimitedRecursiveDepth = std::make_shared<SwitchComponent>(mWindow);
+			mSwitchUnlimitedRecursiveDepth->setState(mSystem->isUnlimitedRecursiveDepth());
+			mMenu.addWithDescription("UNLIMITED RECURSION DEPTH", "Might slow down gamelist updates significantly!", mSwitchUnlimitedRecursiveDepth);
+		}
 
 	}
 
