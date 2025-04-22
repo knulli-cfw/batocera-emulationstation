@@ -66,7 +66,6 @@ bool SystemData::IsManufacturerSupported = false;
 SystemData::SystemData(const SystemMetadata& meta, SystemEnvironmentData* envData, std::vector<EmulatorData>* pEmulators, bool CollectionSystem, bool groupedSystem, bool withTheme, bool loadThemeOnlyIfElements) :
 	mMetadata(meta), mEnvData(envData), mIsCollectionSystem(CollectionSystem), mIsGameSystem(true)
 {
-
 	mBindableRandom = nullptr;
 	mSaveRepository = nullptr;
 	mIsCheevosSupported = -1;
