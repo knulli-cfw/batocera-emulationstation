@@ -1831,7 +1831,7 @@ void GuiMenu::openSystemSettings()
 		}
 
 		// overclocking
-		s->addWithLabel(_("OVERCLOCK"), overclock_choice);
+		s->addWithLabel(_("CPU CLOCK SPEED"), overclock_choice);
 
 		s->addSaveFunc([overclock_choice, window, s]
 		{
