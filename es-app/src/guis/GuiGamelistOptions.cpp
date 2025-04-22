@@ -154,8 +154,13 @@ GuiGamelistOptions::GuiGamelistOptions(Window* window, IGameListView* gamelist, 
 			const FileSorts::SortType& sort = FileSorts::getSortTypes().at(i);
 			mListSort->add(sort.icon + sort.description, sort.id, sort.id == currentSortId); // TODO - actually make the sort type persistent
 		}
+		mMenu.addWithLabel(_("SORT GAMES BY"), mListSort);
 
-		mMenu.addWithLabel(_("SORT GAMES BY"), mListSort);	
+		mMenu.addGroup(_("GAME DETECTION OPTIONS"));
+	    mSwitchUnlimitedRecursiveDepth = std::make_shared<SwitchComponent>(mWindow);
+	    mSwitchUnlimitedRecursiveDepth->setState(mSystem->isUnlimitedRecursiveDepth());
+	    mMenu.addWithDescription("UNLIMITED RECURSION DEPTH", "Might slow down gamelist updates significantly!", mSwitchUnlimitedRecursiveDepth);
+
 	}
 
 	if (!isInRelevancyMode)
@@ -359,6 +364,11 @@ GuiGamelistOptions::~GuiGamelistOptions()
 		(*it)();
 
 	bool saveSort = !fromPlaceholder || mSystem == CollectionSystemManager::get()->getCustomCollectionsBundle();
+
+	// Set
+	if (mSwitchUnlimitedRecursiveDepth->getState() != mSystem->isUnlimitedRecursiveDepth()) {
+		mSystem->setUnlimitedRecursiveDepth(mSwitchUnlimitedRecursiveDepth->getState());
+	}
 
 	// apply sort
 	if (mListSort && saveSort && mListSort->getSelected() != mSystem->getSortId())

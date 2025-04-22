@@ -66,6 +66,8 @@ bool SystemData::IsManufacturerSupported = false;
 SystemData::SystemData(const SystemMetadata& meta, SystemEnvironmentData* envData, std::vector<EmulatorData>* pEmulators, bool CollectionSystem, bool groupedSystem, bool withTheme, bool loadThemeOnlyIfElements) :
 	mMetadata(meta), mEnvData(envData), mIsCollectionSystem(CollectionSystem), mIsGameSystem(true)
 {
+	std::string systemName = getName();
+
 	mBindableRandom = nullptr;
 	mSaveRepository = nullptr;
 	mIsCheevosSupported = -1;
@@ -73,6 +75,14 @@ SystemData::SystemData(const SystemMetadata& meta, SystemEnvironmentData* envDat
 	mGameListHash = 0;
 	mGameCountInfo = nullptr;
 	mSortId = Settings::getInstance()->getInt(getName() + ".sort");
+	mUnlimitedRecursiveDepth = Settings::getInstance()->getBool(getName() + ".unlimited_recursive_depth");
+	int depth;
+	if (mUnlimitedRecursiveDepth) {
+		depth = -1;
+	} else {
+		depth = 1;
+	}
+
 	mGridSizeOverride = Vector2f(0, 0);
 
 	mFilterIndex = nullptr;
@@ -96,7 +106,7 @@ SystemData::SystemData(const SystemMetadata& meta, SystemEnvironmentData* envDat
 
 		if (!Settings::ParseGamelistOnly())
 		{
-			populateFolder(mRootFolder, fileMap);
+			populateFolder(mRootFolder, fileMap, depth);
 
 			if (!UIModeController::LoadEmptySystems())
 			{
@@ -226,7 +236,7 @@ void SystemData::setIsGameSystemStatus()
 	mIsGameSystem = (mMetadata.name != "retropie" && mMetadata.name != "retrobat");
 }
 
-void SystemData::populateFolder(FolderData* folder, std::unordered_map<std::string, FileData*>& fileMap)
+void SystemData::populateFolder(FolderData* folder, std::unordered_map<std::string, FileData*>& fileMap, int depth)
 {
 	const std::string& folderPath = folder->getPath();
 
@@ -290,6 +300,11 @@ void SystemData::populateFolder(FolderData* folder, std::unordered_map<std::stri
 		{
 			std::string fn = Utils::String::toLower(Utils::FileSystem::getFileName(filePath));
 
+			// Do not recurse into folders if remaining depth is 0
+			if (depth == 0) {
+				continue;
+			}
+
 			// Never look in "artwork", reserved for mame roms artwork
 			if (fn == "artwork")
 				continue;
@@ -324,7 +339,7 @@ void SystemData::populateFolder(FolderData* folder, std::unordered_map<std::stri
 				continue;			
 
 			FolderData* newFolder = new FolderData(filePath, this);
-			populateFolder(newFolder, fileMap);
+			populateFolder(newFolder, fileMap, depth - 1);
 
 			//ignore folders that do not contain games
 			if(newFolder->getChildren().size() == 0)
@@ -1568,6 +1583,12 @@ void SystemData::setSortId(const unsigned int sortId)
 {
 	mSortId = sortId;
 	Settings::getInstance()->setInt(getName() + ".sort", mSortId);
+}
+
+void SystemData::setUnlimitedRecursiveDepth(const bool unlimitedRecursiveDepth)
+{
+	mUnlimitedRecursiveDepth = unlimitedRecursiveDepth;
+	Settings::getInstance()->setBool(getName() + ".unlimited_recursive_depth", mUnlimitedRecursiveDepth);
 }
 
 bool SystemData::setSystemViewMode(std::string newViewMode, Vector2f gridSizeOverride, bool setChanged)

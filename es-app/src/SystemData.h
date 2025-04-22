@@ -113,7 +113,7 @@ public:
 	static bool IsManufacturerSupported;
 	static bool hasDirtySystems();
 	static void deleteSystems();
-	static bool loadConfig(Window* window = nullptr); //Load the system config file at getConfigPath(). Returns true if no errors were encountered. An example will be written if the file doesn't exist.	
+	static bool loadConfig(Window* window = nullptr); //Load the system config file at getConfigPath(). Returns true if no errors were encountered. An example will be written if the file doesn't exist.
 	static std::string getConfigPath();
 	
 	bool loadFeatures();
@@ -125,7 +125,7 @@ public:
 	inline bool isCollection() { return mIsCollectionSystem; };
 	inline bool isGameSystem() { return mIsGameSystem; };
 
-	inline bool isGroupSystem() { return mIsGroupSystem; };	
+	inline bool isGroupSystem() { return mIsGroupSystem; };
 	bool isGroupChildSystem();
 
 	bool isVisible();
@@ -168,6 +168,9 @@ public:
 
 	unsigned int getSortId() const { return mSortId; };
 	void setSortId(const unsigned int sortId = 0);
+
+	bool isUnlimitedRecursiveDepth() const { return mUnlimitedRecursiveDepth; };
+	void setUnlimitedRecursiveDepth(const bool unlimitedRecursiveDepth = false);
 
 	std::string getSystemViewMode() const { if (mViewMode == "automatic") return ""; else return mViewMode; };
 	bool setSystemViewMode(std::string newViewMode, Vector2f gridSizeOverride = Vector2f(0, 0), bool setChanged = true);
@@ -248,7 +251,7 @@ private:
 	SystemEnvironmentData* mEnvData;
 	std::shared_ptr<ThemeData> mTheme;
 
-	void populateFolder(FolderData* folder, std::unordered_map<std::string, FileData*>& fileMap);
+	void populateFolder(FolderData* folder, std::unordered_map<std::string, FileData*>& fileMap, int depth);
 	void indexAllGameFilters(const FolderData* folder);
 	void setIsGameSystemStatus();
 	void removeMultiDiskContent(std::unordered_map<std::string, FileData*>& fileMap);
@@ -264,8 +267,9 @@ private:
 	std::vector<EmulatorData> mEmulators;
 	
 	unsigned int mSortId;
+	bool mUnlimitedRecursiveDepth;
 	std::string mViewMode;
-	Vector2f    mGridSizeOverride;	
+	Vector2f    mGridSizeOverride;
 	
 	std::shared_ptr<bool> mShowFilenames;
 
