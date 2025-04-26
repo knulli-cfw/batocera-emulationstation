@@ -368,7 +368,7 @@ GuiGamelistOptions::~GuiGamelistOptions()
 	bool saveSort = !fromPlaceholder || mSystem == CollectionSystemManager::get()->getCustomCollectionsBundle();
 
 	// Set
-	if (mSwitchUnlimitedRecursiveDepth->getState() != mSystem->isUnlimitedRecursiveDepth()) {
+	if (mSwitchUnlimitedRecursiveDepth != nullptr && mSwitchUnlimitedRecursiveDepth->getState() != mSystem->isUnlimitedRecursiveDepth()) {
 		mSystem->setUnlimitedRecursiveDepth(mSwitchUnlimitedRecursiveDepth->getState());
 	}
 
