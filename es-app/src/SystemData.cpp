@@ -254,6 +254,7 @@ void SystemData::populateFolder(FolderData* folder, std::unordered_map<std::stri
 	}
 	*/
 	std::string filePath;
+	std::string fileName;
 	std::string extension;
 	bool isGame;
 	bool showHidden = Settings::ShowHiddenFiles();
@@ -267,6 +268,12 @@ void SystemData::populateFolder(FolderData* folder, std::unordered_map<std::stri
 	for (auto fileInfo : dirContent)
 	{
 		filePath = fileInfo.path;
+
+		// Mac users tended to ask: "Why do all my games appear twice and one of them isn't working?"
+		// Let's just make sure that files which have the Mac hidden file prefix do not identify as games.
+		fileName = Utils::String::toLower(Utils::FileSystem::getFileName(filePath));
+		if (fileName.rfind("._", 0) == 0)
+			continue;
 
 		// skip hidden files and folders
 		if(!showHidden && fileInfo.hidden)
