@@ -894,7 +894,7 @@ bool SystemData::loadConfig(Window* window)
 			std::string fullname = system.child("fullname").text().get();
 
 			if (window != NULL)
-				window->renderSplashScreen(fullname, systemCount == 0 ? 0 : (float)currentSystem / (float)(systemCount + 1));
+				window->renderSplashScreen(fullname, systemCount == 0 ? 0 : (float)currentSystem / (float)(systemCount + 2));
 
 			std::string nm = system.child("name").text().get();
 
@@ -914,7 +914,7 @@ bool SystemData::loadConfig(Window* window)
 			{
 				int px = processedSystem - 1;
 				if (px >= 0 && px < systemsNames.size())
-					window->renderSplashScreen(systemsNames.at(px), (float)px / (float)(systemCount + 1));
+					window->renderSplashScreen(systemsNames.at(px), (float)px / (float)(systemCount + 2));
 			}, 50);
 		}
 		else
@@ -931,12 +931,12 @@ bool SystemData::loadConfig(Window* window)
 		delete pThreadPool;
 
 		if (window != NULL)
-			window->renderSplashScreen(_("Collections"), systemCount == 0 ? 0 : currentSystem / systemCount);
+			window->renderSplashScreen(_("Collections"), systemCount == 0 ? 0 : currentSystem / (float)(systemCount + 1));
 	}
 	else
 	{
 		if (window != NULL)
-			window->renderSplashScreen(_("Collections"), systemCount == 0 ? 0 : currentSystem / systemCount);
+			window->renderSplashScreen(_("Collections"), systemCount == 0 ? 0 : currentSystem / (float)(systemCount + 1));
 
 		CollectionSystemManager::get()->loadCollectionSystems();
 	}
@@ -1072,28 +1072,28 @@ SystemData* SystemData::loadSystem(pugi::xml_node system, bool fullMode)
 	// platform id list
 	std::string platformList = system.child("platform").text().get();
 	std::vector<std::string> platformStrs = readList(platformList);
-	std::vector<PlatformIds::PlatformId> platformIds;
+	std::set<PlatformIds::PlatformId> platformIds;
 	for (auto it = platformStrs.cbegin(); it != platformStrs.cend(); it++)
 	{
 		const char* str = it->c_str();
-		PlatformIds::PlatformId platformId = PlatformIds::getPlatformId(str);
 
+		PlatformIds::PlatformId platformId = PlatformIds::getPlatformId(str);
 		if (platformId == PlatformIds::PLATFORM_IGNORE)
 		{
 			// when platform is ignore, do not allow other platforms
 			platformIds.clear();
 
 			if (md.name == "imageviewer")
-				platformIds.push_back(PlatformIds::IMAGEVIEWER);
+				platformIds.insert(PlatformIds::IMAGEVIEWER);
 			else
-				platformIds.push_back(platformId);
+				platformIds.insert(platformId);
 
 			break;
 		}
 
 		// if there appears to be an actual platform ID supplied but it didn't match the list, warn
 		if (platformId != PlatformIds::PLATFORM_UNKNOWN)
-			platformIds.push_back(platformId);
+			platformIds.insert(platformId);
 		else if (str != NULL && str[0] != '\0' && platformId == PlatformIds::PLATFORM_UNKNOWN)
 			LOG(LogWarning) << "  Unknown platform for system \"" << md.name << "\" (platform \"" << str << "\" from list \"" << platformList << "\")";
 	}
