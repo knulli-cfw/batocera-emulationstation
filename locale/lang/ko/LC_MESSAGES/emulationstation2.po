@@ -1655,7 +1655,7 @@ msgid "UPDATES & DOWNLOADS"
 msgstr "업데이트 & 다운로드"
 
 msgid "DEVICE SETTINGS"
-msgstr ""
+msgstr "장치 설정"
 
 msgid "SYSTEM SETTINGS"
 msgstr "시스템 설정"
@@ -2782,6 +2782,9 @@ msgstr "몬트리올"
 msgid "SAO PAULO"
 msgstr "상파울루"
 
+msgid "SEOUL"
+msgstr "서울"
+
 msgid "CUSTOM"
 msgstr "커스텀"
 
@@ -3141,7 +3144,7 @@ msgid "POWER SAVING AND BATTERY LIFE"
 msgstr ""
 
 msgid "POWER MANAGEMENT"
-msgstr ""
+msgstr "전력 관리"
 
 msgid "DEVICE CUSTOMIZATION"
 msgstr ""
@@ -3156,7 +3159,7 @@ msgid "INSTALL PICO-8"
 msgstr ""
 
 msgid "USB MODE"
-msgstr ""
+msgstr "USB 모드"
 
 msgid "Native Pico-8 was successfully installed."
 msgstr ""
@@ -3168,7 +3171,7 @@ msgid "MTP"
 msgstr ""
 
 msgid "Set the USB mode to access your device."
-msgstr ""
+msgstr "USB 연결 방식을 선택합니다."
 
 msgid "TOGGLE SWITCH MODE"
 msgstr ""
@@ -3189,44 +3192,44 @@ msgid "BATTERY SAVING"
 msgstr ""
 
 msgid "DIM"
-msgstr ""
+msgstr "어둡게"
 
 msgid "DISPLAY OFF"
-msgstr ""
+msgstr "화면 끄기"
 
 msgid "SUSPEND"
-msgstr ""
+msgstr "절전 모드"
 
 msgid "SHUTDOWN"
-msgstr ""
+msgstr "전원 끄기"
 
 msgid "IDLE TIME"
-msgstr ""
+msgstr "유휴 시간"
 
 msgid ""
 "Battery save mode is activated after idle time has passed without any input."
-msgstr ""
+msgstr "입력 없이 유휴 시간이 경과하면 설정한 전력 관리 모드가 활성화됩니다."
 
 msgid "EXTENDED MODE"
-msgstr ""
+msgstr "확장 모드"
 
 msgid "EXTENDED IDLE TIME"
-msgstr ""
+msgstr "확장 유휴 시간"
 
 msgid ""
 "Secondary timer which starts after initial idle time has passed without any "
 "input."
-msgstr ""
+msgstr "입력 없이 유휴 시간이 경과하면 설정된 전력 관리의 확장 모드가 활성화됩니다."
 
 msgid "AGGRESSIVE BATTERY SAVER"
-msgstr ""
+msgstr "에너지 절약 모드"
 
 msgid ""
 "Optimizes battery life with extra power-saving measures during system idle."
-msgstr ""
+msgstr "유휴 상태일 때도 배터리 사용을 최적화합니다."
 
 msgid "LID CLOSE MODE"
-msgstr ""
+msgstr "화면을 닫을 때의 동작"
 
 msgid "REGULAR LED MODE AND COLOR"
 msgstr ""

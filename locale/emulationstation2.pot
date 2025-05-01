@@ -2747,27 +2747,6 @@ msgstr ""
 msgid "PORT"
 msgstr ""
 
-msgid "USE RELAY SERVER"
-msgstr ""
-
-msgid "NEW YORK"
-msgstr ""
-
-msgid "MADRID"
-msgstr ""
-
-msgid "MONTREAL"
-msgstr ""
-
-msgid "SAO PAULO"
-msgstr ""
-
-msgid "CUSTOM"
-msgstr ""
-
-msgid "CUSTOM RELAY SERVER"
-msgstr ""
-
 msgid "AUTOMATICALLY USE HOTSPOT FOR LOCAL NETPLAY"
 msgstr ""
 
@@ -2799,6 +2778,30 @@ msgid "GAME INDEXES"
 msgstr ""
 
 msgid "INDEX NEW GAMES AT STARTUP"
+msgstr ""
+
+msgid "USE RELAY SERVER"
+msgstr ""
+
+msgid "NEW YORK"
+msgstr ""
+
+msgid "MADRID"
+msgstr ""
+
+msgid "MONTREAL"
+msgstr ""
+
+msgid "SAO PAULO"
+msgstr ""
+
+msgid "SEOUL"
+msgstr ""
+
+msgid "CUSTOM"
+msgstr ""
+
+msgid "CUSTOM RELAY SERVER"
 msgstr ""
 
 #, c-format
