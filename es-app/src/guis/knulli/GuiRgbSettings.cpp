@@ -52,36 +52,36 @@ GuiRgbSettings::GuiRgbSettings(Window* window) : GuiSettings(window, _("RGB LED 
     optionListMode = createModeOptionList();
 
     // LED Brightness Slider
-    sliderLedBrightness = createSlider("BRIGHTNESS", 0.f, 100.f, 5.f, "", "", (isH700 || isA133));    
+    sliderLedBrightness = createSlider(_("BRIGHTNESS"), 0.f, 100.f, 5.f, "", "", (isH700 || isA133));    
     setConfigValueForSlider(sliderLedBrightness, DEFAULT_BRIGHTNESS, "led.brightness");
 
     // Adaptive Brightness switch
-    switchAdaptiveBrightness = createSwitch("ADAPTIVE BRIGHTNESS", "led.brightness.adaptive", "Automatically adapts LED brightness to screen brightness (based on the brightness setting above).", (isH700 || isA133));
+    switchAdaptiveBrightness = createSwitch(_("ADAPTIVE BRIGHTNESS"), "led.brightness.adaptive", _("Automatically adapts LED brightness to screen brightness (based on the brightness setting above)."), (isH700 || isA133));
 
     // LED Speed Slider
-    sliderLedSpeed = createSlider("SPEED", 1.f, 100.f, 5.f, "", "Not applicable for all devices/modes. Warning: High speed may cause seizures for people with photosensitive epilepsy.", isH700);
+    sliderLedSpeed = createSlider(_("SPEED"), 1.f, 100.f, 5.f, "", _("Not applicable for all devices/modes. Warning: High speed may cause seizures for people with photosensitive epilepsy."), isH700);
     setConfigValueForSlider(sliderLedSpeed, DEFAULT_SPEED, "led.speed");
 
     // LED Colour Sliders
     std::array<float, 3> rgbValues = getRgbValues();
-    sliderLedRed = createSlider("RED", 0.f, 255.f, 10.f, "", "", (isH700 || isA133));
+    sliderLedRed = createSlider(_("RED"), 0.f, 255.f, 10.f, "", "", (isH700 || isA133));
     sliderLedRed->setValue(rgbValues[0]);
-    sliderLedGreen = createSlider("GREEN", 0.f, 255.f, 10.f, "", "", (isH700 || isA133));
+    sliderLedGreen = createSlider(_("GREEN"), 0.f, 255.f, 10.f, "", "", (isH700 || isA133));
     sliderLedGreen->setValue(rgbValues[1]);
-    sliderLedBlue = createSlider("BLUE", 0.f, 255.f, 10.f, "", "", (isH700 || isA133));
+    sliderLedBlue = createSlider(_("BLUE"), 0.f, 255.f, 10.f, "", "", (isH700 || isA133));
     sliderLedBlue->setValue(rgbValues[2]);
     addEntry(_("RESTORE DEFAULT COLORS"), true, [this] { restoreDefaultColors(); });
 
     addGroup(_("BATTERY CHARGE INDICATION"));
 
     // Low battery threshold slider
-    sliderLowBatteryThreshold = createSlider("LOW BATTERY THRESHOLD", 0.f, 100.f, 5.f, "%", "Show yellow/red breathing when battery is below this threshold. Set to 0 to disable.", (isH700 || isA133));
+    sliderLowBatteryThreshold = createSlider(_("LOW BATTERY THRESHOLD"), 0.f, 100.f, 5.f, "%", _("Show yellow/red breathing when battery is below this threshold. Set to 0 to disable."), (isH700 || isA133));
     setConfigValueForSlider(sliderLowBatteryThreshold, DEFAULT_LOW_BATTERY_THRESHOLD, "led.battery.low");
-    switchBatteryCharging = createSwitch("BATTERY CHARGING", "led.battery.charging", "Show green breathing while device is charging.", (isH700 || isA133));
+    switchBatteryCharging = createSwitch(_("BATTERY CHARGING"), "led.battery.charging", _("Show green breathing while device is charging."), (isH700 || isA133));
 
 
     addGroup(_("RETRO ACHIEVEMENT INDICATION"));
-    switchRetroAchievements = createSwitch("ACHIEVEMENT EFFECT", "led.retroachievements", "Honor your retro achievements with a LED effect.", (isH700 || isA133));
+    switchRetroAchievements = createSwitch(_("ACHIEVEMENT EFFECT"), "led.retroachievements", _("Honor your retro achievements with a LED effect."), (isH700 || isA133));
 
     initializeOnChangeListeners();
     applyValues();
