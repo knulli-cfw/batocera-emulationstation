@@ -22,6 +22,7 @@
 #include "guis/GuiScraperSettings.h"
 #include "guis/GuiControllersSettings.h"
 #include "guis/knulli/GuiDeviceSettings.h"
+#include "guis/knulli/GuiDiskCheck.h"
 #include "views/UIModeController.h"
 #include "views/ViewController.h"
 #include "CollectionSystemManager.h"
@@ -854,7 +855,14 @@ void GuiMenu::openDeveloperSettings()
 	}
 
 	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::DISKFORMAT))
-		s->addEntry(_("FORMAT A DISK"), true, [this] { openFormatDriveSettings(); });
+	s->addEntry(_("FORMAT A DISK"), true, [this] { openFormatDriveSettings(); });
+	
+	#ifdef KNULLI
+		s->addWithDescription(_("DISK CHECK"), _("Verify the integrity of your SD cards."), nullptr, [this, s]
+		{
+			mWindow->pushGui(new GuiDiskCheck(mWindow));
+		});
+	#endif
 
 	s->addWithDescription(_("CLEAN GAMELISTS & REMOVE UNUSED MEDIA"), _("Remove unused entries, and clean references to missing medias."), nullptr, [this, s]
 	{
