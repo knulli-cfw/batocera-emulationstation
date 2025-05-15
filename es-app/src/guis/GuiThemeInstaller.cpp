@@ -12,6 +12,9 @@
 #include "GuiLoading.h"
 #include "components/WebImageComponent.h"
 #include "components/ButtonComponent.h"
+#ifdef KNULLI
+#include "guis/knulli/KnulliThemeCheck.h"
+#endif
 
 #define WINDOW_WIDTH (float)Math::min(Renderer::getScreenHeight() * 1.125f, Renderer::getScreenWidth() * 0.90f)
 
@@ -186,6 +189,12 @@ void GuiThemeInstaller::loadList()
 	int i = 0;
 	for (auto theme : mThemes)
 	{
+
+#ifdef KNULLI
+		if (!KnulliThemeCheck::isCompatible(theme.name))
+			continue;
+#endif
+
 		if (mTabFilter == 1 && !theme.isInstalled)
 			continue;
 

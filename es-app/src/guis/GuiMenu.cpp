@@ -23,6 +23,7 @@
 #include "guis/GuiControllersSettings.h"
 #include "guis/knulli/GuiDeviceSettings.h"
 #include "guis/knulli/GuiDiskCheck.h"
+#include "guis/knulli/CapabilityCheck.h"
 #include "views/UIModeController.h"
 #include "views/ViewController.h"
 #include "CollectionSystemManager.h"
@@ -1236,7 +1237,7 @@ void GuiMenu::openUpdatesSettings()
 	}
 
 	// integration with theBezelProject
-	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::DECORATIONS) && ApiSystem::getInstance()->isScriptingSupported(ApiSystem::THEBEZELPROJECT))
+	if (CapabilityCheck::hasCapability(CapabilityCheck::BEZEL_PROJECT_CAPABILITY) && ApiSystem::getInstance()->isScriptingSupported(ApiSystem::DECORATIONS) && ApiSystem::getInstance()->isScriptingSupported(ApiSystem::THEBEZELPROJECT))
 	{
 		updateGui->addEntry(_("THE BEZEL PROJECT"), true, [this]
 		{

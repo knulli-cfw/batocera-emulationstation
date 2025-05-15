@@ -20,10 +20,6 @@
 #include "CapabilityCheck.h"
 #include "UsbService.h"
 
-const std::string RGB_CAPABILITY = "rgb";
-const std::string ADB_CAPABILITY = "adb";
-const std::string MTP_CAPABILITY = "mtp";
-
 const std::vector<std::string> BOARDS_WITH_TOGGLE_SWITCH = {"trimui-brick", "trimui-smart-pro"};
 
 constexpr const char* DEFAULT_USB_MODE = "off";
@@ -33,9 +29,9 @@ GuiDeviceSettings::GuiDeviceSettings(Window* window) : GuiSettings(window, _("DE
 {
 	addGroup(_("POWER SAVING AND BATTERY LIFE"));
 	addEntry(_("POWER MANAGEMENT"), true, [this] { openPowerManagementSettings(); });
-	if(CapabilityCheck::hasCapability(RGB_CAPABILITY) || BoardCheck::isBoard(BOARDS_WITH_TOGGLE_SWITCH)) {
+	if(CapabilityCheck::hasCapability(CapabilityCheck::RGB_CAPABILITY) || BoardCheck::isBoard(BOARDS_WITH_TOGGLE_SWITCH)) {
 		addGroup(_("DEVICE CUSTOMIZATION"));
-		if(CapabilityCheck::hasCapability(RGB_CAPABILITY)) {
+		if(CapabilityCheck::hasCapability(CapabilityCheck::RGB_CAPABILITY)) {
 			addEntry(_("RGB LED SETTINGS"), true, [this] { openRgbLedSettings(); });
 		}
 		if(BoardCheck::isBoard(BOARDS_WITH_TOGGLE_SWITCH)) {
@@ -54,7 +50,7 @@ GuiDeviceSettings::GuiDeviceSettings(Window* window) : GuiSettings(window, _("DE
 		addEntry(_("INSTALL PICO-8"), true, [this] { installPico8(); });
 	}
 	// Only add USB MODE options if USB service is available on this device.
-	if (UsbService::hasService() && (CapabilityCheck::hasCapability(ADB_CAPABILITY) || CapabilityCheck::hasCapability(MTP_CAPABILITY))) {
+	if (UsbService::hasService() && (CapabilityCheck::hasCapability(CapabilityCheck::ADB_CAPABILITY) || CapabilityCheck::hasCapability(CapabilityCheck::MTP_CAPABILITY))) {
 		addGroup(_("USB MODE"));
 		optionsUsbMode = createUsbModeOptionList();
 
@@ -106,10 +102,10 @@ std::shared_ptr<OptionListComponent<std::string>> GuiDeviceSettings::createUsbMo
         selectedUsbMode = DEFAULT_USB_MODE;
 
 	optionsUsbMode->add(_("OFF"), "off", selectedUsbMode == "off");
-	if (CapabilityCheck::hasCapability(ADB_CAPABILITY)) {
+	if (CapabilityCheck::hasCapability(CapabilityCheck::ADB_CAPABILITY)) {
 		optionsUsbMode->add(_("ADB"), "adb", selectedUsbMode == "adb");
 	}
-	if (CapabilityCheck::hasCapability(MTP_CAPABILITY)) {
+	if (CapabilityCheck::hasCapability(CapabilityCheck::MTP_CAPABILITY)) {
 		optionsUsbMode->add(_("MTP"), "mtp", selectedUsbMode == "mtp");
 	}
 
