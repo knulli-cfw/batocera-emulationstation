@@ -490,6 +490,13 @@ std::string ApiSystem::getIpAdress()
 	return result;
 }
 
+#ifdef KNULLI
+bool ApiSystem::runDiskCheck(const std::function<void(const std::string)>& func)
+{
+	return executeScript("knulli-disk-check", func).second == 0;
+}
+#endif
+
 bool ApiSystem::enableBluetooth()
 {
 	return executeScript("batocera-bluetooth enable 2>&1 >/dev/null");

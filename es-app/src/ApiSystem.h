@@ -168,6 +168,10 @@ public:
 
 	virtual std::string getIpAdress();
 
+#ifdef KNULLI
+	bool runDiskCheck(const std::function<void(const std::string)>& func = nullptr);
+#endif
+
 	bool enableBluetooth();
 	bool disableBluetooth();
 	void startBluetoothLiveDevices(const std::function<void(const std::string)>& func);
