@@ -169,7 +169,7 @@ public:
 	virtual std::string getIpAdress();
 
 #ifdef KNULLI
-	bool runDiskCheck(const std::function<void(const std::string)>& func = nullptr, const std::string diskCheckMode = "fast");
+	bool runDiskCheck(const std::function<void(const std::string)>& func = nullptr);
 #endif
 
 	bool enableBluetooth();

@@ -6,20 +6,19 @@
 class ThreadedDiskCheck
 {
 public:
-	static void start(Window* window, std::string diskCheckMode = "fast");
+	static void start(Window* window);
 	static bool isRunning() { return mInstance != nullptr; }
 
 private:
 	void run();
 	void updateNotificationComponentContent(const std::string info);
 
-	ThreadedDiskCheck(Window* window, std::string diskCheckMode);
+	ThreadedDiskCheck(Window* window);
 	~ThreadedDiskCheck();
 
 	Window*						mWindow;
 	AsyncNotificationComponent* mWndNotification;
 
 	std::thread*				mHandle;
-	std::string					mDiskCheckMode;
 	static ThreadedDiskCheck*	mInstance;
 };
