@@ -7,4 +7,6 @@ class KnulliThemeCheck
 public:
         static bool isCompatible(const std::string themeName);
 
+private:
+        static std::vector<std::string> getCompatibleThemes();
 };

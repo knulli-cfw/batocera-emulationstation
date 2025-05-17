@@ -9,11 +9,24 @@
 #include <vector>
 #include <string>
 
-const std::vector<std::string> KNULLI_COMPATIBLE_THEMES = {"Art-Book-Next", "Canvas", "Knulli", "Techdweeb", "Minimal"};
+static const std::string COMPATIBLE_THEMES_FILE = "/usr/share/emulationstation/knulli-compatible-themes.txt";
+
+std::vector<std::string> KnulliThemeCheck::getCompatibleThemes()
+{
+	if (Utils::FileSystem::exists(COMPATIBLE_THEMES_FILE)) {
+		std::ifstream file(COMPATIBLE_THEMES_FILE);
+		std::string themesCsv;
+		std::getline(file, themesCsv);
+		return themesCsv.empty() ? std::vector<std::string>() : Utils::String::split(themesCsv, ',');
+	}
+	return std::vector<std::string>();
+}
 
 bool KnulliThemeCheck::isCompatible(const std::string themeName)
 {
-	for (const auto& compatibleTheme : KNULLI_COMPATIBLE_THEMES) {
+	std::vector<std::string> compatibleThemes = KnulliThemeCheck::getCompatibleThemes();
+
+	for (const auto& compatibleTheme : compatibleThemes) {
 		if (themeName == compatibleTheme) {
 			return true;
 		}
