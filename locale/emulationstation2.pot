@@ -910,6 +910,12 @@ msgstr ""
 msgid "PAIR A BLUETOOTH DEVICE MANUALLY"
 msgstr ""
 
+msgid "CONTROLLER ASSIGNMENT"
+msgstr ""
+
+msgid "Always use the built-in handheld controls for player 1, even if additional controllers are connected."
+msgstr ""
+
 msgid "DISPLAY OPTIONS"
 msgstr ""
 
@@ -1249,6 +1255,12 @@ msgid "SORT GAMES BY"
 msgstr ""
 
 msgid "GAME DETECTION OPTIONS"
+msgstr ""
+
+msgid "UNLIMITED RECURSION DEPTH"
+msgstr ""
+
+msgid "Might slow down gamelist updates significantly!"
 msgstr ""
 
 msgid "DYNAMIC COLLECTION"
@@ -2265,6 +2277,9 @@ msgstr ""
 msgid "QUICK RESUME MODE"
 msgstr ""
 
+msgid "If shutdown during gameplay, boots directly into game on next startup. Works with Auto Save/Load on supported emulators."
+msgstr ""
+
 msgid ""
 "If shutdown during gameplay, boots directly into game on next startup. Works "
 "with Auto Save/Load on supported emulators."
@@ -2290,6 +2305,83 @@ msgid "REWIND"
 msgstr ""
 
 msgid "Store past states to rewind to in realtime, if the core supports it."
+msgstr ""
+
+msgid "TOGGLE FAST FORWARD"
+msgstr ""
+
+msgid ""
+"Enable to toggle fast forward instead of holding it down. Only on libretro "
+"cores."
+msgstr ""
+
+msgid "RETROARCH HOTKEYS"
+msgstr ""
+
+msgid "INCREASE SAVE SLOT NUMBER"
+msgstr ""
+
+msgid "Default hotkey + UP."
+msgstr ""
+
+msgid "DECREASE SAVE SLOT NUMBER"
+msgstr ""
+
+msgid "Default hotkey + DOWN."
+msgstr ""
+
+msgid "Default hotkey + LEFT."
+msgstr ""
+
+msgid "FAST-FORWARD"
+msgstr ""
+
+msgid "Default hotkey + RIGHT."
+msgstr ""
+
+msgid "SAVE STATE"
+msgstr ""
+
+msgid "Default hotkey + Y."
+msgstr ""
+
+msgid "LOAD STATE"
+msgstr ""
+
+msgid "Default hotkey + X."
+msgstr ""
+
+msgid "RETROARCH MENU"
+msgstr ""
+
+msgid "Default hotkey + B."
+msgstr ""
+
+msgid "RESET EMULATOR"
+msgstr ""
+
+msgid "Default hotkey + A."
+msgstr ""
+
+msgid "Default hotkey + L1."
+msgstr ""
+
+msgid "AUTO TRANSLATE"
+msgstr ""
+
+msgid "Default hotkey + R1."
+msgstr ""
+
+msgid "PREVIOUS SHADER"
+msgstr ""
+
+msgid "Default hotkey + L2."
+msgstr ""
+
+msgid "NEXT SHADER"
+msgstr ""
+
+msgid "Default hotkey + R2."
 msgstr ""
 
 msgid "INTEGER SCALING (PIXEL PERFECT)"
@@ -2681,6 +2773,13 @@ msgstr ""
 
 msgid "ARE YOU SURE YOU WANT TO FORMAT THIS DRIVE?"
 msgstr ""
+
+msgid "DISK CHECK"
+msgstr ""
+
+msgid "Verify the integrity of your SD cards."
+msgstr ""
+
 
 msgid "EDIT METADATA"
 msgstr ""
@@ -3135,6 +3234,12 @@ msgstr ""
 msgid "Native Pico-8 was successfully installed."
 msgstr ""
 
+msgid "Unable to install: An unknown error occurred. If the error persists, try installing Pico-8 manually."
+msgstr ""
+
+msgid "Unable to install: Pico-8 installer files missing. Please download the Raspberry Pi version of Pico-8 and place the ZIP file in the roms/pico8 folder and try again."
+msgstr ""
+
 msgid "ADB"
 msgstr ""
 
@@ -3211,7 +3316,25 @@ msgstr ""
 msgid "BATTERY CHARGE INDICATION"
 msgstr ""
 
+msgid "LOW BATTERY THRESHOLD"
+msgstr ""
+
+msgid "Show yellow/red breathing when battery is below this threshold. Set to 0 to disable."
+msgstr ""
+
+msgid "BATTERY CHARGING"
+msgstr ""
+
+msgid "Show green breathing while device is charging."
+msgstr ""
+
 msgid "RETRO ACHIEVEMENT INDICATION"
+msgstr ""
+
+msgid "RETRO ACHIEVEMENT EFFECT"
+msgstr ""
+
+msgid "Honor your retro achievements with a LED effect."
 msgstr ""
 
 msgid "STATIC"
@@ -3235,6 +3358,18 @@ msgstr ""
 msgid ""
 "Set the default LED animation. (Not all of the settings below are applicable "
 "to every mode.)"
+msgstr ""
+
+msgid "ADAPTIVE BRIGHTNESS"
+msgstr ""
+
+msgid "Automatically adapts LED brightness to screen brightness (based on the brightness setting above)."
+msgstr ""
+
+msgid "SPEED"
+msgstr ""
+
+msgid "Not applicable for all devices/modes. Warning: High speed may cause seizures for people with photosensitive epilepsy."
 msgstr ""
 
 msgid "Loading system config..."
@@ -3838,6 +3973,121 @@ msgstr ""
 #. TRANSLATION: shared
 msgctxt "game_options"
 msgid "RUMBLE LEVEL"
+msgstr ""
+
+#. TRANSLATION: shared
+msgctxt "game_options"
+msgid "RETROARCH HOTKEYS"
+msgstr ""
+
+#. TRANSLATION: shared
+msgctxt "game_options"
+msgid "INCREASE SAVE SLOT NUMBER"
+msgstr ""
+
+#. TRANSLATION: shared
+msgctxt "game_options"
+msgid "Default hotkey + UP."
+msgstr ""
+
+#. TRANSLATION: shared
+msgctxt "game_options"
+msgid "DECREASE SAVE SLOT NUMBER"
+msgstr ""
+
+#. TRANSLATION: shared
+msgctxt "game_options"
+msgid "Default hotkey + DOWN."
+msgstr ""
+
+#. TRANSLATION: shared
+msgctxt "game_options"
+msgid "Default hotkey + LEFT."
+msgstr ""
+
+#. TRANSLATION: shared
+msgctxt "game_options"
+msgid "FAST-FORWARD"
+msgstr ""
+
+#. TRANSLATION: shared
+msgctxt "game_options"
+msgid "Default hotkey + RIGHT."
+msgstr ""
+
+#. TRANSLATION: shared
+msgctxt "game_options"
+msgid "SAVE STATE"
+msgstr ""
+
+#. TRANSLATION: shared
+msgctxt "game_options"
+msgid "Default hotkey + Y."
+msgstr ""
+
+#. TRANSLATION: shared
+msgctxt "game_options"
+msgid "LOAD STATE"
+msgstr ""
+
+#. TRANSLATION: shared
+msgctxt "game_options"
+msgid "Default hotkey + X."
+msgstr ""
+
+#. TRANSLATION: shared
+msgctxt "game_options"
+msgid "RETROARCH MENU"
+msgstr ""
+
+#. TRANSLATION: shared
+msgctxt "game_options"
+msgid "Default hotkey + B."
+msgstr ""
+
+#. TRANSLATION: shared
+msgctxt "game_options"
+msgid "RESET EMULATOR"
+msgstr ""
+
+#. TRANSLATION: shared
+msgctxt "game_options"
+msgid "Default hotkey + A."
+msgstr ""
+
+#. TRANSLATION: shared
+msgctxt "game_options"
+msgid "Default hotkey + L1."
+msgstr ""
+
+#. TRANSLATION: shared
+msgctxt "game_options"
+msgid "AUTO TRANSLATE"
+msgstr ""
+
+#. TRANSLATION: shared
+msgctxt "game_options"
+msgid "Default hotkey + R1."
+msgstr ""
+
+#. TRANSLATION: shared
+msgctxt "game_options"
+msgid "PREVIOUS SHADER"
+msgstr ""
+
+#. TRANSLATION: shared
+msgctxt "game_options"
+msgid "Default hotkey + L2."
+msgstr ""
+
+#. TRANSLATION: shared
+msgctxt "game_options"
+msgid "NEXT SHADER"
+msgstr ""
+
+#. TRANSLATION: shared
+msgctxt "game_options"
+msgid "Default hotkey + R2."
 msgstr ""
 
 #. TRANSLATION: shared
