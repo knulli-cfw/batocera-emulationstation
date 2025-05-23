@@ -86,9 +86,9 @@ void GuiDeviceSettings::installPico8()
 	if(result == 0) {
 		mWindow->pushGui(new GuiMsgBox(mWindow, _("Native Pico-8 was successfully installed."), _("OK"), nullptr));
 	} else if(result == 1) {
-		mWindow->pushGui(new GuiMsgBox(mWindow, "Unable to install: An unknown error occurred. If the error persists, try installing Pico-8 manually.", "OK", nullptr));
+		mWindow->pushGui(new GuiMsgBox(mWindow, _("Unable to install: An unknown error occurred. If the error persists, try installing Pico-8 manually."), _("OK"), nullptr));
 	} else if(result == 2) {
-		mWindow->pushGui(new GuiMsgBox(mWindow, "Unable to install: Pico-8 installer files missing. Please download the Raspberry Pi version of Pico-8 and place the ZIP file in the roms/pico8 folder and try again.", "OK", nullptr));
+		mWindow->pushGui(new GuiMsgBox(mWindow, _("Unable to install: Pico-8 installer files missing. Please download the Raspberry Pi version of Pico-8 and place the ZIP file in the roms/pico8 folder and try again."), _("OK"), nullptr));
 	}
 }
 

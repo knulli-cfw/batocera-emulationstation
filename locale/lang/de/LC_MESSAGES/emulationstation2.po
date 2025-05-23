@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: emulationstation\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2021-12-15 23:48+0100\n"
-"PO-Revision-Date: 2024-10-12 18:00+0000\n"
+"PO-Revision-Date: 2025-05-22 02:00+0200\n"
 "Last-Translator: \n"
 "Language-Team: German\n"
 "Language: de\n"
@@ -3561,3 +3561,268 @@ msgid ""
 msgstr ""
 "KALIBRIERE PISTOLE\n"
 "Zur Kalibration auf Ziele schießen"
+
+msgid "API KEY"
+msgstr "API-KEY"
+
+msgid "CONTROLLER ASSIGNMENT"
+msgstr "CONTROLLER-ZUWEISUNG"
+
+msgid "USE HANDHELD CONTROLS FOR PLAYER 1"
+msgstr "HANDHELD ALS CONTROLLER FÜR SPIELER 1"
+
+msgid "Always use the built-in handheld controls for player 1, even if additional controllers are connected."
+msgstr "Das Handheld-Gerät auch dann als Controller für Spieler 1 benutzen, wenn weitere Controller angeschlossen sind."
+
+msgid "QUICK RESUME MODE"
+msgstr "SPIEL BEIM START FORTSETZEN"
+
+msgid "If shutdown during gameplay, boots directly into game on next startup. Works with Auto Save/Load on supported emulators."
+msgstr "Wird das Gerät mitten im Spiel heruntergefahren, wird das Gerät das Spiel direkt nach dem nächsten Hochfahren laden. Unterstützt Auto Speichern/Laden je nach Emulator."
+
+msgid "TOGGLE FAST FORWARD"
+msgstr "VORSPULEN EIN-/AUSCHALTEN"
+
+msgid ""
+"Enable to toggle fast forward instead of holding it down. Only on libretro "
+"cores."
+msgstr "Vorspulen mit einem Tastendruck Ein-/Ausschalten statt gedrückt halten. Nur für Libretro-Cores."
+
+msgid "RETROARCH HOTKEYS"
+msgstr "RETROARCH-TASTENKOMBINATIONEN"
+
+msgid "INCREASE SAVE SLOT NUMBER"
+msgstr "NÄCHSTER SPEICHERPLATZ"
+
+msgid "Default hotkey + UP."
+msgstr "Standard: Hotkey + HOCH."
+
+msgid "DECREASE SAVE SLOT NUMBER"
+msgstr "VORHERIGER SPEICHERPLATZ"
+
+msgid "Default hotkey + DOWN."
+msgstr "Standard: Hotkey + RUNTER."
+
+msgid "Default hotkey + LEFT."
+msgstr "Standard: Hotkey + LINKS."
+
+msgid "FAST-FORWARD"
+msgstr "VORSPULFUNKTION"
+
+msgid "Default hotkey + RIGHT."
+msgstr "Standard: Hotkey + RECHTS."
+
+msgid "SAVE STATE"
+msgstr "SPIELZUSTAND SPEICHERN"
+
+msgid "Default hotkey + Y."
+msgstr "Standard: Hotkey + Y."
+
+msgid "LOAD STATE"
+msgstr "SPIELZUSTAND LADEN"
+
+msgid "Default hotkey + X."
+msgstr "Standard: Hotkey + X."
+
+msgid "RETROARCH MENU"
+msgstr "RETROARCH-MENÜ"
+
+msgid "Default hotkey + B."
+msgstr "Standard: Hotkey + B."
+
+msgid "RESET EMULATOR"
+msgstr "EMULATOR ZURÜCKSETZEN"
+
+msgid "Default hotkey + A."
+msgstr "Standard: Hotkey + A."
+
+msgid "Default hotkey + L1."
+msgstr "Standard: Hotkey + L1."
+
+msgid "AUTO TRANSLATE"
+msgstr "AUTOMATISCHE ÜBERSETZUNG"
+
+msgid "Default hotkey + R1."
+msgstr "Standard: Hotkey + R1."
+
+msgid "PREVIOUS SHADER"
+msgstr "VORHERIGER SHADER"
+
+msgid "Default hotkey + L2."
+msgstr "Standard: Hotkey + L2."
+
+msgid "NEXT SHADER"
+msgstr "NÄCHSTER SHADER"
+
+msgid "Default hotkey + R2."
+msgstr "Standard: Hotkey + R2."
+
+msgid "GAME DETECTION OPTIONS"
+msgstr "SPIELE ERKENNEN"
+
+msgid "UNLIMITED RECURSION DEPTH"
+msgstr "UNBEGRENZTE REKURSIONSTIEFE"
+
+msgid "Might slow down gamelist updates significantly!"
+msgstr "Könnte Aktualisierung der Spielelisten signifikant verlangsamen!"
+
+msgid "DEVICE SETTINGS"
+msgstr "GERÄTEEINSTELLUNGEN"
+
+msgid "POWER SAVING AND BATTERY LIFE"
+msgstr "ENERGIESPAREN UND AKKUPFLEGE"
+
+msgid "POWER MANAGEMENT"
+msgstr "ENERGIEVERWALTUNG"
+
+msgid "BATTERY SAVING"
+msgstr "AKKULAUFZEIT VERLÄNGERN"
+
+msgid "DIM"
+msgstr "DIMMEN"
+
+msgid "DISPLAY OFF"
+msgstr "BILDSCHIRM AUS"
+
+msgid "SUSPEND"
+msgstr "RUHEZUSTAND"
+
+msgid "SHUTDOWN"
+msgstr "HERUNTERFAHREN"
+
+msgid "IDLE TIME"
+msgstr "LEERLAUFZEIT"
+
+msgid "Battery save mode is activated after idle time has passed without any input."
+msgstr "Energiesparmodus wird aktiviert wenn das Gerät für diesen Zeitraum keine Eingabe empfangen hat."
+
+msgid "EXTENDED MODE"
+msgstr "ERWEITERTER MODUS"
+
+msgid "EXTENDED IDLE TIME"
+msgstr "ERWEITERTE LEERLAUFZEIT"
+
+msgid "Secondary timer which starts after initial idle time has passed without any input."
+msgstr "Zweiter Timer, der startet, direkt nachdem die initiale Leerlaufzeit ohne Eingabe abgelaufen ist."
+
+msgid "LID CLOSE MODE"
+msgstr "MODUS BEIM ZUKLAPPEN"
+
+msgid "AGGRESSIVE BATTERY SAVER"
+msgstr "AGGRESSIVES ENERGIESPAREN"
+
+msgid "Optimizes battery life with extra power-saving measures during system idle."
+msgstr "Optimiert die Akkulaufzeit mit zusätzlichen Energiesparmaßnahmen während das Gerät im Leerlauf ist."
+
+msgid "DEVICE CUSTOMIZATION"
+msgstr "GERÄT PERSONALISIEREN"
+
+msgid "RGB LED SETTINGS"
+msgstr "RGB-LED-EINSTELLUNGEN"
+
+msgid "REGULAR LED MODE AND COLOR"
+msgstr "REGULÄRER LED-MODUS UND FARBEN"
+
+msgid "STATIC"
+msgstr "STATISCH"
+
+msgid "BREATHING (FAST)"
+msgstr "PULSIEREN (SCHNELL)"
+
+msgid "BREATHING (MEDIUM)"
+msgstr "PULSIEREN (MITTEL)"
+
+msgid "BREATHING (SLOW)"
+msgstr "PULSIEREN (LANGSAM)"
+
+msgid "SINGLE RAINBOW"
+msgstr "EINFARBIGER REGENBOGEN"
+
+msgid "MULTI RAINBOW"
+msgstr "MEHRFARBIGER REGENBOGEN"
+
+msgid "ADAPTIVE BRIGHTNESS"
+msgstr "ADAPTIVE HELLIGKEIT"
+
+msgid ""
+"Set the default LED animation. (Not all of the settings below are applicable "
+"to every mode.)"
+msgstr "Passt die LED-Helligkeit automatisch der Bildschirmhelligkeit an (basierend auf der Helligkeitseinstellung weiter oben)."
+
+msgid "Automatically adapts LED brightness to screen brightness (based on the brightness setting above)."
+msgstr "Passt die LED-Helligkeit automatisch der Bildschirmhelligkeit an (basierend auf der Helligkeitseinstellung weiter oben)."
+
+msgid "SPEED"
+msgstr "GESCHWINDIGKEIT"
+
+msgid "Not applicable for all devices/modes. Warning: High speed may cause seizures for people with photosensitive epilepsy."
+msgstr "Kann nicht auf alle Geräte/Modi angewandt werden. Warnung: Hohe Geschwindigkeit kann bei Personen mit Photosensibilität epileptische Anfälle verursachen."
+
+msgid "RESTORE DEFAULT COLORS"
+msgstr "STANDARDFARBEN WIEDERHERSTELLEN"
+
+msgid "LOW BATTERY THRESHOLD"
+msgstr "SCHWELLWERT FÜR NIEDRIGEN AKKUSTAND"
+
+msgid "Show yellow/red breathing when battery is below this threshold. Set to 0 to disable."
+msgstr "LEDs pulsieren gelb/rot wenn der Akkustand unter diesen Schwellwert fällt. Setze den Wert auf 0 um die Funktion zu deaktivieren."
+
+msgid "BATTERY CHARGING"
+msgstr "AKKU LADEN"
+
+msgid "Show green breathing while device is charging."
+msgstr "LEDs pulsieren grün während das Gerät geladen wird."
+
+msgid "RETRO ACHIEVEMENT INDICATION"
+msgstr "RETRO-ACHIEVEMENT-BENACHRICHTIGUNG"
+
+msgid "RETRO ACHIEVEMENT EFFECT"
+msgstr "RETRO-ACHIEVEMENT-EFFEKT"
+
+msgid "Honor your retro achievements with a LED effect."
+msgstr "Würdige deine erreichten Retro-Achievements mit einem LED-Effekt."
+
+msgid "USB MODE"
+msgstr "USB-MODUS"
+
+msgid "Set the USB mode to access your device."
+msgstr "Wähle den USB-Modus, mit dem auf dein Gerät zugegriffen werden kann."
+
+msgid "NATIVE PICO-8"
+msgstr "NATIVES PICO-8"
+
+msgid "INSTALL PICO-8"
+msgstr "PICO-8 INSTALLIEREN"
+
+msgid "Native Pico-8 was successfully installed."
+msgstr "Natives Pico-8 wurde erfolgreich installiert."
+
+msgid "Unable to install: An unknown error occurred. If the error persists, try installing Pico-8 manually."
+msgstr "Installation fehlgeschlagen: Ein unbekannter Fehler ist aufgetreten. Falls der Fehler erneut auftritt, solltest du Pico-8 manuell installieren."
+
+msgid "Unable to install: Pico-8 installer files missing. Please download the Raspberry Pi version of Pico-8 and place the ZIP file in the roms/pico8 folder and try again."
+msgstr "Installation fehlgeschlagen: Pico-8-Installationsdateien wurden nicht gefunden. Bitte lade die Raspberry-Pi-Version von Pico-8 herunter, lege die ZIP-Datei in den Ordner roms/pico8 und versuch es noch einmal."
+
+msgid "TOGGLE SWITCH MODE"
+msgstr "SCHIEBESCHALTER-MODUS"
+
+msgid "Decide what to use the switch of your device for."
+msgstr "Wähle aus, was du mit dem Schiebeschalter an deinem Gerät kontrollieren möchtest."
+
+msgid "MUTE/UNMUTE"
+msgstr "TON EIN/AUS"
+
+msgid "RGB ON/OFF"
+msgstr "RGB-LEDS EIN/AUS"
+
+msgid "AIRPLANE MODE ON/OFF"
+msgstr "FLUGZEUGMODUS EIN/AUS"
+
+msgid "DISK CHECK"
+msgstr "LAUFWERKE ÜBERPRÜFEN"
+
+msgid "Verify the integrity of your SD cards."
+msgstr "Überprüfe die Integrität deiner SD-Karten."
+
+msgid "CPU CLOCK RATE"
+msgstr "CPU-TAKTRATE"
