@@ -70,8 +70,7 @@ GuiDeviceSettings::GuiDeviceSettings(Window* window) : ExtendedGuiSettings(windo
 	}
 
 	addGroup(_("TELEMETRY"));
-	switchTelemetryStatistics = createSwitch(_("ENABLE STATISTICS"), "system.telemetry.statistics.disabled", _("Help the Knulli project keep track of which devices and Knulli versions are currently in use. Enable telemetry and report your device model and your current Knulli version to our statistics server after boot. No other data will be transmitted!"), false, false, true);
-
+	switchTelemetryStatistics = createSwitch(_("ENABLE STATISTICS"), "system.telemetry", _("Help the Knulli project keep track of which devices and Knulli versions are currently in use. Enable telemetry and report your device model and your current Knulli version to our statistics server after boot. No other data will be transmitted!"), true, false, true);
 	addSaveFunc([this] {
 		// Set the telemetry settings in batocera.conf
 		SystemConf::getInstance()->set("system.telemetry", switchTelemetryStatistics->getState() ? "1" : "0");
