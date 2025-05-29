@@ -1,3 +1,4 @@
+#include "guis/knulli/ExtendedGuiSettings.h"
 #include "guis/knulli/GuiDeviceSettings.h"
 #include "guis/knulli/GuiPowerManagementSettings.h"
 #include "guis/knulli/GuiRgbSettings.h"
@@ -6,7 +7,6 @@
 #include "components/SliderComponent.h"
 #include "components/SwitchComponent.h"
 #include "guis/GuiMsgBox.h"
-#include "guis/GuiSettings.h"
 #include "views/UIModeController.h"
 #include "views/ViewController.h"
 #include "SystemConf.h"
@@ -25,7 +25,7 @@ const std::vector<std::string> BOARDS_WITH_TOGGLE_SWITCH = {"trimui-brick", "tri
 constexpr const char* DEFAULT_USB_MODE = "off";
 constexpr const char* DEFAULT_SWITCH_MODE = "mute";
 
-GuiDeviceSettings::GuiDeviceSettings(Window* window) : GuiSettings(window, _("DEVICE SETTINGS").c_str())
+GuiDeviceSettings::GuiDeviceSettings(Window* window) : ExtendedGuiSettings(window, _("DEVICE SETTINGS").c_str())
 {
 	addGroup(_("POWER SAVING AND BATTERY LIFE"));
 	addEntry(_("POWER MANAGEMENT"), true, [this] { openPowerManagementSettings(); });
@@ -68,6 +68,16 @@ GuiDeviceSettings::GuiDeviceSettings(Window* window) : GuiSettings(window, _("DE
 			}
 		});
 	}
+
+	addGroup(_("TELEMETRY"));
+	switchTelemetryStatistics = createSwitch(_("ENABLE STATISTICS"), "system.telemetry.statistics.disabled", _("Help the Knulli project keep track of which devices and Knulli versions are currently in use. Enable telemetry and report your device model and your current Knulli version to our statistics server after boot. No other data will be transmitted!"), false, false, true);
+
+	addSaveFunc([this] {
+		// Set the telemetry settings in batocera.conf
+		SystemConf::getInstance()->set("system.telemetry", switchTelemetryStatistics->getState() ? "1" : "0");
+		SystemConf::getInstance()->saveSystemConf();
+	});
+
 }
 
 void GuiDeviceSettings::openPowerManagementSettings()
