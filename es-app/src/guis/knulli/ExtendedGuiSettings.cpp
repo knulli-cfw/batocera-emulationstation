@@ -53,7 +53,7 @@ std::shared_ptr<SwitchComponent> ExtendedGuiSettings::createSwitch(std::string l
     if (selected.empty())
         selected = defaultState;
 
-    switchComponent->setState(selected == defaultState);
+    switchComponent->setState(selected == SWITCH_ON);
     if (!show) { // TODO: Awful hack to hide the switch, find a better way to do this
         return switchComponent;
     }
