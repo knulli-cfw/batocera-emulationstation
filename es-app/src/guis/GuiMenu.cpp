@@ -1280,7 +1280,7 @@ void GuiMenu::openUpdatesSettings()
 		else
 #endif
 #if KNULLI
-			if (updatesType.empty() || (updatesType != "alpha" && updatesType != "development")
+			if (updatesType.empty() || (updatesType != "alpha" && updatesType != "development"))
 				updatesType = "stable";
 #else
 			if (updatesType.empty() || updatesType != BETA_NAME)
