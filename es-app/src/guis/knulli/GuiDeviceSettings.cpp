@@ -1,5 +1,7 @@
-#include "guis/knulli/ExtendedGuiSettings.h"
 #include "guis/knulli/GuiDeviceSettings.h"
+#include "guis/knulli/ExtendedGuiSettings.h"
+
+#include "guis/knulli/FactorySettings.h"
 #include "guis/knulli/GuiPowerManagementSettings.h"
 #include "guis/knulli/GuiRgbSettings.h"
 #include "guis/knulli/Pico8Installer.h"
@@ -76,6 +78,18 @@ GuiDeviceSettings::GuiDeviceSettings(Window* window) : ExtendedGuiSettings(windo
 		SystemConf::getInstance()->set("system.telemetry", switchTelemetryStatistics->getState() ? "1" : "0");
 		SystemConf::getInstance()->saveSystemConf();
 	});
+
+	if (FactorySettings::hasFactoryReset()) {
+		addGroup(_("FACTORY SETTINGS"));
+		addWithDescription(_("FACTORY RESET"), _("This will reset all your Knulli settings to factory defaults. Other user data (e.g., games, BIOS files, saves, etc.) will be left untouched."), nullptr, [this]
+		{
+			mWindow->pushGui(new GuiMsgBox(mWindow, _("ARE YOU SURE YOU WANT TO RESET TO FACTORY SETTINGS? ALL YOUR SETTINGS WILL BE UNDONE!\n\nDO NOT PANIC: THE SCREEN WILL TURN OFF AND THE DEVICE WILL REBOOT AUTOMATICALLY AFTER A COUPLE OF SECONDS."), _("YES"), [this]
+				{
+					FactorySettings::applyFactoryReset();
+				},
+				_("NO"), nullptr));
+		}, "", false, true);
+	}
 
 }
 
