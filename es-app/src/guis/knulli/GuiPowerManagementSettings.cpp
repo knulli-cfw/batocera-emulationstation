@@ -91,6 +91,7 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 		if (selectedLidCloseMode.empty())
 			selectedLidCloseMode = "suspend";
 
+		optionsLidCloseMode->add(_("NONE"),           "none", selectedLidCloseMode == "none");
 		optionsLidCloseMode->add(_("DISPLAY OFF"),    "dispoff", selectedLidCloseMode == "dispoff");
 		optionsLidCloseMode->add(_("SUSPEND"),        "suspend", selectedLidCloseMode == "suspend");
 		optionsLidCloseMode->add(_("SHUTDOWN"),       "shutdown", selectedLidCloseMode == "shutdown");
