@@ -167,6 +167,7 @@ public:
     bool disableWifi();
 
 	virtual std::string getIpAdress();
+	virtual bool isWifiAPModeSupported();
 
 	bool enableBluetooth();
 	bool disableBluetooth();
