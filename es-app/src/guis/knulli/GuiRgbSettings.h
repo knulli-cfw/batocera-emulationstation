@@ -1,21 +1,19 @@
 #pragma once
-#include "guis/GuiSettings.h"
+#include "ExtendedGuiSettings.h"
 #include "components/SliderComponent.h"
 #include "components/OptionListComponent.h"
 #include "components/SwitchComponent.h"
 #include <array>
 #include <memory>
 
-class GuiRgbSettings : public GuiSettings
+class GuiRgbSettings : public ExtendedGuiSettings
 {
 public:
     GuiRgbSettings(Window* window);
 
 private:
     std::shared_ptr<OptionListComponent<std::string>> createModeOptionList();
-    std::shared_ptr<SliderComponent> createSlider(std::string label, float min, float max, float step, std::string unit, std::string description, bool show);
-    void setConfigValueForSlider(std::shared_ptr<SliderComponent> slider, float defaultValue, std::string settingsID);
-    std::shared_ptr<SwitchComponent> createSwitch(std::string label, std::string variable, std::string description, bool show);
+
     std::array<float, 3> getRgbValues();
     void setRgbValues(float red, float green, float blue);
     void initializeOnChangeListeners();

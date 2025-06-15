@@ -169,7 +169,7 @@ void GuiUpdate::update(int deltaTime)
 				if (versionExtra == "none")
 					message = Utils::String::format(_("YOU ARE CURRENTLY USING VERSION %s\nDO YOU WANT TO UPDATE TO VERSION %s?").c_str(), ApiSystem::getInstance()->getVersion().c_str(), mUpdateVersion.c_str());
 				else
-					message = Utils::String::format(_("UNOFFICIAL SYSTEM MODIFICATIONS DETECTED.\nUPGRADING COULD BREAK YOUR SYSTEM.\nDO YOU WANT TO UPDATE TO VERSION %s?").c_str(), mUpdateVersion.c_str());
+					message = Utils::String::format(_("YOUR SYSTEM HAS BEEN PATCHED OR MODIFIED.\nUPGRADING WILL REMOVE ANY PATCHES AND MODIFICATIONS.\nDO YOU WANT TO UPDATE TO VERSION %s?").c_str(), mUpdateVersion.c_str());
 
 				window->pushGui(new GuiMsgBox(window, message, _("YES"), [this]
 				{

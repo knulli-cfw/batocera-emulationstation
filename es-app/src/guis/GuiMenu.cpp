@@ -22,6 +22,8 @@
 #include "guis/GuiScraperSettings.h"
 #include "guis/GuiControllersSettings.h"
 #include "guis/knulli/GuiDeviceSettings.h"
+#include "guis/knulli/ThreadedDiskCheck.h"
+#include "guis/knulli/CapabilityCheck.h"
 #include "views/UIModeController.h"
 #include "views/ViewController.h"
 #include "CollectionSystemManager.h"
@@ -854,7 +856,23 @@ void GuiMenu::openDeveloperSettings()
 	}
 
 	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::DISKFORMAT))
-		s->addEntry(_("FORMAT A DISK"), true, [this] { openFormatDriveSettings(); });
+	s->addEntry(_("FORMAT A DISK"), true, [this] { openFormatDriveSettings(); });
+	
+	#ifdef KNULLI
+	s->addWithDescription(_("DISK CHECK"), _("Verify the integrity of your SD cards."), nullptr, [this, s]
+	{
+		if (ThreadedDiskCheck::isRunning())
+			mWindow->pushGui(new GuiMsgBox(mWindow, _("DISK CHECK IS ALREADY RUNNING.")));
+		else
+		{
+			mWindow->pushGui(new GuiMsgBox(mWindow, _("RUN DISK CHECK NOW?"), _("YES"), [this]
+				{
+					ThreadedDiskCheck::start(mWindow);
+				},
+				_("NO"), nullptr));
+		}
+	});
+	#endif
 
 	s->addWithDescription(_("CLEAN GAMELISTS & REMOVE UNUSED MEDIA"), _("Remove unused entries, and clean references to missing medias."), nullptr, [this, s]
 	{
@@ -1228,7 +1246,7 @@ void GuiMenu::openUpdatesSettings()
 	}
 
 	// integration with theBezelProject
-	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::DECORATIONS) && ApiSystem::getInstance()->isScriptingSupported(ApiSystem::THEBEZELPROJECT))
+	if (CapabilityCheck::hasCapability(CapabilityCheck::BEZEL_PROJECT_CAPABILITY) && ApiSystem::getInstance()->isScriptingSupported(ApiSystem::DECORATIONS) && ApiSystem::getInstance()->isScriptingSupported(ApiSystem::THEBEZELPROJECT))
 	{
 		updateGui->addEntry(_("THE BEZEL PROJECT"), true, [this]
 		{
@@ -1239,7 +1257,6 @@ void GuiMenu::openUpdatesSettings()
 		});
 	}
 
-#ifndef KNULLI
 	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::UPGRADE))
 	{
 		updateGui->addGroup(_("SOFTWARE UPDATES"));
@@ -1262,12 +1279,20 @@ void GuiMenu::openUpdatesSettings()
 			updatesTypeList->add("unstable", "unstable", updatesType == "unstable");
 		else
 #endif
+#if KNULLI
+			if (updatesType.empty() || (updatesType != "alpha" && updatesType != "development"))
+				updatesType = "stable";
+#else
 			if (updatesType.empty() || updatesType != BETA_NAME)
 				updatesType = "stable";
-
+#endif			
 		updatesTypeList->add("stable", "stable", updatesType == "stable");
+#if KNULLI
+		updatesTypeList->add("alpha", "alpha", updatesType == "alpha");
+		updatesTypeList->add("development", "development", updatesType == "development");
+#else
 		updatesTypeList->add(BETA_NAME, BETA_NAME, updatesType == BETA_NAME);
-
+#endif
 		updateGui->addWithLabel(_("UPDATE TYPE"), updatesTypeList);
 		updatesTypeList->setSelectedChangedCallback([](std::string name)
 		{
@@ -1291,7 +1316,7 @@ void GuiMenu::openUpdatesSettings()
 			}
 		});
 	}
-#endif
+
 	mWindow->pushGui(updateGui);
 }
 
@@ -1789,7 +1814,7 @@ void GuiMenu::openSystemSettings()
 	// Overclock choice
 	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::OVERCLOCK))
 	{
-		auto overclock_choice = std::make_shared<OptionListComponent<std::string>>(window, _("OVERCLOCK"), false);
+		auto overclock_choice = std::make_shared<OptionListComponent<std::string>>(window, _("CPU CLOCK RATE"), false);
 
 		std::string currentOverclock = Settings::getInstance()->getString("Overclock");
 		if (currentOverclock == "")
@@ -1831,7 +1856,7 @@ void GuiMenu::openSystemSettings()
 		}
 
 		// overclocking
-		s->addWithLabel(_("OVERCLOCK"), overclock_choice);
+		s->addWithLabel(_("CPU CLOCK RATE"), overclock_choice);
 
 		s->addSaveFunc([overclock_choice, window, s]
 		{

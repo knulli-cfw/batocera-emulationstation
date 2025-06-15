@@ -16,8 +16,6 @@
 #include "utils/Platform.h"
 #include "CapabilityCheck.h"
 
-const std::string LID_CAPABILITY = "lid";
-
 GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSettings(window, _("POWER MANAGEMENT").c_str())
 {
 
@@ -88,11 +86,12 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 	// Lid close mode
 	auto optionsLidCloseMode = std::make_shared<OptionListComponent<std::string> >(mWindow, _("LID CLOSE MODE"), false);
 	// TODO: do not even instantiate if lid is not supported
-	if (CapabilityCheck::hasCapability(LID_CAPABILITY)) {
+	if (CapabilityCheck::hasCapability(CapabilityCheck::LID_CAPABILITY)) {
 		std::string selectedLidCloseMode = SystemConf::getInstance()->get("system.lid");
 		if (selectedLidCloseMode.empty())
 			selectedLidCloseMode = "suspend";
 
+		optionsLidCloseMode->add(_("NONE"),           "none", selectedLidCloseMode == "none");
 		optionsLidCloseMode->add(_("DISPLAY OFF"),    "dispoff", selectedLidCloseMode == "dispoff");
 		optionsLidCloseMode->add(_("SUSPEND"),        "suspend", selectedLidCloseMode == "suspend");
 		optionsLidCloseMode->add(_("SHUTDOWN"),       "shutdown", selectedLidCloseMode == "shutdown");
@@ -109,7 +108,7 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 		SystemConf::getInstance()->set("system.batterysaver.extendedtimer", std::to_string(newBatterySaverExtendedTimeSeconds));
 		SystemConf::getInstance()->set("system.batterysaver.extendedmode", optionsBatterySaveExtendedMode->getSelected());
 		SystemConf::getInstance()->setBool("system.batterysaver.aggressive", aggressiveBatterySaveMode->getState());
-		if (CapabilityCheck::hasCapability(LID_CAPABILITY)) {
+		if (CapabilityCheck::hasCapability(CapabilityCheck::LID_CAPABILITY)) {
 			SystemConf::getInstance()->set("system.lid", optionsLidCloseMode->getSelected());
 		}
 		SystemConf::getInstance()->saveSystemConf();

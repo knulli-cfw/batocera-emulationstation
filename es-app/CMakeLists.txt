@@ -79,12 +79,16 @@ set(ES_HEADERS
     # Knulli-related GUIs
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/BoardCheck.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/CapabilityCheck.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/ExtendedGuiSettings.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/FactorySettings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiDeviceSettings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiPowerManagementSettings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiRgbSettings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/Pico8Installer.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/RgbService.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/UsbService.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/ThreadedDiskCheck.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/KnulliThemeCheck.h
 
     # Scrapers
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scrapers/Scraper.h
@@ -191,12 +195,16 @@ set(ES_SOURCES
     # Knulli-related GUIs
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/BoardCheck.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/CapabilityCheck.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/ExtendedGuiSettings.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/FactorySettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiDeviceSettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiPowerManagementSettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiRgbSettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/Pico8Installer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/RgbService.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/UsbService.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/ThreadedDiskCheck.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/KnulliThemeCheck.cpp
 
     # Scrapers
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scrapers/Scraper.cpp

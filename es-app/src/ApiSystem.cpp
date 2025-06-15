@@ -234,7 +234,7 @@ std::pair<std::string, int> ApiSystem::updateSystem(const std::function<void(con
 {
 	LOG(LogDebug) << "ApiSystem::updateSystem";
 
-	std::string updatecommand = "batocera-upgrade";
+	std::string updatecommand = "knulli-upgrade";
 
 	FILE *pipe = popen(updatecommand.c_str(), "r");
 	if (pipe == nullptr)
@@ -371,7 +371,7 @@ bool ApiSystem::canUpdate(std::vector<std::string>& output)
 {
 	LOG(LogDebug) << "ApiSystem::canUpdate";
 
-	FILE *pipe = popen("batocera-config canupdate", "r");
+	FILE *pipe = popen("knulli-update-check", "r");
 	if (pipe == NULL)
 		return false;
 
@@ -496,6 +496,13 @@ bool ApiSystem::isWifiAPModeSupported()
 
 	return executeScript("batocera-wifi has_ap_mode");
 }
+
+#ifdef KNULLI
+bool ApiSystem::runDiskCheck(const std::function<void(const std::string)>& func)
+{
+	return executeScript("knulli-disk-check", func).second == 0;
+}
+#endif
 
 bool ApiSystem::enableBluetooth()
 {

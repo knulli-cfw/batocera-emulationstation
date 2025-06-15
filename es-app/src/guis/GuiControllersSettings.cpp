@@ -152,6 +152,23 @@ GuiControllersSettings::GuiControllersSettings(Window* wnd, int autoSel) : GuiSe
 #endif
 	}
 
+#ifdef KNULLI
+
+	addGroup(_("CONTROLLER ASSIGNMENT"));
+
+	// ALWAYS ASSIGN INTERNAL HANDHELD CONTROLS TO PLAYER 1 EVEN IF A CONTROLLER IS CONNECTED
+	bool alwaysHandheldEnabled = SystemConf::getInstance()->getBool("system.input.p1_handheld");
+	auto alwaysHandheld = std::make_shared<SwitchComponent>(mWindow);
+	alwaysHandheld->setState(alwaysHandheldEnabled);
+	addWithDescription(_("USE HANDHELD CONTROLS FOR PLAYER 1"), _("Always use the built-in handheld controls for player 1, even if additional controllers are connected."), alwaysHandheld);
+
+	addSaveFunc([alwaysHandheld]
+	{
+		SystemConf::getInstance()->setBool("system.input.p1_handheld", alwaysHandheld->getState());
+	});		
+
+#endif
+
 	addGroup(_("DISPLAY OPTIONS"));
 
 	// CONTROLLER NOTIFICATION
