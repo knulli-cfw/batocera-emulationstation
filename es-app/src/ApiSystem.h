@@ -167,6 +167,7 @@ public:
     bool disableWifi();
 
 	virtual std::string getIpAdress();
+	virtual bool isWifiAPModeSupported();
 
 #ifdef KNULLI
 	bool runDiskCheck(const std::function<void(const std::string)>& func = nullptr);
