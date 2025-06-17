@@ -201,7 +201,7 @@ GuiNetPlay::GuiNetPlay(Window* window)
 	std::vector< std::shared_ptr<ButtonComponent> > buttons;
 	buttons.push_back(std::make_shared<ButtonComponent>(mWindow, _("REFRESH"), _("REFRESH"), [this] 
 	{
-			if (ApiSystem::getInstance()->getIpAdress() != "NOT CONNECTED")
+			if (ApiSystem::getInstance()->getIpAddress() != "NOT CONNECTED")
 				startRequest();
 			else if (SystemConf::getInstance()->getBool("wifi.enabled") && SystemConf::getInstance()->getBool("global.netplay.hotspot"))
 				findHotspot();
@@ -239,7 +239,7 @@ GuiNetPlay::GuiNetPlay(Window* window)
 	// Loading
     mBusyAnim.setSize(Vector2f(Renderer::getScreenWidth(), Renderer::getScreenHeight()));
 	
-	if (ApiSystem::getInstance()->getIpAdress() != "NOT CONNECTED")
+	if (ApiSystem::getInstance()->getIpAddress() != "NOT CONNECTED")
 		startRequest();
 	else if (SystemConf::getInstance()->getBool("wifi.enabled") && SystemConf::getInstance()->getBool("global.netplay.hotspot"))
 		findHotspot();
