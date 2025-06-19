@@ -1247,7 +1247,7 @@ void FolderData::getFilesRecursiveWithContext(std::vector<FileData*>& out, unsig
 					if (!filter->showHiddenFiles && it->getHidden())
 						continue;
 
-					if (filter->filterKidGame && it->getKidGame())
+					if (filter->filterKidGame && !it->getKidGame())
 						continue;
 
 					if (typeMask == GAME && filter->hiddenExtensions.size() > 0)
