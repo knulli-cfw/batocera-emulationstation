@@ -41,8 +41,7 @@ set(ES_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiGeneralScreensaverOptions.h 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiMenu.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiSettings.h    
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiScraperStart.h	
-	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiScraperSettings.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiScraperStart.h		
 	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiHashStart.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiGamelistFilter.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiCollectionSystemsOptions.h
@@ -97,6 +96,7 @@ set(ES_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scrapers/GamesDBJSONScraperResources.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scrapers/ArcadeDBJSONScraper.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/scrapers/HfsDBScraper.h
+	${CMAKE_CURRENT_SOURCE_DIR}/src/scrapers/IGDBScraper.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scrapers/ScreenScraper.h    
 
     # Views
@@ -162,8 +162,7 @@ set(ES_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiGeneralScreensaverOptions.cpp    
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiMenu.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiSettings.cpp    
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiScraperStart.cpp	
-	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiScraperSettings.cpp	
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiScraperStart.cpp		
 	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiHashStart.cpp	
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiGamelistFilter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiCollectionSystemsOptions.cpp
@@ -214,6 +213,7 @@ set(ES_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scrapers/GamesDBJSONScraperResources.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scrapers/ArcadeDBJSONScraper.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/scrapers/HfsDBScraper.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/scrapers/IGDBScraper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scrapers/ScreenScraper.cpp	
 
     # Views
