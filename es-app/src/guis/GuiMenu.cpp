@@ -2997,6 +2997,7 @@ void GuiMenu::updateGameLists(Window* window, bool confirm)
 
 	if (!confirm)
 	{
+		Scripting::fireEvent("update-gamelists");
 		ViewController::reloadAllGames(window, true, true);
 		return;
 	}
