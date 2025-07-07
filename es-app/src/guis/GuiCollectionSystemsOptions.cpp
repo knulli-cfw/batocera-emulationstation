@@ -193,19 +193,22 @@ void GuiCollectionSystemsOptions::initializeMenu()
 					window->pushGui(new GuiTextEditPopup(window, _("New Collection Name"), "", finalCreateCollection, false));
 			});
 
-		s->addGroup(_("CREATE FROM THEME"));
-
-		// add Custom Systems
-		for (auto it = unusedFolders.cbegin(); it != unusedFolders.cend(); it++)
+		if (!dynamicCollection)
 		{
-			std::string name = *it;
-			s->addEntry(Utils::String::toUpper(name), false, [name, this, dynamicCollection]
-				{
-					if (dynamicCollection)
-						createFilterCollection(name, false);
-					else
-						createCollection(name);
-				});
+			s->addGroup(_("CREATE FROM THEME"));
+
+			// add Custom Systems
+			for (auto it = unusedFolders.cbegin(); it != unusedFolders.cend(); it++)
+			{
+				std::string name = *it;
+				s->addEntry(Utils::String::toUpper(name), false, [name, this, dynamicCollection]
+					{
+						if (dynamicCollection)
+							createFilterCollection(name, false);
+						else
+							createCollection(name);
+					});
+			}
 		}
 
 		mWindow->pushGui(s);
