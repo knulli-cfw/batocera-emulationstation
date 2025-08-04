@@ -51,7 +51,7 @@ void ViewController::init(Window* window)
 	if (sInstance != nullptr)
 		delete sInstance;
 
-	sInstance = new ViewController(window);	
+	sInstance = new ViewController(window);
 }
 
 void ViewController::saveState()
@@ -61,7 +61,7 @@ void ViewController::saveState()
 
 	if (Settings::getInstance()->getString("StartupSystem") != "lastsystem")
 		return;
-	
+
 	SystemData* activeSystem = nullptr;
 
 	if (sInstance->mState.viewing == GAME_LIST)
@@ -73,19 +73,19 @@ void ViewController::saveState()
 	{
 		if (Settings::getInstance()->setString("LastSystem", activeSystem->getName()))
 			Settings::getInstance()->saveFile();
-	}	
+	}
 }
 
 ViewController::ViewController(Window* window)
 	: GuiComponent(window), mCurrentView(nullptr), mCamera(Transform4x4f::Identity()), mFadeOpacity(0), mLockInput(false)
 {
 	mSystemListView = nullptr;
-	mState.viewing = NOTHING;	
+	mState.viewing = NOTHING;
 	mState.system = nullptr;
 }
 
 ViewController::~ViewController()
-{	
+{
 	ISimpleGameListView* simpleView = dynamic_cast<ISimpleGameListView*>(mCurrentView.get());
 	if (simpleView != nullptr)
 		simpleView->closePopupContext();
@@ -179,7 +179,7 @@ void ViewController::goToSystemView(SystemData* system, bool forceImmediate)
 	// Realign system view
 	auto systemList = getSystemListView();
 	systemList->setPosition(systemId * (float)Renderer::getScreenWidth(), systemList->getPosition().y());
-	
+
 	// Realign every gamelist views
 	for (auto gameList : mGameListViews)
 	{
@@ -266,7 +266,7 @@ void ViewController::goToGameList(SystemData* system, bool forceImmediate)
 		sysList->setPosition(view->getPosition().x(), sysList->getPosition().y());
 		offX = sysList->getPosition().x() - offX;
 		mCamera.translation().x() -= offX;
-	}	
+	}
 	else if (mState.viewing == GAME_LIST && mState.system != nullptr)
 	{
 		// Realign current view to center
@@ -313,17 +313,17 @@ void ViewController::goToGameList(SystemData* system, bool forceImmediate)
 				}
 			}
 		}
-	}	
-	
+	}
+
 	mState.viewing = GAME_LIST;
 	mState.system = destinationSystem;
-	
+
 	if (collectionFolder != nullptr)
 	{
 		ISimpleGameListView* simpleView = dynamic_cast<ISimpleGameListView*>(view.get());
 		if (simpleView != nullptr)
 			simpleView->moveToFolder(collectionFolder);
-	}	
+	}
 
 	if (AudioManager::isInitialized())
 		AudioManager::getInstance()->changePlaylist(system->getTheme());
@@ -401,16 +401,16 @@ void ViewController::playViewTransition(bool forceImmediate)
 			advanceAnimation(0, FADE_DURATION - (int)(mFadeOpacity * FADE_DURATION));
 		}
 		else
-			advanceAnimation(0, (int)(mFadeOpacity * FADE_DURATION));		
-	} 
+			advanceAnimation(0, (int)(mFadeOpacity * FADE_DURATION));
+	}
 	else if (transition_style == "slide" || transition_style == "auto")
 	{
 		// slide or simple slide
 		setAnimation(new MoveCameraAnimation(mCamera, target));
 		updateHelpPrompts(); // update help prompts immediately
-	} 
+	}
 	else
-	{		
+	{
 		// instant
 		setAnimation(new LambdaAnimation([this, target](float)
 		{
@@ -443,7 +443,7 @@ void ViewController::onFileChanged(FileData* file, FileChangeType change)
 	}
 
 	for (auto collection : CollectionSystemManager::get()->getAutoCollectionSystems())
-	{		
+	{
 		auto cit = mGameListViews.find(collection.second.system);
 		if (cit != mGameListViews.cend() && collection.second.system->getRootFolder()->FindByPath(key))
 			cit->second->onFileChanged(file, change);
@@ -556,7 +556,7 @@ void ViewController::launch(FileData* game, LaunchGameOptions options, Vector3f 
 		options.netPlayMode = DISABLED;
 	else if (options.netPlayMode == DISABLED && Settings::getInstance()->getBool("NetPlayAutomaticallyCreateLobby"))
 		options.netPlayMode = SERVER;
-	
+
 	Transform4x4f origCamera = mCamera;
 	origCamera.translation() = -mCurrentView->getPosition();
 
@@ -566,19 +566,19 @@ void ViewController::launch(FileData* game, LaunchGameOptions options, Vector3f 
 	mLockInput = true;
 
 	GuiComponent::isLaunchTransitionRunning = true;
-		
+
 	if (!Settings::getInstance()->getBool("HideWindow"))
 		mWindow->setCustomSplashScreen(game->getImagePath(), game->getName(), game);
 
 	std::string transition_style = Settings::GameTransitionStyle();
 	if (transition_style.empty() || transition_style == "auto")
 		transition_style = Settings::TransitionStyle();
-	
+
 	if (Settings::PowerSaverMode() == "instant")
 		transition_style = "instant";
 
 	if(transition_style == "auto")
-		transition_style = "slide";
+		transition_style = "fast slide";
 
 	if (Settings::PowerSaverMode() == "instant")
 		transition_style = "instant";
@@ -611,13 +611,13 @@ void ViewController::launch(FileData* game, LaunchGameOptions options, Vector3f 
 				this->onFileChanged(game, FILE_METADATA_CHANGED);
 			}
 		});
-	} 
+	}
 	else if (transition_style == "slide" || transition_style == "fast slide")
 	{
 		int slideDuration = (transition_style == "fast slide") ? 750 : 1500; // Halve the duration for fast slide
 		// move camera to zoom in on center + fade out, launch game, come back in
 		setAnimation(new LaunchAnimation(mCamera, mFadeOpacity, center, slideDuration), 0, [this, origCamera, center, game, options]
-		{			
+		{
 			if (doLaunchGame(game, options))
 			{
 				GuiComponent::isLaunchTransitionRunning = false;
@@ -632,11 +632,11 @@ void ViewController::launch(FileData* game, LaunchGameOptions options, Vector3f 
 				this->onFileChanged(game, FILE_METADATA_CHANGED);
 			}
 		});
-	} 
+	}
 	else // instant
-	{ 		
+	{
 		setAnimation(new LaunchAnimation(mCamera, mFadeOpacity, center, 10), 0, [this, origCamera, center, game, options]
-		{			
+		{
 			if (doLaunchGame(game, options))
 			{
 				GuiComponent::isLaunchTransitionRunning = false;
@@ -870,7 +870,7 @@ bool ViewController::input(InputConfig* config, Input input)
 	if (config->getDeviceId() == DEVICE_KEYBOARD && input.value && input.id == SDLK_F5)
 	{
 		mWindow->render();
-		
+
 		FileSorts::reset();
 		ResourceManager::getInstance()->unloadAll();
 		ResourceManager::getInstance()->reloadAll();
@@ -899,7 +899,7 @@ bool ViewController::input(InputConfig* config, Input input)
 
 	// Next song
 	if (((mState.viewing != GAME_LIST && config->isMappedTo("l3", input)) || config->isMappedTo("r3", input)) && input.value != 0)
-	{		
+	{
 		AudioManager::getInstance()->playRandomMusic(false);
 		return true;
 	}
@@ -942,7 +942,7 @@ void ViewController::update(int deltaTime)
 		mCurrentView = mDeferPlayViewTransitionTo;
 		mDeferPlayViewTransitionTo = nullptr;
 
-		playViewTransition(false); 
+		playViewTransition(false);
 	}
 }
 
@@ -1009,7 +1009,7 @@ void ViewController::preload()
 	bool splash = preloadUI && Settings::getInstance()->getBool("SplashScreen") && Settings::getInstance()->getBool("SplashScreenProgress");
 
 	for(auto it = SystemData::sSystemVector.cbegin(); it != SystemData::sSystemVector.cend(); it++)
-	{		
+	{
 		if ((*it)->isGroupChildSystem() || !(*it)->isVisible())
 		{
 			i++;
@@ -1057,7 +1057,7 @@ void ViewController::reloadGameListView(IGameListView* view)
 			continue;
 
 		SystemData* system = it->first;
-			
+
 		std::string cursorPath;
 		FileData* cursor = view->getCursor();
 		if (cursor != nullptr && !cursor->isPlaceHolder())
@@ -1068,9 +1068,9 @@ void ViewController::reloadGameListView(IGameListView* view)
 		system->setUIModeFilters();
 		system->updateDisplayedGameCount();
 
-		std::shared_ptr<IGameListView> newView = getGameListView(system);		
+		std::shared_ptr<IGameListView> newView = getGameListView(system);
 		if (isCurrent)
-		{		
+		{
 			mCurrentView = newView;
 			mCurrentView->setPosition(position);
 
@@ -1089,11 +1089,11 @@ void ViewController::reloadGameListView(IGameListView* view)
 					}
 				}
 			}
-		}		
+		}
 
-		break;		
+		break;
 	}
-	
+
 	// Redisplay the current view
 	if (mCurrentView)
 	{
@@ -1136,7 +1136,7 @@ void ViewController::reloadAll(Window* window, bool reloadTheme)
 
 		mCurrentView->onHide();
 	}
-	
+
 	ThemeData::setDefaultTheme(nullptr);
 
 	SystemData* system = nullptr;
@@ -1154,12 +1154,12 @@ void ViewController::reloadAll(Window* window, bool reloadTheme)
 	}
 
 	mGameListViews.clear();
-	
+
 	// If preloaded is disabled
 	for (auto it = SystemData::sSystemVector.cbegin(); it != SystemData::sSystemVector.cend(); it++)
 		if (cursorMap.find((*it)) == cursorMap.end())
 			cursorMap[(*it)] = NULL;
-	
+
 	if (reloadTheme && cursorMap.size() > 0)
 	{
 		mCurrentView.reset();
@@ -1176,7 +1176,7 @@ void ViewController::reloadAll(Window* window, bool reloadTheme)
 			SystemData* pooledSystem = it->first;
 
 			pool.queueWorkItem([pooledSystem, &processedSystem]
-			{ 
+			{
 				pooledSystem->loadTheme();
 				pooledSystem->resetFilters();
 				processedSystem++;
@@ -1219,7 +1219,7 @@ void ViewController::reloadAll(Window* window, bool reloadTheme)
 				if (mState.getSystem() == it->first)
 					getGameListView(mState.getSystem())->setCursor(it->second);
 			}
-			
+
 			idx++;
 
 			int time = SDL_GetTicks();
@@ -1244,7 +1244,7 @@ void ViewController::reloadAll(Window* window, bool reloadTheme)
 				ViewController::get()->onThemeChanged(theme);
 				break;
 			}
-		}	
+		}
 	}
 
 	// Rebuild SystemListView
@@ -1359,11 +1359,11 @@ void ViewController::reloadAllGames(Window* window, bool deleteCurrentGui, bool 
 		ApiSystem::getInstance()->callBatoceraPreGameListsHook();
 
 	ViewController::init(window);
-	
-	CollectionSystemManager::init(window);		
+
+	CollectionSystemManager::init(window);
 	SystemData::loadConfig(window);
-	
-	ViewController::get()->goToSystemView(systemName, true, viewMode);	
+
+	ViewController::get()->goToSystemView(systemName, true, viewMode);
 	ViewController::get()->reloadAll(nullptr, false); // Avoid reloading themes a second time
 
 	window->closeSplashScreen();
