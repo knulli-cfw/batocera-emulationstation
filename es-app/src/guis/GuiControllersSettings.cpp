@@ -160,12 +160,12 @@ GuiControllersSettings::GuiControllersSettings(Window* wnd, int autoSel) : GuiSe
 	bool alwaysHandheldEnabled = SystemConf::getInstance()->getBool("system.input.p1_handheld");
 	auto alwaysHandheld = std::make_shared<SwitchComponent>(mWindow);
 	alwaysHandheld->setState(alwaysHandheldEnabled);
-	addWithDescription(_("USE HANDHELD CONTROLS FOR PLAYER 1"), _("Always use the built-in handheld controls for player 1, even if additional controllers are connected."), alwaysHandheld);
+	addWithDescription(_("HANDHELD AS PLAYER 1"), _("Always use the built-in handheld controls for player 1, even if additional controllers are connected."), alwaysHandheld);
 
 	addSaveFunc([alwaysHandheld]
 	{
 		SystemConf::getInstance()->setBool("system.input.p1_handheld", alwaysHandheld->getState());
-	});		
+	});
 
 #endif
 
@@ -183,7 +183,7 @@ GuiControllersSettings::GuiControllersSettings(Window* wnd, int autoSel) : GuiSe
 			delete this;
 			openControllersSettings(parent, 1);
 		} });
-		
+
 	// CONTROLLER ACTIVITY
 	auto activity = std::make_shared<SwitchComponent>(mWindow);
 	activity->setState(Settings::getInstance()->getBool("ShowControllerActivity"));
@@ -531,15 +531,15 @@ void GuiControllersSettings::openControllersSpecificSettings_steamdeckgun()
 	mWindow->pushGui(s);
 }
 
-void GuiControllersSettings::clearLoadedInput() 
+void GuiControllersSettings::clearLoadedInput()
 {
-	for (int i = 0; i < mLoadedInput.size(); i++) 
+	for (int i = 0; i < mLoadedInput.size(); i++)
 		delete mLoadedInput[i];
 
 	mLoadedInput.clear();
 }
 
-GuiControllersSettings::~GuiControllersSettings() 
+GuiControllersSettings::~GuiControllersSettings()
 {
 	clearLoadedInput();
 }

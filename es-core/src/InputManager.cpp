@@ -11,6 +11,7 @@
 #include <iostream>
 #include <assert.h>
 #include "Settings.h"
+#include "SystemConf.h"
 #include <algorithm>
 #include <mutex>
 #include "utils/StringUtil.h"
@@ -37,7 +38,7 @@
 //    It can change even if the device is the same, and is only used to open joysticks (required to receive SDL events).
 // 2. SDL_JoystickID - this is an ID for each joystick that is supposed to remain consistent between plugging and unplugging.
 //    ES doesn't care if it does, though.
-// 3. "Device ID" - this is something I made up and is what InputConfig's getDeviceID() returns.  
+// 3. "Device ID" - this is something I made up and is what InputConfig's getDeviceID() returns.
 //    This is actually just an SDL_JoystickID (also called instance ID), but -1 means "keyboard" instead of "error."
 // 4. Joystick GUID - this is some squashed version of joystick vendor, version, and a bunch of other device-specific things.
 //    It should remain the same across runs of the program/system restarts/device reordering and is what I use to identify which joystick to load.
@@ -75,7 +76,7 @@ void InputManager::init()
 	if (initialized())
 		deinit();
 
-	mKeyboardInputConfig = new InputConfig(DEVICE_KEYBOARD, -1, "Keyboard", KEYBOARD_GUID_STRING, 0, 0, 0); 
+	mKeyboardInputConfig = new InputConfig(DEVICE_KEYBOARD, -1, "Keyboard", KEYBOARD_GUID_STRING, 0, 0, 0);
 	loadInputConfig(mKeyboardInputConfig);
 
   rebuildAllJoysticks(false);
@@ -84,7 +85,7 @@ void InputManager::init()
 	SDL_USER_CECBUTTONDOWN = SDL_RegisterEvents(2);
 	SDL_USER_CECBUTTONUP   = SDL_USER_CECBUTTONDOWN + 1;
 	CECInput::init();
-	mCECInputConfig = new InputConfig(DEVICE_CEC, -1, "CEC", CEC_GUID_STRING, 0, 0, 0); 
+	mCECInputConfig = new InputConfig(DEVICE_CEC, -1, "CEC", CEC_GUID_STRING, 0, 0, 0);
 	loadInputConfig(mCECInputConfig);
 #else
 	mCECInputConfig = nullptr;
@@ -190,10 +191,10 @@ void InputManager::deinit()
 	}
 }
 
-int InputManager::getNumJoysticks() 
-{ 
+int InputManager::getNumJoysticks()
+{
 	std::unique_lock<std::mutex> lock(mJoysticksLock);
-	return (int)mJoysticks.size(); 
+	return (int)mJoysticks.size();
 }
 
 InputConfig* InputManager::getInputConfigByDevice(int device)
@@ -209,7 +210,7 @@ InputConfig* InputManager::getInputConfigByDevice(int device)
 
 	if(device == DEVICE_GUN)
 		return mGunInputConfig;
-	
+
 	return mInputConfigs[device];
 }
 
@@ -244,7 +245,7 @@ class Win32RawInputApi
 {
 public:
 	Win32RawInputApi()
-	{		
+	{
 		m_hSDL2 = ::LoadLibrary("SDL2.dll");
 		if (m_hSDL2 != NULL)
 		{
@@ -272,7 +273,7 @@ public:
 
 		m_hSetupapi = NULL;
 	}
-	
+
 	std::string SDL_JoystickPathForIndex(int device_index)
 	{
 		if (m_JoystickPathForIndex != NULL)
@@ -317,13 +318,13 @@ public:
 		return devicePath;
 	}
 
-private:	
+private:
 	HMODULE m_hSDL2;
 	HMODULE m_hSetupapi;
 
 	typedef const char *(SDLCALL *SDL_JoystickPathForIndexPtr)(int);
 	SDL_JoystickPathForIndexPtr m_JoystickPathForIndex;
-	
+
 	typedef CONFIGRET(WINAPI* CM_Locate_DevNodeAPtr)(PDEVINST pdnDevInst, DEVINSTID_A pDeviceID, ULONG ulFlags);
 	CM_Locate_DevNodeAPtr m_CM_Locate_DevNodeA;
 
@@ -353,9 +354,9 @@ void InputManager::rebuildAllJoysticks(bool deinit)
 
 	SDL_SetHint("SDL_JOYSTICK_HIDAPI_WII", "0");
 #endif
-			
+
 	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, Settings::getInstance()->getBool("BackgroundJoystickInput") ? "1" : "0");
-	SDL_InitSubSystem(SDL_INIT_JOYSTICK);	
+	SDL_InitSubSystem(SDL_INIT_JOYSTICK);
 
 	mJoysticksLock.lock();
 
@@ -410,10 +411,10 @@ void InputManager::rebuildAllJoysticks(bool deinit)
 		{
 #if !BATOCERA
 			std::string mappingString;
-			
+
 			if (SDL_IsGameController(idx))
 				mappingString = SDL_GameControllerMappingForDeviceIndex(idx);
-			
+
 			if (!mappingString.empty() && loadFromSdlMapping(mInputConfigs[joyId], mappingString))
 			{
 				InputManager::getInstance()->writeDeviceConfig(mInputConfigs[joyId]); // save
@@ -428,11 +429,11 @@ void InputManager::rebuildAllJoysticks(bool deinit)
 
 		// set up the prevAxisValues
 		int numAxes = SDL_JoystickNumAxes(joy);
-		
+
 		mPrevAxisValues.erase(joyId);
 		mPrevAxisValues[joyId] = new int[numAxes];
 		std::fill(mPrevAxisValues[joyId], mPrevAxisValues[joyId] + numAxes, 0); //initialize array to 0
-	}	
+	}
 
 	mJoysticksLock.unlock();
 
@@ -447,9 +448,9 @@ void InputManager::rebuildAllJoysticks(bool deinit)
 // Retrocompatible declaration for SDL_JoyBatteryEvent
 typedef struct SDL_JoyBatteryEventX
 {
-	Uint32 type;        
-	Uint32 timestamp;   
-	SDL_JoystickID which; 
+	Uint32 type;
+	Uint32 timestamp;
+	SDL_JoystickID which;
 	SDL_JoystickPowerLevel level;
 } SDL_JoyBatteryEventX;
 #endif
@@ -497,7 +498,7 @@ bool InputManager::parseEvent(const SDL_Event& ev, Window* window)
 #endif
 
 	case SDL_JOYAXISMOTION:
-	{		
+	{
 	// some axes are "full" : from -32000 to +32000
 	// in this case, their unpressed state is not 0
 	// SDL provides a function to get this value
@@ -526,15 +527,15 @@ bool InputManager::parseEvent(const SDL_Event& ev, Window* window)
 #endif
 
 		if (mPrevAxisValues.find(ev.jaxis.which) != mPrevAxisValues.cend())
-		{			
+		{
 			//if it switched boundaries
 			if ((abs(ev.jaxis.value - initialValue) > DEADZONE) != (abs(mPrevAxisValues[ev.jaxis.which][ev.jaxis.axis]) > DEADZONE))
 			{
 				int normValue;
-				if (abs(ev.jaxis.value - initialValue) <= DEADZONE) 
+				if (abs(ev.jaxis.value - initialValue) <= DEADZONE)
 					normValue = 0;
 				else
-					if (ev.jaxis.value - initialValue > 0) 
+					if (ev.jaxis.value - initialValue > 0)
 						normValue = 1;
 					else
 						normValue = -1;
@@ -543,7 +544,7 @@ bool InputManager::parseEvent(const SDL_Event& ev, Window* window)
 				causedEvent = true;
 			}
 
-			mPrevAxisValues[ev.jaxis.which][ev.jaxis.axis] = ev.jaxis.value - initialValue; 
+			mPrevAxisValues[ev.jaxis.which][ev.jaxis.axis] = ev.jaxis.value - initialValue;
 		}
 
 		return causedEvent;
@@ -552,8 +553,8 @@ bool InputManager::parseEvent(const SDL_Event& ev, Window* window)
 	case SDL_JOYBUTTONUP:
 		window->input(getInputConfigByDevice(ev.jbutton.which), Input(ev.jbutton.which, TYPE_BUTTON, ev.jbutton.button, ev.jbutton.state == SDL_PRESSED, false));
 		return true;
-	
-	case SDL_MOUSEBUTTONDOWN:        
+
+	case SDL_MOUSEBUTTONDOWN:
 	case SDL_MOUSEBUTTONUP:
 		if (!getGunManager()->isReplacingMouse())
 			if (!window->processMouseButton(ev.button.button, ev.type == SDL_MOUSEBUTTONDOWN, ev.button.x, ev.button.y))
@@ -649,7 +650,7 @@ bool InputManager::parseEvent(const SDL_Event& ev, Window* window)
 			    window->displayNotificationMessage(_U("\uF11B ") + Utils::String::format(_("%s disconnected").c_str(), Utils::String::trim(it->second->getDeviceName()).c_str()));
 			  }
 			}
-	
+
 			rebuildAllJoysticks();
 		}
 		return false;
@@ -683,7 +684,7 @@ bool InputManager::tryLoadInputConfig(std::string path, InputConfig* config, boo
 	pugi::xml_node root = doc.child("inputList");
 	if (!root)
 		return false;
-	
+
 	// Search for exact match guid + name
 	for (pugi::xml_node item = root.child("inputConfig"); item; item = item.next_sibling("inputConfig"))
 	{
@@ -780,14 +781,14 @@ static std::map<std::string, std::string> _sdlToEsMapping =
 };
 
 bool InputManager::loadFromSdlMapping(InputConfig* config, const std::string& mapping)
-{	
+{
 	bool isConfigured = false;
 
 	auto mapArray = Utils::String::split(mapping, ',', true);
 	for (auto tt : mapArray)
 	{
 		size_t pos = tt.find(':');
-		if (pos == std::string::npos) 
+		if (pos == std::string::npos)
 			continue;
 
 		std::string key = tt.substr(0, pos);
@@ -802,14 +803,14 @@ bool InputManager::loadFromSdlMapping(InputConfig* config, const std::string& ma
 
 		int valueSign = 1;
 		int idx = 0;
-				
+
 		switch (value[idx])
 		{
-		case '-': 
+		case '-':
 			valueSign = -1;
 			idx++;
 			break;
-		case '+': 
+		case '+':
 			idx++;
 			break;
 		}
@@ -817,14 +818,14 @@ bool InputManager::loadFromSdlMapping(InputConfig* config, const std::string& ma
 		Input input;
 		input.device = config->getDeviceId();
 		input.type = InputType::TYPE_COUNT;
-		input.configured = false;		
+		input.configured = false;
 
 		switch (value[idx])
 		{
 		case 'a':
 			{
 				input.type = InputType::TYPE_AXIS;
-				input.id = Utils::String::toInteger(value.substr(idx + 1));				
+				input.id = Utils::String::toInteger(value.substr(idx + 1));
 				input.value = 1 * valueSign;
 				input.configured = true;
 
@@ -859,7 +860,7 @@ bool InputManager::loadFromSdlMapping(InputConfig* config, const std::string& ma
 		{
 			// BATOCERA : Uncomment the next line using a patch to compute the code
 			// input.computeCode();
-			
+
 			config->mapInput(inputName->second, input);
 			isConfigured = true;
 		}
@@ -964,15 +965,15 @@ void InputManager::writeDeviceConfig(InputConfig* config)
 			// successfully loaded, delete the old entry if it exists
 			pugi::xml_node root = doc.child("inputList");
 			if (root)
-			{				
+			{
 				pugi::xml_node oldEntry(NULL);
-				for (pugi::xml_node item = root.child("inputConfig"); item; item = item.next_sibling("inputConfig")) 
+				for (pugi::xml_node item = root.child("inputConfig"); item; item = item.next_sibling("inputConfig"))
 				{
 					if (strcmp(config->getDeviceGUIDString().c_str(), item.attribute("deviceGUID").value()) == 0
 #if !WIN32
 						&& strcmp(config->getDeviceName().c_str(), item.attribute("deviceName").value()) == 0
 #endif
-						) 
+						)
 					{
 						oldEntry = item;
 						break;
@@ -990,7 +991,7 @@ void InputManager::writeDeviceConfig(InputConfig* config)
 
 	config->writeToXML(root);
 	doc.save_file(WINSTRINGW(path).c_str());
-        
+
 	/* create a es_last_input.cfg so that people can easily share their config */
 	pugi::xml_document lastdoc;
 	pugi::xml_node lastroot = lastdoc.append_child("inputList");
@@ -1000,7 +1001,7 @@ void InputManager::writeDeviceConfig(InputConfig* config)
 
 	Scripting::fireEvent("config-changed");
 	Scripting::fireEvent("controls-changed");
-	
+
 	// execute any onFinish commands and re-load the config for changes
 	doOnFinish();
 	loadInputConfig(config);
@@ -1035,7 +1036,7 @@ void InputManager::doOnFinish()
 						std::string tocall = command.text().get();
 
 						LOG(LogInfo) << "	" << tocall;
-						std::cout << "==============================================\ninput config finish command:\n";						
+						std::cout << "==============================================\ninput config finish command:\n";
 						int exitCode = Utils::Platform::ProcessStartInfo(tocall).run();
 						std::cout << "==============================================\n";
 
@@ -1085,7 +1086,7 @@ int InputManager::getNumConfiguredDevices()
 	return num;
 }
 
-void InputManager::computeLastKnownPlayersDeviceIndexes() 
+void InputManager::computeLastKnownPlayersDeviceIndexes()
 {
 	std::map<int, InputConfig*> playerJoysticks = computePlayersConfigs();
 
@@ -1143,7 +1144,7 @@ std::map<int, InputConfig*> InputManager::computePlayersConfigs()
 	}
 
 	// First loop, search for GUID + NAME. High Priority
-	for (int player = 0; player < MAX_PLAYERS; player++) 
+	for (int player = 0; player < MAX_PLAYERS; player++)
 	{
 		if (playerJoysticks.find(player) != playerJoysticks.cend())
 			continue;
@@ -1164,7 +1165,7 @@ std::map<int, InputConfig*> InputManager::computePlayersConfigs()
 	}
 
 	// Second loop, search for NAME. Low Priority
-	for (int player = 0; player < MAX_PLAYERS; player++) 
+	for (int player = 0; player < MAX_PLAYERS; player++)
 	{
 		if (playerJoysticks.find(player) != playerJoysticks.cend())
 			continue;
@@ -1184,7 +1185,7 @@ std::map<int, InputConfig*> InputManager::computePlayersConfigs()
 	}
 
 	// Last loop, search for free controllers for remaining players.
-	for (int player = 0; player < MAX_PLAYERS; player++) 
+	for (int player = 0; player < MAX_PLAYERS; player++)
 	{
 		if (playerJoysticks.find(player) != playerJoysticks.cend())
 			continue;
@@ -1199,19 +1200,38 @@ std::map<int, InputConfig*> InputManager::computePlayersConfigs()
 	}
 
 	// in case of hole (player 1 missing, but player 4 set, fill the holes with last players joysticks)
-	for (int player = 0; player < MAX_PLAYERS; player++) 
+	for (int player = 0; player < MAX_PLAYERS; player++)
 	{
 		if (playerJoysticks.find(player) != playerJoysticks.cend())
 			continue;
 
-		for (int repplayer = MAX_PLAYERS; repplayer > player; repplayer--) 
+		for (int repplayer = MAX_PLAYERS; repplayer > player; repplayer--)
 		{
-			if (playerJoysticks[player] == NULL && playerJoysticks[repplayer] != NULL) 
+			if (playerJoysticks[player] == NULL && playerJoysticks[repplayer] != NULL)
 			{
 				playerJoysticks[player] = playerJoysticks[repplayer];
 				playerJoysticks[repplayer] = NULL;
 			}
-		}		
+		}
+	}
+
+	const bool handheldAlwaysP1 = SystemConf::getInstance()->getBool("system.input.p1_handheld");
+
+	if (!handheldAlwaysP1) {
+		int assigned = 0;
+		for (int p = 0; p < MAX_PLAYERS; ++p) {
+			auto it = playerJoysticks.find(p);
+			if (it == playerJoysticks.end() || it->second == nullptr) break;
+			assigned++;
+		}
+
+		// Shift left only if we have at least two assigned controllers.
+		if (assigned > 1 && playerJoysticks[0] != nullptr) {
+			InputConfig* handheld = playerJoysticks[0];
+			for (int p = 0; p < assigned - 1; ++p)
+				playerJoysticks[p] = playerJoysticks[p + 1];
+			playerJoysticks[assigned - 1] = handheld;
+		}
 	}
 
 	for (int player = 0; player < MAX_PLAYERS; player++)
@@ -1254,7 +1274,7 @@ void InputManager::updateBatteryLevel(int id, const std::string& device, const s
 
 	mJoysticksLock.lock();
 
-	for (auto joy : mJoysticks) 
+	for (auto joy : mJoysticks)
 	{
 		InputConfig* config = getInputConfigByDevice(joy.first);
 		if (config != NULL && config->isConfigured())
