@@ -1217,6 +1217,21 @@ std::map<int, InputConfig*> InputManager::computePlayersConfigs()
 
 	const bool handheldAlwaysP1 = SystemConf::getInstance()->getBool("system.input.p1_handheld");
 
+	// Let's find the internal handheld controls (if present)
+	InputConfig* internalControls = NULL;
+	for (int p = 0; p < MAX_PLAYERS; p++) {
+		if (playerJoysticks[p]->isInternal()) {
+			internalControls = playerJoysticks[p];
+			LOG(LogDebug) << "Identified internal handheld controls: \"" << internalControls->getDeviceName() << "\".\n";
+			break;
+		}
+	}
+#ifdef KNULLI
+	if (internalControls == NULL) {
+		LOG(LogError) << "No internal handheld controls found!\n";
+	}
+#endif
+
 	if (!handheldAlwaysP1) {
 		int assigned = 0;
 		for (int p = 0; p < MAX_PLAYERS; ++p) {
