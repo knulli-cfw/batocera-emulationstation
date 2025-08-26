@@ -1138,12 +1138,11 @@ std::map<int, InputConfig*> InputManager::computePlayersConfigs()
 		if (conf.second != nullptr && conf.second->isConfigured())
 			availableConfigured.push_back(conf.second);
 
-	LOG(LogError) << "Attempt sorting\n";
+
 	// sort available configs by how long they are connected
 	std::sort(availableConfigured.begin(), availableConfigured.end(), [this](InputConfig * a, InputConfig * b) -> bool {
 		return this->mDevicePathConnectionTimestamps[a->getDevicePath()] < this->mDevicePathConnectionTimestamps[b->getDevicePath()];
 	});
-	
 
 	// 2. Pour chaque joueur verifier si il y a un configurated
 	// associer le input au joueur
@@ -1152,13 +1151,19 @@ std::map<int, InputConfig*> InputManager::computePlayersConfigs()
 
 	int nextAvailablePlayer = 0;
 
+	// If there's only one controller, assign it to player 1 and return
+	if (availableConfigured.size() == 1) {
+		playerJoysticks[0] = availableConfigured[0];
+		return playerJoysticks;
+	}
+
 	// Check if we have to force internal controls for player 1
 	const bool handheldAlwaysP1 = SystemConf::getInstance()->getBool("system.input.p1_handheld");
 	if (handheldAlwaysP1) {
 		// Find internal controls and assign them to player 1
 		for (auto controller = availableConfigured.begin(); controller != availableConfigured.end(); ++controller)
 		{
-			// Skip non-internal controls, we want internal ones for player 1
+			// Skip non-internal controls, we want internal controls for player 1
 			if (!(*controller)->isInternal())
 				continue;
 			playerJoysticks[0] = *controller;
@@ -1167,7 +1172,7 @@ std::map<int, InputConfig*> InputManager::computePlayersConfigs()
 			break;
 		}
 		if (playerJoysticks.find(0) == playerJoysticks.cend()) {
-			// No internal controls found, we cannot force player 1 to be internal
+			// No internal controls found, ignore the setting
 			LOG(LogWarning) << "system.input.p1_handheld is set but no internal controls found, ignoring the setting.\n";
 		}
 	}
@@ -1180,6 +1185,9 @@ std::map<int, InputConfig*> InputManager::computePlayersConfigs()
 
 		for (auto controller = availableConfigured.begin(); controller != availableConfigured.end(); ++controller)
 		{
+			// Skip internal controls, they have been assigned to player 1 if needed
+			if ((*controller)->isInternal())
+				continue;
 			playerJoysticks[player] = *controller;
 			availableConfigured.erase(controller);
 			break;
