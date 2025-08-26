@@ -626,8 +626,6 @@ bool InputManager::parseEvent(const SDL_Event& ev, Window* window)
 
 			if (!addedDevicePath.empty() && mDevicePathConnectionTimestamps.find(addedDevicePath) == mDevicePathConnectionTimestamps.cend()) {
 				mDevicePathConnectionTimestamps[addedDevicePath] = ev.jdevice.timestamp;
-			} else {
-				LOG(LogError) << "Joystick device \"" << addedDeviceName << "\" has been added without device path!\n";
 			}
 
 #ifdef HAVE_UDEV
@@ -1139,14 +1137,13 @@ std::map<int, InputConfig*> InputManager::computePlayersConfigs()
 			availableConfigured.push_back(conf.second);
 
 
-	// sort available configs by how long they are connected
+	// Sort available configs by how long they are connected (older first)
+	// (Internal controls will most likely be the oldest)
 	std::sort(availableConfigured.begin(), availableConfigured.end(), [this](InputConfig * a, InputConfig * b) -> bool {
 		return this->mDevicePathConnectionTimestamps[a->getDevicePath()] < this->mDevicePathConnectionTimestamps[b->getDevicePath()];
 	});
 
-	// 2. Pour chaque joueur verifier si il y a un configurated
-	// associer le input au joueur
-	// enlever des disponibles
+	// Initialize player controller assignments
 	std::map<int, InputConfig*> playerJoysticks;
 
 	int nextAvailablePlayer = 0;
@@ -1154,30 +1151,41 @@ std::map<int, InputConfig*> InputManager::computePlayersConfigs()
 	// If there's only one controller, assign it to player 1 and return
 	if (availableConfigured.size() == 1) {
 		playerJoysticks[0] = availableConfigured[0];
+		LOG(LogInfo) << "computePlayersConfigs : Player " << 0 << " => " << playerJoysticks[0]->getDevicePath() << " (connected since " << mDevicePathConnectionTimestamps[playerJoysticks[0]->getDevicePath()] << ")";
 		return playerJoysticks;
 	}
-
-	// Check if we have to force internal controls for player 1
-	const bool handheldAlwaysP1 = SystemConf::getInstance()->getBool("system.input.p1_handheld");
-	if (handheldAlwaysP1) {
-		// Find internal controls and assign them to player 1
-		for (auto controller = availableConfigured.begin(); controller != availableConfigured.end(); ++controller)
-		{
-			// Skip non-internal controls, we want internal controls for player 1
-			if (!(*controller)->isInternal())
-				continue;
-			playerJoysticks[0] = *controller;
-			availableConfigured.erase(controller);
+	
+	// Find internal controls
+	InputConfig * internalController = nullptr;
+	for (auto controller = availableConfigured.begin(); controller != availableConfigured.end(); ++controller)
+	{
+		// Skip non-internal controls, we are looking for internal controls
+		if (!(*controller)->isInternal()) {
+			continue;
+		}
+		// Found internal controls, remove them from the list of available controllers
+		internalController = *controller;
+		availableConfigured.erase(controller);
+		break;
+	}
+	// Assign internal controls to player 1 if needed
+	if (internalController != nullptr) {
+		// Check if we have to force internal controls for player 1
+		const bool handheldAlwaysP1 = SystemConf::getInstance()->getBool("system.input.p1_handheld");
+		if (handheldAlwaysP1 && playerJoysticks.find(0) == playerJoysticks.cend()) {
+			// Assign internal controller to player 1
+			playerJoysticks[0] = internalController;
 			nextAvailablePlayer++;
-			break;
+		} else {
+			// Put the internal controller back but move it to the end of the list
+			availableConfigured.push_back(internalController);
 		}
-		if (playerJoysticks.find(0) == playerJoysticks.cend()) {
-			// No internal controls found, ignore the setting
-			LOG(LogWarning) << "system.input.p1_handheld is set but no internal controls found, ignoring the setting.\n";
-		}
+	} else {
+		LOG(LogError) << "No internal controls found!";
 	}
 
-	// Assign configured controllers to players
+	// Assign configured controllers to players in order of connection time
+	// (If internal controls aren't assigned to player 1, they will be the last to be assigned)
 	for (int player = nextAvailablePlayer; player < MAX_PLAYERS; player++)
 	{
 		if (playerJoysticks.find(player) != playerJoysticks.cend())
@@ -1185,9 +1193,6 @@ std::map<int, InputConfig*> InputManager::computePlayersConfigs()
 
 		for (auto controller = availableConfigured.begin(); controller != availableConfigured.end(); ++controller)
 		{
-			// Skip internal controls, they have been assigned to player 1 if needed
-			if ((*controller)->isInternal())
-				continue;
 			playerJoysticks[player] = *controller;
 			availableConfigured.erase(controller);
 			break;
@@ -1197,13 +1202,13 @@ std::map<int, InputConfig*> InputManager::computePlayersConfigs()
 	// Log controller assignments
 	for (int player = 0; player < MAX_PLAYERS; player++)
 	{
-		if (playerJoysticks.find(player) != playerJoysticks.cend())
-			continue;
-
-		LOG(LogInfo) << "computePlayersConfigs : Player " << player << " => " << playerJoysticks[player]->getDevicePath();
+		if (playerJoysticks[player] == nullptr) {
+			LOG(LogInfo) << "computePlayersConfigs : Player " << player << " => none";
+		} else {
+			LOG(LogInfo) << "computePlayersConfigs : Player " << player << " => " << playerJoysticks[player]->getDevicePath() << " (connected since " << mDevicePathConnectionTimestamps[playerJoysticks[player]->getDevicePath()] << ")";
+		}
 	}
-
-	return playerJoysticks;
+return playerJoysticks;
 }
 
 std::string InputManager::configureEmulators() {
