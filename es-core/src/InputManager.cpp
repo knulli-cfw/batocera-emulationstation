@@ -612,11 +612,23 @@ bool InputManager::parseEvent(const SDL_Event& ev, Window* window)
 	case SDL_JOYDEVICEADDED:
 		{
 			std::string addedDeviceName;
+			std::string addedDevicePath;
 			bool isWheel = false;
 			auto id = SDL_JoystickGetDeviceInstanceID(ev.jdevice.which);
 			auto it = std::find_if(mInputConfigs.cbegin(), mInputConfigs.cend(), [id](const std::pair<SDL_JoystickID, InputConfig*> & t) { return t.second != nullptr && t.second->getDeviceId() == id; });
-			if (it == mInputConfigs.cend())
+
+			if (it == mInputConfigs.cend()) {
 				addedDeviceName = SDL_JoystickNameForIndex(ev.jdevice.which);
+				addedDevicePath = SDL_JoystickPathForIndex(ev.jdevice.which);
+			} else {
+				addedDevicePath = it->second->getDevicePath();
+			}
+
+			if (!addedDevicePath.empty() && mDevicePathConnectionTimestamps.find(addedDevicePath) == mDevicePathConnectionTimestamps.cend()) {
+				mDevicePathConnectionTimestamps[addedDevicePath] = ev.jdevice.timestamp;
+			} else {
+				LOG(LogError) << "Joystick device \"" << addedDeviceName << "\" has been added without device path!\n";
+			}
 
 #ifdef HAVE_UDEV
 #ifdef SDL_JoystickDevicePathById
@@ -634,15 +646,24 @@ bool InputManager::parseEvent(const SDL_Event& ev, Window* window)
 			  if(isWheel) {
 			    window->displayNotificationMessage(_U("\uF1B9 ") + Utils::String::format(_("%s connected").c_str(), Utils::String::trim(addedDeviceName).c_str()));
 			  } else {
-			    window->displayNotificationMessage(_U("\uF11B ") + Utils::String::format(_("%s connected").c_str(), Utils::String::trim(addedDeviceName).c_str()));
+				window->displayNotificationMessage(_U("\uF11B ") + Utils::String::format(_("%s connected").c_str(), Utils::String::trim(addedDeviceName).c_str()));
 			  }
 			}
+
 		}
 		return true;
 
 	case SDL_JOYDEVICEREMOVED:
 		{
+			// Remove connection timestamp entry for the path of the disconnected device
 			auto it = mInputConfigs.find(ev.jdevice.which);
+			if (it->second != nullptr && !it->second->getDevicePath().empty()) {
+				auto disconnectedIt = mDevicePathConnectionTimestamps.find(it->second->getDevicePath());
+				if (disconnectedIt != mDevicePathConnectionTimestamps.cend()) {
+					mDevicePathConnectionTimestamps.erase(disconnectedIt);
+				}
+			}
+
 			if (Settings::getInstance()->getBool("ShowControllerNotifications") && it != mInputConfigs.cend() && it->second != nullptr) {
 			  if(it->second->isWheel()) {
 			    window->displayNotificationMessage(_U("\uF1B9 ") + Utils::String::format(_("%s disconnected").c_str(), Utils::String::trim(it->second->getDeviceName()).c_str()));
@@ -654,6 +675,7 @@ bool InputManager::parseEvent(const SDL_Event& ev, Window* window)
 			rebuildAllJoysticks();
 		}
 		return false;
+		
 	}
 
 	if (mCECInputConfig && (ev.type == (unsigned int)SDL_USER_CECBUTTONDOWN || ev.type == (unsigned int)SDL_USER_CECBUTTONUP))
@@ -1116,139 +1138,55 @@ std::map<int, InputConfig*> InputManager::computePlayersConfigs()
 		if (conf.second != nullptr && conf.second->isConfigured())
 			availableConfigured.push_back(conf.second);
 
-	// sort available configs
-	std::sort(availableConfigured.begin(), availableConfigured.end(), [](InputConfig * a, InputConfig * b) -> bool { return a->getSortDevicePath() < b->getSortDevicePath(); });
+	LOG(LogError) << "Attempt sorting\n";
+	// sort available configs by how long they are connected
+	std::sort(availableConfigured.begin(), availableConfigured.end(), [this](InputConfig * a, InputConfig * b) -> bool {
+		return this->mDevicePathConnectionTimestamps[a->getDevicePath()] < this->mDevicePathConnectionTimestamps[b->getDevicePath()];
+	});
+	
 
 	// 2. Pour chaque joueur verifier si il y a un configurated
 	// associer le input au joueur
 	// enlever des disponibles
 	std::map<int, InputConfig*> playerJoysticks;
 
-	// First loop, search for PATH. Ultra High Priority
-	for (int player = 0; player < MAX_PLAYERS; player++)
-	{
-		std::string playerConfigPath = Settings::getInstance()->getString(Utils::String::format("INPUT P%iPATH", player + 1));
-		if (!playerConfigPath.empty())
-		{
-			for (auto it1 = availableConfigured.begin(); it1 != availableConfigured.end(); ++it1)
-			{
-				InputConfig* config = *it1;
-				if (playerConfigPath == config->getSortDevicePath())
-				{
-					availableConfigured.erase(it1);
-					playerJoysticks[player] = config;
-					break;
-				}
-			}
-		}
-	}
+	int nextAvailablePlayer = 0;
 
-	// First loop, search for GUID + NAME. High Priority
-	for (int player = 0; player < MAX_PLAYERS; player++)
-	{
-		if (playerJoysticks.find(player) != playerJoysticks.cend())
-			continue;
-
-		std::string playerConfigName = Settings::getInstance()->getString(Utils::String::format("INPUT P%iNAME", player + 1));
-		std::string playerConfigGuid = Settings::getInstance()->getString(Utils::String::format("INPUT P%iGUID", player + 1));
-
-		for (auto it1 = availableConfigured.begin(); it1 != availableConfigured.end(); ++it1)
-		{
-			InputConfig* config = *it1;
-			if (playerConfigName == config->getDeviceName() && playerConfigGuid == config->getDeviceGUIDString())
-			{
-				availableConfigured.erase(it1);
-				playerJoysticks[player] = config;
-				break;
-			}
-		}
-	}
-
-	// Second loop, search for NAME. Low Priority
-	for (int player = 0; player < MAX_PLAYERS; player++)
-	{
-		if (playerJoysticks.find(player) != playerJoysticks.cend())
-			continue;
-
-		std::string playerConfigName = Settings::getInstance()->getString(Utils::String::format("INPUT P%dNAME", player + 1));
-
-		for (auto it1 = availableConfigured.begin(); it1 != availableConfigured.end(); ++it1)
-		{
-			InputConfig * config = *it1;
-			if (playerConfigName == config->getDeviceName())
-			{
-				availableConfigured.erase(it1);
-				playerJoysticks[player] = config;
-				break;
-			}
-		}
-	}
-
-	// Last loop, search for free controllers for remaining players.
-	for (int player = 0; player < MAX_PLAYERS; player++)
-	{
-		if (playerJoysticks.find(player) != playerJoysticks.cend())
-			continue;
-
-		// si aucune config a été trouvé pour le joueur, on essaie de lui filer un libre
-		for (auto it1 = availableConfigured.begin(); it1 != availableConfigured.end(); ++it1)
-		{
-			playerJoysticks[player] = *it1;
-			availableConfigured.erase(it1);
-			break;
-		}
-	}
-
-	// in case of hole (player 1 missing, but player 4 set, fill the holes with last players joysticks)
-	for (int player = 0; player < MAX_PLAYERS; player++)
-	{
-		if (playerJoysticks.find(player) != playerJoysticks.cend())
-			continue;
-
-		for (int repplayer = MAX_PLAYERS; repplayer > player; repplayer--)
-		{
-			if (playerJoysticks[player] == NULL && playerJoysticks[repplayer] != NULL)
-			{
-				playerJoysticks[player] = playerJoysticks[repplayer];
-				playerJoysticks[repplayer] = NULL;
-			}
-		}
-	}
-
+	// Check if we have to force internal controls for player 1
 	const bool handheldAlwaysP1 = SystemConf::getInstance()->getBool("system.input.p1_handheld");
+	if (handheldAlwaysP1) {
+		// Find internal controls and assign them to player 1
+		for (auto controller = availableConfigured.begin(); controller != availableConfigured.end(); ++controller)
+		{
+			// Skip non-internal controls, we want internal ones for player 1
+			if (!(*controller)->isInternal())
+				continue;
+			playerJoysticks[0] = *controller;
+			availableConfigured.erase(controller);
+			nextAvailablePlayer++;
+			break;
+		}
+		if (playerJoysticks.find(0) == playerJoysticks.cend()) {
+			// No internal controls found, we cannot force player 1 to be internal
+			LOG(LogWarning) << "system.input.p1_handheld is set but no internal controls found, ignoring the setting.\n";
+		}
+	}
 
-	// Let's find the internal handheld controls (if present)
-	InputConfig* internalControls = NULL;
-	for (int p = 0; p < MAX_PLAYERS; p++) {
-		if (playerJoysticks[p]->isInternal()) {
-			internalControls = playerJoysticks[p];
-			LOG(LogDebug) << "Identified internal handheld controls: \"" << internalControls->getDeviceName() << "\".\n";
+	// Assign configured controllers to players
+	for (int player = nextAvailablePlayer; player < MAX_PLAYERS; player++)
+	{
+		if (playerJoysticks.find(player) != playerJoysticks.cend())
+			continue;
+
+		for (auto controller = availableConfigured.begin(); controller != availableConfigured.end(); ++controller)
+		{
+			playerJoysticks[player] = *controller;
+			availableConfigured.erase(controller);
 			break;
 		}
 	}
-#ifdef KNULLI
-	if (internalControls == NULL) {
-		LOG(LogError) << "No internal handheld controls found!\n";
-	}
-#endif
 
-	if (!handheldAlwaysP1) {
-		int assigned = 0;
-		for (int p = 0; p < MAX_PLAYERS; ++p) {
-			auto it = playerJoysticks.find(p);
-			if (it == playerJoysticks.end() || it->second == nullptr) break;
-			assigned++;
-		}
-
-		// Shift left only if we have at least two assigned controllers.
-		if (assigned > 1 && playerJoysticks[0] != nullptr) {
-			InputConfig* handheld = playerJoysticks[0];
-			for (int p = 0; p < assigned - 1; ++p)
-				playerJoysticks[p] = playerJoysticks[p + 1];
-			playerJoysticks[assigned - 1] = handheld;
-		}
-	}
-
+	// Log controller assignments
 	for (int player = 0; player < MAX_PLAYERS; player++)
 	{
 		if (playerJoysticks.find(player) != playerJoysticks.cend())

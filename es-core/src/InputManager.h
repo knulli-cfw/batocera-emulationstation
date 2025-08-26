@@ -86,6 +86,8 @@ private:
 	std::map<std::string, int> mJoysticksInitialValues;
 	std::map<SDL_JoystickID, SDL_Joystick*> mJoysticks;
 	std::map<SDL_JoystickID, InputConfig*> mInputConfigs;
+	std::map<std::string, uint32_t> mDevicePathConnectionTimestamps;
+	
 
 	InputConfig* mMouseButtonsInputConfig;
 	InputConfig* mKeyboardInputConfig;
