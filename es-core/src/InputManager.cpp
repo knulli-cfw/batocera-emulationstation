@@ -612,21 +612,12 @@ bool InputManager::parseEvent(const SDL_Event& ev, Window* window)
 	case SDL_JOYDEVICEADDED:
 		{
 			std::string addedDeviceName;
-			std::string addedDevicePath;
 			bool isWheel = false;
 			auto id = SDL_JoystickGetDeviceInstanceID(ev.jdevice.which);
 			auto it = std::find_if(mInputConfigs.cbegin(), mInputConfigs.cend(), [id](const std::pair<SDL_JoystickID, InputConfig*> & t) { return t.second != nullptr && t.second->getDeviceId() == id; });
 
-			if (it == mInputConfigs.cend()) {
+			if (it == mInputConfigs.cend())
 				addedDeviceName = SDL_JoystickNameForIndex(ev.jdevice.which);
-				addedDevicePath = SDL_JoystickPathForIndex(ev.jdevice.which);
-			} else {
-				addedDevicePath = it->second->getDevicePath();
-			}
-
-			if (!addedDevicePath.empty() && mDevicePathConnectionTimestamps.find(addedDevicePath) == mDevicePathConnectionTimestamps.cend()) {
-				mDevicePathConnectionTimestamps[addedDevicePath] = ev.jdevice.timestamp;
-			}
 
 #ifdef HAVE_UDEV
 #ifdef SDL_JoystickDevicePathById
@@ -653,15 +644,7 @@ bool InputManager::parseEvent(const SDL_Event& ev, Window* window)
 
 	case SDL_JOYDEVICEREMOVED:
 		{
-			// Remove connection timestamp entry for the path of the disconnected device
 			auto it = mInputConfigs.find(ev.jdevice.which);
-			if (it->second != nullptr && !it->second->getDevicePath().empty()) {
-				auto disconnectedIt = mDevicePathConnectionTimestamps.find(it->second->getDevicePath());
-				if (disconnectedIt != mDevicePathConnectionTimestamps.cend()) {
-					mDevicePathConnectionTimestamps.erase(disconnectedIt);
-				}
-			}
-
 			if (Settings::getInstance()->getBool("ShowControllerNotifications") && it != mInputConfigs.cend() && it->second != nullptr) {
 			  if(it->second->isWheel()) {
 			    window->displayNotificationMessage(_U("\uF1B9 ") + Utils::String::format(_("%s disconnected").c_str(), Utils::String::trim(it->second->getDeviceName()).c_str()));
@@ -1136,13 +1119,6 @@ std::map<int, InputConfig*> InputManager::computePlayersConfigs()
 		if (conf.second != nullptr && conf.second->isConfigured())
 			availableConfigured.push_back(conf.second);
 
-
-	// Sort available configs by how long they are connected (older first)
-	// (Internal controls will most likely be the oldest)
-	std::sort(availableConfigured.begin(), availableConfigured.end(), [this](InputConfig * a, InputConfig * b) -> bool {
-		return this->mDevicePathConnectionTimestamps[a->getDevicePath()] < this->mDevicePathConnectionTimestamps[b->getDevicePath()];
-	});
-
 	// Initialize player controller assignments
 	std::map<int, InputConfig*> playerJoysticks;
 
@@ -1151,10 +1127,13 @@ std::map<int, InputConfig*> InputManager::computePlayersConfigs()
 	// If there's only one controller, assign it to player 1 and return
 	if (availableConfigured.size() == 1) {
 		playerJoysticks[0] = availableConfigured[0];
-		LOG(LogInfo) << "computePlayersConfigs : Player " << 0 << " => " << playerJoysticks[0]->getDevicePath() << " (connected since " << mDevicePathConnectionTimestamps[playerJoysticks[0]->getDevicePath()] << ")";
+		LOG(LogInfo) << "computePlayersConfigs : Player " << 0 << " => " << playerJoysticks[0]->getDevicePath();
 		return playerJoysticks;
 	}
 	
+	// Sort available configs by device path
+    std::sort(availableConfigured.begin(), availableConfigured.end(), [](InputConfig * a, InputConfig * b) -> bool { return a->getSortDevicePath() < b->getSortDevicePath(); });
+
 	// Find internal controls
 	InputConfig * internalController = nullptr;
 	for (auto controller = availableConfigured.begin(); controller != availableConfigured.end(); ++controller)
@@ -1205,7 +1184,7 @@ std::map<int, InputConfig*> InputManager::computePlayersConfigs()
 		if (playerJoysticks[player] == nullptr) {
 			LOG(LogInfo) << "computePlayersConfigs : Player " << player << " => none";
 		} else {
-			LOG(LogInfo) << "computePlayersConfigs : Player " << player << " => " << playerJoysticks[player]->getDevicePath() << " (connected since " << mDevicePathConnectionTimestamps[playerJoysticks[player]->getDevicePath()] << ")";
+			LOG(LogInfo) << "computePlayersConfigs : Player " << player << " => " << playerJoysticks[player]->getDevicePath();
 		}
 	}
 return playerJoysticks;
