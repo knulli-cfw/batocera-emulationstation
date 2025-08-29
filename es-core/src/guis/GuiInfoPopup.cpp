@@ -58,7 +58,7 @@ GuiInfoPopup::GuiInfoPopup(Window* window, std::string message, int duration) :
 	addChild(mFrame);
 
 	// we only init the actual time when we first start to render
-	mStartTime = 0;
+	mStarted = false;
 
 	mGrid = new ComponentGrid(window, Vector2i(1, 3));
 	mGrid->setSize(mSize);
@@ -82,12 +82,15 @@ void GuiInfoPopup::update(int deltaTime)
 {
 	GuiComponent::update(deltaTime);
 
-	int curTime = SDL_GetTicks();
+    auto curTime = std::chrono::steady_clock::now();
 
 	// we only init the actual time when we first start to render
-	if (mStartTime == 0)
+	if (!mStarted)
+    {
 		mStartTime = curTime;
-	else if (curTime - mStartTime > mDuration || curTime < mStartTime)
+        mStarted = true;
+    }
+	else if (std::chrono::duration_cast<std::chrono::milliseconds>(curTime - mStartTime).count() > mDuration || curTime < mStartTime)
 	{
 		// If we're past the popup duration, no need to render or if SDL reset : Stop
 		mRunning = false;
@@ -100,11 +103,11 @@ void GuiInfoPopup::update(int deltaTime)
 	// compute fade in effect
 	int alpha = 255;
 
-	if (curTime - mStartTime <= FADE_DURATION)
-		alpha = ((curTime - mStartTime) * 255 / FADE_DURATION);
-	else if (curTime - mStartTime >= mDuration - FADE_DURATION)
+	if (std::chrono::duration_cast<std::chrono::milliseconds>(curTime - mStartTime).count() <= FADE_DURATION)
+		alpha = ((std::chrono::duration_cast<std::chrono::milliseconds>(curTime - mStartTime).count()) * 255 / FADE_DURATION);
+	else if (std::chrono::duration_cast<std::chrono::milliseconds>(curTime - mStartTime).count() >= mDuration - FADE_DURATION)
 	{
-		alpha = ((-(curTime - mStartTime - mDuration) * 255) / FADE_DURATION);
+		alpha = ((-(std::chrono::duration_cast<std::chrono::milliseconds>(curTime - mStartTime).count() - mDuration) * 255) / FADE_DURATION);
 		mFadeOut = (float) (255 - alpha) / 255.0;
 	}
 

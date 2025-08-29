@@ -1,6 +1,7 @@
 #include "SystemConf.h"
 #include <iostream>
 #include <fstream>
+#include <chrono>
 #include "Log.h"
 #include "utils/StringUtil.h"
 #include "utils/FileSystemUtil.h"
@@ -132,7 +133,7 @@ bool SystemConf::saveSystemConf()
 
 	static std::string removeID = "$^�(p$^mpv$�rpver$^vper$vper$^vper$vper$vper$^vperv^pervncvizn";
 
-	int lastTime = SDL_GetTicks();
+	auto lastTime = std::chrono::steady_clock::now();
 
 	/* Save new value if exists */
 	for (auto& it : changedConf)
@@ -181,9 +182,7 @@ bool SystemConf::saveSystemConf()
 		}
 	}
 
-	lastTime = SDL_GetTicks() - lastTime;
-
-	LOG(LogDebug) << "saveSystemConf :  " << lastTime;
+	LOG(LogDebug) << "saveSystemConf :  " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - lastTime).count();
 
 	std::ofstream fileout(mSystemConfFileTmp); //Temporary file
 	if (!fileout)

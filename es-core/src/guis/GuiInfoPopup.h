@@ -1,7 +1,7 @@
 #pragma once
 #ifndef ES_APP_GUIS_GUI_INFO_POPUP_H
 #define ES_APP_GUIS_GUI_INFO_POPUP_H
-
+#include <chrono>
 #include "GuiComponent.h"
 #include "Window.h"
 
@@ -22,16 +22,17 @@ public:
 	std::string         getMessage() { return mMessage; }
 
 private:
-	std::string         mMessage;
+	std::string         					mMessage;
 
-	int                 mStartTime;
-	int                 mDuration;
-	bool                mRunning;	
+    bool                					mStarted=false;
+	std::chrono::steady_clock::time_point	mStartTime;
+	int                 					mDuration;
+	bool                					mRunning;
 
-	float				mFadeOut;
+	float									mFadeOut;
 
-	ComponentGrid*      mGrid;
-	NinePatchComponent* mFrame;
+	ComponentGrid*      					mGrid;
+	NinePatchComponent* 					mFrame;
 };
 
 #endif // ES_APP_GUIS_GUI_INFO_POPUP_H

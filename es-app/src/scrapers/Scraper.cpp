@@ -264,7 +264,7 @@ ScraperHttpRequest::ScraperHttpRequest(std::vector<ScraperSearchResult>& results
 
 	mRequest = new HttpReq(url, &mOptions);
 	mRetryCount = 0;
-	mOverQuotaPendingTime = 0;
+	mOverQuotaPending = false;
 	mOverQuotaRetryDelay = OVERQUOTA_RETRY_DELAY;
 	mOverQuotaRetryCount = OVERQUOTA_RETRY_COUNT;
 }
@@ -276,12 +276,12 @@ ScraperHttpRequest::~ScraperHttpRequest()
 
 void ScraperHttpRequest::update()
 {
-	if (mOverQuotaPendingTime > 0)
+	if (mOverQuotaPending)
 	{
-		int lastTime = SDL_GetTicks();
-		if (lastTime - mOverQuotaPendingTime > mOverQuotaRetryDelay)
+		auto lastTime = std::chrono::steady_clock::now();
+		if (std::chrono::duration_cast<std::chrono::milliseconds>(lastTime - mOverQuotaPendingTime).count() > mOverQuotaRetryDelay)
 		{
-			mOverQuotaPendingTime = 0;
+			mOverQuotaPending = false;
 
 			LOG(LogDebug) << "REQ_429_TOOMANYREQUESTS : Retrying";
 
@@ -331,7 +331,8 @@ void ScraperHttpRequest::update()
 
 		setStatus(ASYNC_IN_PROGRESS);
 
-		mOverQuotaPendingTime = SDL_GetTicks();
+		mOverQuotaPendingTime = std::chrono::steady_clock::now();
+		mOverQuotaPending = true;
 		LOG(LogDebug) << "REQ_429_TOOMANYREQUESTS : Retrying in " << mOverQuotaRetryDelay << " seconds";
 		return;
 	}
@@ -500,7 +501,7 @@ ImageDownloadHandle::ImageDownloadHandle(const std::string& url, const std::stri
 	mSavePath(path), mMaxWidth(maxWidth), mMaxHeight(maxHeight)
 {
 	mRetryCount = 0;
-	mOverQuotaPendingTime = 0;
+	mOverQuotaPending = false;
 	mOverQuotaRetryDelay = OVERQUOTA_RETRY_DELAY;
 	mOverQuotaRetryCount = OVERQUOTA_RETRY_COUNT;
 
@@ -550,12 +551,13 @@ int ImageDownloadHandle::getPercent()
 
 void ImageDownloadHandle::update()
 {
-	if (mOverQuotaPendingTime > 0)
+	if (mOverQuotaPending)
 	{
-		int lastTime = SDL_GetTicks();
-		if (lastTime - mOverQuotaPendingTime > mOverQuotaRetryDelay)
+		auto lastTime = std::chrono::steady_clock::now();
+
+		if (std::chrono::duration_cast<std::chrono::milliseconds>(lastTime - mOverQuotaPendingTime).count() > mOverQuotaRetryDelay)
 		{
-			mOverQuotaPendingTime = 0;
+			mOverQuotaPending = false;
 
 			LOG(LogDebug) << "REQ_429_TOOMANYREQUESTS : Retrying";
 
@@ -590,7 +592,8 @@ void ImageDownloadHandle::update()
 			mOverQuotaRetryDelay = Utils::String::toInteger(retryDelay) * 1000;
 		}
 
-		mOverQuotaPendingTime = SDL_GetTicks();
+		mOverQuotaPendingTime = std::chrono::steady_clock::now();
+		mOverQuotaPending = true;
 		LOG(LogDebug) << "REQ_429_TOOMANYREQUESTS : Retrying in " << mOverQuotaRetryDelay << " seconds";
 		return;
 	}

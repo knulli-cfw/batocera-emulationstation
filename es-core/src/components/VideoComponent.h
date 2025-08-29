@@ -1,7 +1,7 @@
 #pragma once
 #ifndef ES_CORE_COMPONENTS_VIDEO_COMPONENT_H
 #define ES_CORE_COMPONENTS_VIDEO_COMPONENT_H
-
+#include <chrono>
 #include "components/ImageComponent.h"
 #include "components/ImageGridComponent.h"
 #include "GuiComponent.h"
@@ -193,36 +193,36 @@ private:
 	void manageState();
 
 protected:
-	unsigned						mVideoWidth;
-	unsigned						mVideoHeight;
-	Vector2f						mTargetSize;
-	std::shared_ptr<TextureResource> mTexture;
-	float							mFadeIn;
-	std::string						mStaticImagePath;
-	ImageComponent					mStaticImage;
-	bool							mPlayAudio;
+	unsigned								mVideoWidth;
+	unsigned								mVideoHeight;
+	Vector2f								mTargetSize;
+	std::shared_ptr<TextureResource> 		mTexture;
+	float									mFadeIn;
+	std::string								mStaticImagePath;
+	ImageComponent							mStaticImage;
+	bool									mPlayAudio;
 
-	std::string						mVideoPath;
-	std::string						mPlayingVideoPath;
+	std::string								mVideoPath;
+	std::string								mPlayingVideoPath;
 
-	std::string						mThemedPath;
+	std::string								mThemedPath;
 
-	bool							mStartDelayed;
-	unsigned						mStartTime;
-	bool							mIsPlaying;		
-	bool							mScreensaverActive;
-	bool							mScreensaverMode;
-	bool							mTargetIsMax;
-	bool							mTargetIsMin;
+	bool									mStartDelayed;
+	std::chrono::steady_clock::time_point	mStartTime;
+	bool									mIsPlaying;
+	bool									mScreensaverActive;
+	bool									mScreensaverMode;
+	bool									mTargetIsMax;
+	bool									mTargetIsMin;
 
-	bool							mIsWaitingForVideoToStart;
+	bool									mIsWaitingForVideoToStart;
 
-	bool							mIsTopWindow;
-	bool							mEnabled;
+	bool									mIsTopWindow;
+	bool									mEnabled;
 
-	float							mRoundCorners;
+	float									mRoundCorners;
 
-	Configuration					mConfig;
+	Configuration							mConfig;
 };
 
 #endif // ES_CORE_COMPONENTS_VIDEO_COMPONENT_H
