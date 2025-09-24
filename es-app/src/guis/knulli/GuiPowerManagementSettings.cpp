@@ -36,19 +36,19 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 
 	addWithLabel(_("MODE"), optionsBatterySaveMode);
 
-	// Battery save mode timer (1-120 minutes in 1 minute steps)
-	auto sliderBatterySaverTime = std::make_shared<SliderComponent>(mWindow, 1.f, 60.f, 1.f, "m");
+	// Idlewatcher timer (1-60 minutes in 1 minute steps)
+	auto sliderIdleWatcherTimer = std::make_shared<SliderComponent>(mWindow, 1.f, 60.f, 1.f, "m");
 
-	float selectedBatterySaverTimeSeconds = 120.f;
-	std::string configuredBatterySaverTime = SystemConf::getInstance()->get("system.batterysaver.timer");
+	float selectedIdleWatcherTimeSeconds = 300.f;
+	std::string configuredBatterySaverTime = SystemConf::getInstance()->get("system.idlewatcher.timer");
 	if (!configuredBatterySaverTime.empty()) {
-		selectedBatterySaverTimeSeconds = Utils::String::toFloat(configuredBatterySaverTime);
+		selectedIdleWatcherTimeSeconds = Utils::String::toFloat(configuredBatterySaverTime);
 	}
 
-	int selectedBatterySaverTimeMinutes = (int)Math::round(selectedBatterySaverTimeSeconds/60.f);
+	int selectedIdleWatcherTimeMinutes = (int)Math::round(selectedIdleWatcherTimeSeconds/60.f);
 
-	sliderBatterySaverTime->setValue((float)(selectedBatterySaverTimeMinutes));
-	addWithDescription(_("IDLE TIME"),_("Battery save mode is activated after idle time has passed without any input."), sliderBatterySaverTime);
+	sliderIdleWatcherTimer->setValue((float)(selectedIdleWatcherTimeMinutes));
+	addWithDescription(_("IDLE TIME"),_("Battery save mode is activated after idle time has passed without any input."), sliderIdleWatcherTimer);
 
 	// Battery save extended mode
 	auto optionsBatterySaveExtendedMode = std::make_shared<OptionListComponent<std::string> >(mWindow, _("EXTENDED MODE"), false);
@@ -63,19 +63,19 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 
 	addWithLabel(_("EXTENDED MODE"), optionsBatterySaveExtendedMode);
 
-	// Battery save extended mode timer (1-120 minutes in 1 minute steps)
-	auto sliderBatterySaverExtendedTime = std::make_shared<SliderComponent>(mWindow, 1.f, 60.f, 1.f, "m");
+	// Idlewatcher extended timer (1-60 minutes in 1 minute steps)
+	auto sliderIdleWatcherExtendedTime = std::make_shared<SliderComponent>(mWindow, 1.f, 60.f, 1.f, "m");
 
-	float selectedBatterySaverExtendedTimeSeconds = 120.f;
-	std::string configuredBatterySaverExtendedTime = SystemConf::getInstance()->get("system.batterysaver.extendedtimer");
+	float selectedBatterySaverExtendedTimeSeconds = 900.f;
+	std::string configuredBatterySaverExtendedTime = SystemConf::getInstance()->get("system.idlewatcher.extendedtimer");
 	if (!configuredBatterySaverExtendedTime.empty()) {
 		selectedBatterySaverExtendedTimeSeconds = Utils::String::toFloat(configuredBatterySaverExtendedTime);
 	}
 
-	int selectedBatterySaverExtendedTimeMinutes = (int)Math::round(selectedBatterySaverExtendedTimeSeconds/60.f);
+	int selectedIdleWatcherExtendedTimeMinutes = (int)Math::round(selectedBatterySaverExtendedTimeSeconds/60.f);
 
-	sliderBatterySaverExtendedTime->setValue((float)(selectedBatterySaverExtendedTimeMinutes));
-	addWithDescription(_("EXTENDED IDLE TIME"),_("Secondary timer which starts after initial idle time has passed without any input."), sliderBatterySaverExtendedTime);
+	sliderIdleWatcherExtendedTime->setValue((float)(selectedIdleWatcherExtendedTimeMinutes));
+	addWithDescription(_("EXTENDED IDLE TIME"),_("Secondary timer which starts after initial idle time has passed without any input."), sliderIdleWatcherExtendedTime);
 
 	// Aggressive battery save mode toggle
 	auto aggressiveBatterySaveMode = std::make_shared<SwitchComponent>(mWindow);
@@ -99,13 +99,13 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 		addWithLabel(_("LID CLOSE MODE"), optionsLidCloseMode);
 	}
 
-	addSaveFunc([this, optionsBatterySaveMode, sliderBatterySaverTime, optionsBatterySaveExtendedMode, sliderBatterySaverExtendedTime, aggressiveBatterySaveMode, optionsLidCloseMode]
+	addSaveFunc([this, optionsBatterySaveMode, sliderIdleWatcherTimer, optionsBatterySaveExtendedMode, sliderIdleWatcherExtendedTime, aggressiveBatterySaveMode, optionsLidCloseMode]
 	{
-		int newBatterySaverTimeSeconds = (int)Math::round(sliderBatterySaverTime->getValue()*60.f);
-		int newBatterySaverExtendedTimeSeconds = (int)Math::round(sliderBatterySaverExtendedTime->getValue()*60.f);
-		SystemConf::getInstance()->set("system.batterysaver.timer", std::to_string(newBatterySaverTimeSeconds));
+		int newBatterySaverTimeSeconds = (int)Math::round(sliderIdleWatcherTimer->getValue()*60.f);
+		int newBatterySaverExtendedTimeSeconds = (int)Math::round(sliderIdleWatcherExtendedTime->getValue()*60.f);
+		SystemConf::getInstance()->set("system.idlewatcher.timer", std::to_string(newBatterySaverTimeSeconds));
 		SystemConf::getInstance()->set("system.batterysaver.mode", optionsBatterySaveMode->getSelected());
-		SystemConf::getInstance()->set("system.batterysaver.extendedtimer", std::to_string(newBatterySaverExtendedTimeSeconds));
+		SystemConf::getInstance()->set("system.idlewatcher.extendedtimer", std::to_string(newBatterySaverExtendedTimeSeconds));
 		SystemConf::getInstance()->set("system.batterysaver.extendedmode", optionsBatterySaveExtendedMode->getSelected());
 		SystemConf::getInstance()->setBool("system.batterysaver.aggressive", aggressiveBatterySaveMode->getState());
 		if (CapabilityCheck::hasCapability(CapabilityCheck::LID_CAPABILITY)) {
