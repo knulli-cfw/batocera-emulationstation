@@ -857,7 +857,7 @@ void GuiMenu::openDeveloperSettings()
 
 	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::DISKFORMAT))
 	s->addEntry(_("FORMAT A DISK"), true, [this] { openFormatDriveSettings(); });
-	
+
 	#ifdef KNULLI
 	s->addWithDescription(_("DISK CHECK"), _("Verify the integrity of your SD cards."), nullptr, [this, s]
 	{
@@ -1285,7 +1285,7 @@ void GuiMenu::openUpdatesSettings()
 #else
 			if (updatesType.empty() || updatesType != BETA_NAME)
 				updatesType = "stable";
-#endif			
+#endif
 		updatesTypeList->add("stable", "stable", updatesType == "stable");
 #if KNULLI
 		updatesTypeList->add("alpha", "alpha", updatesType == "alpha");
@@ -2671,6 +2671,20 @@ void GuiMenu::openGamesSettings()
 
 	s->addWithLabel(_("INCREMENTAL SAVESTATES"), incrementalSaveStates);
 	s->addSaveFunc([incrementalSaveStates] { SystemConf::getInstance()->set("global.incrementalsavestates", incrementalSaveStates->getSelected()); });
+
+	// SET MAX NUMBER OF INCREMENTAL SAVE STATES
+	auto maxIncrementalSaveStates = std::make_shared<OptionListComponent<std::string>>(mWindow, _("MAXIMUM INCREMENTAL SAVESTATES"));
+	maxIncrementalSaveStates->addRange({
+		{ _("AUTO"), "" },
+		{ _("10"), "10" },
+		{ _("20"), "20" },
+		{ _("30"), "30" },
+		{ _("40"), "40" },
+		{ _("50"), "50" } },
+		SystemConf::getInstance()->get("global.maxincrementalsavestates"));
+
+	s->addWithDescription(_("MAXIMUM INCREMENTAL SAVESTATES"), _("Sets the maximum number of incremental savestates used."), maxIncrementalSaveStates);
+	s->addSaveFunc([maxIncrementalSaveStates] { SystemConf::getInstance()->set("global.maxincrementalsavestates", maxIncrementalSaveStates->getSelected()); });
 
 	// SHOW SAVE STATES
 	auto showSaveStates = std::make_shared<OptionListComponent<std::string>>(mWindow, _("SHOW SAVESTATE MANAGER"));
