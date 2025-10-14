@@ -857,7 +857,7 @@ void GuiMenu::openDeveloperSettings()
 
 	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::DISKFORMAT))
 	s->addEntry(_("FORMAT A DISK"), true, [this] { openFormatDriveSettings(); });
-	
+
 	#ifdef KNULLI
 	s->addWithDescription(_("DISK CHECK"), _("Verify the integrity of your SD cards."), nullptr, [this, s]
 	{
@@ -1285,7 +1285,7 @@ void GuiMenu::openUpdatesSettings()
 #else
 			if (updatesType.empty() || updatesType != BETA_NAME)
 				updatesType = "stable";
-#endif			
+#endif
 		updatesTypeList->add("stable", "stable", updatesType == "stable");
 #if KNULLI
 		updatesTypeList->add("alpha", "alpha", updatesType == "alpha");
@@ -1431,7 +1431,7 @@ void GuiMenu::openSystemSettings()
 
 	// power saver
 	auto power_saver = std::make_shared< OptionListComponent<std::string> >(mWindow, _("POWER SAVING MODE"), false);
-	power_saver->addRange({ { _("DISABLED"), "disabled" }, { _("DEFAULT"), "default" }, { _("ENHANCED"), "enhanced" }, { _("INSTANT"), "instant" }, }, Settings::PowerSaverMode());
+	power_saver->addRange({ { _("DISABLED"), "disabled" }, { _("DEFAULT"), "default" }, { _("ENHANCED"), "enhanced" }, }, Settings::PowerSaverMode());
 	s->addWithDescription(_("POWER SAVING MODE"), _("Reduces power consumption when idle (useful for handhelds)."), power_saver);
 	s->addSaveFunc([this, power_saver]
 	{
