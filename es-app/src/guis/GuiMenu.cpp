@@ -1814,7 +1814,7 @@ void GuiMenu::openSystemSettings()
 	// Overclock choice
 	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::OVERCLOCK))
 	{
-		auto overclock_choice = std::make_shared<OptionListComponent<std::string>>(window, _("CPU CLOCK RATE"), false);
+		auto overclock_choice = std::make_shared<OptionListComponent<std::string>>(window, _("MAX CPU FREQUENCY"), false);
 
 		std::string currentOverclock = Settings::getInstance()->getString("Overclock");
 		if (currentOverclock == "")
@@ -1863,7 +1863,7 @@ void GuiMenu::openSystemSettings()
 			if (overclock_choice->changed() && Settings::getInstance()->setString("Overclock", overclock_choice->getSelected()))
 			{
 				ApiSystem::getInstance()->setOverclock(overclock_choice->getSelected());
-				s->setVariable("reboot", true);
+				//s->setVariable("reboot", true); disable reboot prompt
 			}
 		});
 	}
