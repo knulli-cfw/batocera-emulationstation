@@ -124,6 +124,7 @@ public:
 	inline int getDeviceNbAxes() const { return mDeviceNbAxes; }; 
 	inline int getBatteryLevel() const { return mBatteryLevel; };
   	inline int isWheel()         const { return mIsWheel;      };
+	inline int isInternal()      const { return mIsInternal;   };
 	inline const std::string& getDevicePath() { return mDevicePath; };
 
 	std::string getSortDevicePath();
@@ -164,6 +165,7 @@ private:
 
 	int mBatteryLevel;
 	bool mIsWheel;
+	bool mIsInternal;
 
 public:
 	static void AssignActionButtons();

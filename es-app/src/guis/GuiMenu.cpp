@@ -857,7 +857,7 @@ void GuiMenu::openDeveloperSettings()
 
 	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::DISKFORMAT))
 	s->addEntry(_("FORMAT A DISK"), true, [this] { openFormatDriveSettings(); });
-	
+
 	#ifdef KNULLI
 	s->addWithDescription(_("DISK CHECK"), _("Verify the integrity of your SD cards."), nullptr, [this, s]
 	{
@@ -1291,7 +1291,7 @@ void GuiMenu::openUpdatesSettings()
 #else
 			if (updatesType.empty() || updatesType != BETA_NAME)
 				updatesType = "stable";
-#endif			
+#endif
 		updatesTypeList->add("stable", "stable", updatesType == "stable");
 #if KNULLI
 		updatesTypeList->add("alpha", "alpha", updatesType == "alpha");
@@ -1437,7 +1437,7 @@ void GuiMenu::openSystemSettings()
 
 	// power saver
 	auto power_saver = std::make_shared< OptionListComponent<std::string> >(mWindow, _("POWER SAVING MODE"), false);
-	power_saver->addRange({ { _("DISABLED"), "disabled" }, { _("DEFAULT"), "default" }, { _("ENHANCED"), "enhanced" }, { _("INSTANT"), "instant" }, }, Settings::PowerSaverMode());
+	power_saver->addRange({ { _("DISABLED"), "disabled" }, { _("DEFAULT"), "default" }, { _("ENHANCED"), "enhanced" }, }, Settings::PowerSaverMode());
 	s->addWithDescription(_("POWER SAVING MODE"), _("Reduces power consumption when idle (useful for handhelds)."), power_saver);
 	s->addSaveFunc([this, power_saver]
 	{
@@ -1820,7 +1820,7 @@ void GuiMenu::openSystemSettings()
 	// Overclock choice
 	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::OVERCLOCK))
 	{
-		auto overclock_choice = std::make_shared<OptionListComponent<std::string>>(window, _("CPU CLOCK RATE"), false);
+		auto overclock_choice = std::make_shared<OptionListComponent<std::string>>(window, _("MAX CPU FREQUENCY"), false);
 
 		std::string currentOverclock = Settings::getInstance()->getString("Overclock");
 		if (currentOverclock == "")
@@ -1869,7 +1869,7 @@ void GuiMenu::openSystemSettings()
 			if (overclock_choice->changed() && Settings::getInstance()->setString("Overclock", overclock_choice->getSelected()))
 			{
 				ApiSystem::getInstance()->setOverclock(overclock_choice->getSelected());
-				s->setVariable("reboot", true);
+				//s->setVariable("reboot", true); disable reboot prompt
 			}
 		});
 	}
@@ -2677,6 +2677,20 @@ void GuiMenu::openGamesSettings()
 
 	s->addWithLabel(_("INCREMENTAL SAVESTATES"), incrementalSaveStates);
 	s->addSaveFunc([incrementalSaveStates] { SystemConf::getInstance()->set("global.incrementalsavestates", incrementalSaveStates->getSelected()); });
+
+	// SET MAX NUMBER OF INCREMENTAL SAVE STATES
+	auto maxIncrementalSaveStates = std::make_shared<OptionListComponent<std::string>>(mWindow, _("MAXIMUM INCREMENTAL SAVESTATES"));
+	maxIncrementalSaveStates->addRange({
+		{ _("AUTO"), "" },
+		{ _("10"), "10" },
+		{ _("20"), "20" },
+		{ _("30"), "30" },
+		{ _("40"), "40" },
+		{ _("50"), "50" } },
+		SystemConf::getInstance()->get("global.maxincrementalsavestates"));
+
+	s->addWithDescription(_("MAXIMUM INCREMENTAL SAVESTATES"), _("Sets the maximum number of incremental savestates used."), maxIncrementalSaveStates);
+	s->addSaveFunc([maxIncrementalSaveStates] { SystemConf::getInstance()->set("global.maxincrementalsavestates", maxIncrementalSaveStates->getSelected()); });
 
 	// SHOW SAVE STATES
 	auto showSaveStates = std::make_shared<OptionListComponent<std::string>>(mWindow, _("SHOW SAVESTATE MANAGER"));

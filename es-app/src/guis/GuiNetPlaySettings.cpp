@@ -6,6 +6,8 @@
 #include "GuiHashStart.h"
 #include <unordered_map>
 
+#define fake_gettext_paris _("PARIS")
+#define fake_gettext_osaka _("OSAKA")
 #define fake_gettext_seoul _("SEOUL")
 
 static std::vector<std::pair<std::string, std::string>> communityRelayServers;
@@ -148,7 +150,8 @@ void GuiNetPlaySettings::addRelayServerOptions(int selectItem)
 	for (auto& kv : communityRelayServers)
 	{
 		std::string serverName = kv.first;
-		relayServer->add(Utils::String::toUpper(serverName.c_str()), serverName, selectedRelayServer == serverName);
+		std::string upperName = Utils::String::toUpper(serverName.c_str());
+		relayServer->add(_(upperName.c_str()), serverName, selectedRelayServer == serverName);
 	}
 
 	// Custom relay server
