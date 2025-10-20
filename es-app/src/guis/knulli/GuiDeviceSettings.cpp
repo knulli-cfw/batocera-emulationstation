@@ -2,9 +2,11 @@
 #include "guis/knulli/ExtendedGuiSettings.h"
 
 #include "guis/knulli/FactorySettings.h"
+#include "guis/knulli/GuiDisplaySettings.h"
 #include "guis/knulli/GuiPowerManagementSettings.h"
 #include "guis/knulli/GuiRgbSettings.h"
 #include "guis/knulli/Pico8Installer.h"
+#include "guis/knulli/syscalls/DisplaySettings.h"
 #include "components/OptionListComponent.h"
 #include "components/SliderComponent.h"
 #include "components/SwitchComponent.h"
@@ -31,8 +33,12 @@ GuiDeviceSettings::GuiDeviceSettings(Window* window) : ExtendedGuiSettings(windo
 {
 	addGroup(_("POWER SAVING AND BATTERY LIFE"));
 	addEntry(_("POWER MANAGEMENT"), true, [this] { openPowerManagementSettings(); });
-	if(CapabilityCheck::hasCapability(CapabilityCheck::RGB_CAPABILITY) || BoardCheck::isBoard(BOARDS_WITH_TOGGLE_SWITCH)) {
+	if(CapabilityCheck::hasCapability(CapabilityCheck::RGB_CAPABILITY) || BoardCheck::isBoard(BOARDS_WITH_TOGGLE_SWITCH) || DisplaySettings::hasDisplaySettings()) {
 		addGroup(_("DEVICE CUSTOMIZATION"));
+		// Only add Display Settings if display settings are supported on this device.
+		if(DisplaySettings::hasDisplaySettings()) {
+			addEntry(_("DISPLAY SETTINGS"), true, [this] { openDisplaySettings(); });
+		}
 		if(CapabilityCheck::hasCapability(CapabilityCheck::RGB_CAPABILITY)) {
 			addEntry(_("RGB LED SETTINGS"), true, [this] { openRgbLedSettings(); });
 		}
@@ -96,6 +102,11 @@ GuiDeviceSettings::GuiDeviceSettings(Window* window) : ExtendedGuiSettings(windo
 void GuiDeviceSettings::openPowerManagementSettings()
 {
 	mWindow->pushGui(new GuiPowerManagementSettings(mWindow));
+}
+
+void GuiDeviceSettings::openDisplaySettings()
+{
+	mWindow->pushGui(new GuiDisplaySettings(mWindow));
 }
 
 void GuiDeviceSettings::openRgbLedSettings()

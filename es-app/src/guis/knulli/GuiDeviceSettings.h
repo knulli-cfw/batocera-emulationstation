@@ -8,6 +8,7 @@ public:
 
 private:
         void openPowerManagementSettings();
+        void openDisplaySettings();
         void openRgbLedSettings();
         void installPico8();
 

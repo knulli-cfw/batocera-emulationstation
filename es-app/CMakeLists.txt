@@ -77,11 +77,14 @@ set(ES_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiFileBrowser.h	
 	
     # Knulli-related GUIs
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/syscalls/DisplaySettings.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/syscalls/SysCalls.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/BoardCheck.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/CapabilityCheck.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/ExtendedGuiSettings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/FactorySettings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiDeviceSettings.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiDisplaySettings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiPowerManagementSettings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiRgbSettings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/Pico8Installer.h
@@ -193,11 +196,14 @@ set(ES_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiFileBrowser.cpp
 	
     # Knulli-related GUIs
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/syscalls/DisplaySettings.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/syscalls/SysCalls.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/BoardCheck.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/CapabilityCheck.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/ExtendedGuiSettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/FactorySettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiDeviceSettings.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiDisplaySettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiPowerManagementSettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiRgbSettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/Pico8Installer.cpp
