@@ -13,7 +13,11 @@ const std::string SEPARATOR = " ";
 
 bool DisplaySettings::hasDisplaySettings()
 {
-	return Utils::FileSystem::exists(DISPLAY_SETTINGS_COMMAND_NAME);
+	if (!Utils::FileSystem::exists(DISPLAY_SETTINGS_COMMAND_NAME))
+		return false;
+
+	std::vector<std::string> capabilities = getCapabilities();
+	return capabilities.size() > 0;
 }
 
 std::vector<std::string> DisplaySettings::getCapabilities()

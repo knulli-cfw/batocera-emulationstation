@@ -31,16 +31,23 @@ GuiDisplaySettings::GuiDisplaySettings(Window* window) : ExtendedGuiSettings(win
 	
 	for (const std::string& capability : capabilities)
 	{
+
+		// Let's not make sliders for empty capability names
+		if (capability.empty())
+			continue;
+
         // make an uppercase copy safely
         std::string label = capability;
         std::transform(label.begin(), label.end(), label.begin(), [](unsigned char c){ return std::toupper(c); });
 		std::shared_ptr<SliderComponent> slider = createSlider(_(label.c_str()), 0.f, 99.f, 5.f, "", _(""), true);
 		setConfigValueForSlider(slider, 50.f, CONF_PREFIX + capability);
 
+		// on change, set the value via DisplaySettings syscall
 		slider->setOnValueChanged([this, capability](float value) {
 			DisplaySettings::set(capability, (int)value);
 		});
 
+		// store sliders and labels for save function
 		sliderLabels.push_back(capability);
 		sliders.push_back(slider);
 	}

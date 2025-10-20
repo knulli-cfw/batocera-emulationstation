@@ -31,7 +31,8 @@ std::string SysCalls::executeAndCatchOutput(const char* cmd) {
     }
     pclose(pipe);
 
-    // Sanitize output by removing newlines and carriage returns
+    // Sanitize output by removing spaces, newlines, and carriage returns
+    result.erase(std::remove(result.begin(), result.end(), ' '), result.cend());
     result.erase(std::remove(result.begin(), result.end(), '\r'), result.cend());
     result.erase(std::remove(result.begin(), result.end(), '\n'), result.cend());
 
@@ -43,8 +44,10 @@ std::string SysCalls::executeAndCatchOutput(const std::string cmd) {
 }
 
 std::vector<std::string> SysCalls::executeAndCatchOutputCsv(const char* cmd) {
-    std::vector<std::string> result;
     std::string output = executeAndCatchOutput(cmd);
+    if (output.empty()) {
+        return std::vector<std::string>();
+    }
     return split(output, ',');
 }
 
