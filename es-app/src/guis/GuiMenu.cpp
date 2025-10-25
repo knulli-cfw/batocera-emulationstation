@@ -2673,7 +2673,7 @@ void GuiMenu::openGamesSettings()
 	s->addSaveFunc([incrementalSaveStates] { SystemConf::getInstance()->set("global.incrementalsavestates", incrementalSaveStates->getSelected()); });
 
 	// SET MAX NUMBER OF INCREMENTAL SAVE STATES
-	auto maxIncrementalSaveStates = std::make_shared<OptionListComponent<std::string>>(mWindow, _("MAXIMUM INCREMENTAL SAVESTATES"));
+	auto maxIncrementalSaveStates = std::make_shared<OptionListComponent<std::string>>(mWindow, _("MAX INCREMENTAL SAVESTATES"));
 	maxIncrementalSaveStates->addRange({
 		{ _("AUTO"), "" },
 		{ _("10"), "10" },
@@ -2683,7 +2683,7 @@ void GuiMenu::openGamesSettings()
 		{ _("50"), "50" } },
 		SystemConf::getInstance()->get("global.maxincrementalsavestates"));
 
-	s->addWithDescription(_("MAXIMUM INCREMENTAL SAVESTATES"), _("Sets the maximum number of incremental savestates used."), maxIncrementalSaveStates);
+	s->addWithDescription(_("MAX INCREMENTAL SAVESTATES"), _("Sets the maximum number of incremental savestates used."), maxIncrementalSaveStates);
 	s->addSaveFunc([maxIncrementalSaveStates] { SystemConf::getInstance()->set("global.maxincrementalsavestates", maxIncrementalSaveStates->getSelected()); });
 
 	// SHOW SAVE STATES
