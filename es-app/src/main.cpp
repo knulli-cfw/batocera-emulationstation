@@ -553,9 +553,6 @@ int main(int argc, char* argv[])
 	bool splashScreen = Settings::getInstance()->getBool("SplashScreen");
 	bool splashScreenProgress = Settings::getInstance()->getBool("SplashScreenProgress");
 
-	LOG(LogError) << "Splash Screen: " << (splashScreen ? "Enabled" : "Disabled");
-	LOG(LogError) << "Splash Screen Progress: " << (splashScreenProgress ? "Enabled" : "Disabled");
-
 	if (splashScreen)
 	{
 		std::string progressText = _("Loading...");
