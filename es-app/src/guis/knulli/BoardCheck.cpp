@@ -9,7 +9,7 @@
 #include <vector>
 #include <string>
 
-const std::string BOARD_FILE = "/boot/boot/batocera.board";
+const std::string BOARD_FILE = "/boot/boot/knulli.board";
 
 std::string BoardCheck::getBoard()
 {

@@ -92,7 +92,7 @@ bool Win32ApiSystem::isScriptingSupported(ScriptId script)
 		return canSuspend();
 	
 	case ApiSystem::WIFI:
-		executables.push_back("batocera-wifi");
+		executables.push_back("knulli-wifi");
 		break;
 	case ApiSystem::RETROACHIVEMENTS:
 #ifdef CHEEVOS_DEV_LOGIN
@@ -100,16 +100,16 @@ bool Win32ApiSystem::isScriptingSupported(ScriptId script)
 #endif
 		break;
 	case ApiSystem::BLUETOOTH:
-		executables.push_back("batocera-bluetooth");
+		executables.push_back("knulli-bluetooth");
 		break;
 
 	case ApiSystem::RESOLUTION:
 #if _DEBUG
-		executables.push_back("batocera-resolution");
+		executables.push_back("knulli-resolution");
 #endif
 		break;
 	case ApiSystem::BIOSINFORMATION:
-		executables.push_back("batocera-systems");
+		executables.push_back("knulli-systems");
 		break;
 	case ApiSystem::NETPLAY:
 	case ApiSystem::GAMESETTINGS:
@@ -122,7 +122,7 @@ bool Win32ApiSystem::isScriptingSupported(ScriptId script)
 		executables.push_back("pdfinfo");		
 		break;
 	case ApiSystem::BATOCERASTORE:
-		executables.push_back("batocera-store");
+		executables.push_back("knulli-store");
 		break;
 	case ApiSystem::EVMAPY:
 		executables.push_back("emulatorLauncher");
@@ -137,14 +137,14 @@ bool Win32ApiSystem::isScriptingSupported(ScriptId script)
 				return true;
 			}
 			else
-				executables.push_back("batocera-padsinfo");
+				executables.push_back("knulli-padsinfo");
 		}
 		break;
 	case ApiSystem::UPGRADE:
 		return true;
 
 	case ApiSystem::SERVICES:
-		executables.push_back("batocera-services");
+		executables.push_back("knulli-services");
 		break;
 	 case ApiSystem::READPLANEMODE:
 		return true;	 
@@ -162,7 +162,7 @@ bool Win32ApiSystem::isScriptingSupported(ScriptId script)
 
 	if (script == ApiSystem::BATOCERASTORE)
 	{
-		std::string path = Paths::findEmulationStationFile("batocera-store.cfg");
+		std::string path = Paths::findEmulationStationFile("knulli-store.cfg");
 		if (path.empty() || !Utils::FileSystem::exists(path))
 			return false;
 	}
@@ -844,10 +844,10 @@ void Win32ApiSystem::updateEmulatorLauncher(const std::function<void(const std::
 
 	std::string zipFile = path + "/" + fileName;
 
-	if (downloadFile(url, zipFile, "batocera-ports", func))
+	if (downloadFile(url, zipFile, "knulli-ports", func))
 	{
 		if (func != nullptr)
-			func(std::string("Extracting batocera-ports"));
+			func(std::string("Extracting knulli-ports"));
 
 		unzipFile(zipFile, path);
 		Utils::FileSystem::removeFile(zipFile);
