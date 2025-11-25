@@ -11,6 +11,7 @@
 const std::string CapabilityCheck::RGB_CAPABILITY = "rgb";
 const std::string CapabilityCheck::HDMI_CAPABILITY = "hdmi";
 const std::string CapabilityCheck::LID_CAPABILITY = "lid";
+const std::string CapabilityCheck::PWRLED_CAPABILITY = "pwrled";
 const std::string CapabilityCheck::WIFI_CAPABILITY = "wifi";
 const std::string CapabilityCheck::BLUETOOTH_CAPABILITY = "bluetooth";
 const std::string CapabilityCheck::ANALOG_STICK_CAPABILITY = "analogstick";

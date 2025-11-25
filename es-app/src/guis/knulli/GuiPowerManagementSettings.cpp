@@ -83,6 +83,15 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 	aggressiveBatterySaveMode->setState(SystemConf::getInstance()->getBool("system.batterysaver.aggressive"));
 	addWithDescription(_("AGGRESSIVE BATTERY SAVER"),_("Optimizes battery life with extra power-saving measures during system idle."), aggressiveBatterySaveMode);
 
+	// Power LED toggle switch
+	auto powerLedSwitch = std::make_shared<SwitchComponent>(mWindow);
+	if (CapabilityCheck::hasCapability(CapabilityCheck::PWRLED_CAPABILITY)) {
+		bool powerLedEnabled = SystemConf::getInstance()->getBool("system.power.led");
+		powerLedSwitch->setState(powerLedEnabled);
+
+		addWithLabel(_("POWER LED"), powerLedSwitch);
+	}
+
 	// Lid close mode
 	auto optionsLidCloseMode = std::make_shared<OptionListComponent<std::string> >(mWindow, _("LID CLOSE MODE"), false);
 	// TODO: do not even instantiate if lid is not supported
@@ -99,7 +108,14 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 		addWithLabel(_("LID CLOSE MODE"), optionsLidCloseMode);
 	}
 
-	addSaveFunc([this, optionsBatterySaveMode, sliderIdleWatcherTimer, optionsBatterySaveExtendedMode, sliderIdleWatcherExtendedTime, aggressiveBatterySaveMode, optionsLidCloseMode]
+	addSaveFunc([this,
+	             optionsBatterySaveMode,
+	             sliderIdleWatcherTimer,
+	             optionsBatterySaveExtendedMode,
+	             sliderIdleWatcherExtendedTime,
+	             aggressiveBatterySaveMode,
+	             powerLedSwitch,
+	             optionsLidCloseMode]
 	{
 		int newIdleWatcherTimeSeconds = (int)Math::round(sliderIdleWatcherTimer->getValue()*60.f);
 		int newIdleWatcherExtendedTimeSeconds = (int)Math::round(sliderIdleWatcherExtendedTime->getValue()*60.f);
@@ -108,6 +124,9 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 		SystemConf::getInstance()->set("system.idlewatcher.extendedtimer", std::to_string(newIdleWatcherExtendedTimeSeconds));
 		SystemConf::getInstance()->set("system.batterysaver.extendedmode", optionsBatterySaveExtendedMode->getSelected());
 		SystemConf::getInstance()->setBool("system.batterysaver.aggressive", aggressiveBatterySaveMode->getState());
+		if (CapabilityCheck::hasCapability(CapabilityCheck::PWRLED_CAPABILITY)) {
+			SystemConf::getInstance()->setBool("system.power.led", powerLedSwitch->getState());
+		}
 		if (CapabilityCheck::hasCapability(CapabilityCheck::LID_CAPABILITY)) {
 			SystemConf::getInstance()->set("system.lid", optionsLidCloseMode->getSelected());
 		}
