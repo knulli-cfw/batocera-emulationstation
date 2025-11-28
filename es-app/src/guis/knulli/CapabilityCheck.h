@@ -7,6 +7,7 @@ public:
         static const std::string RGB_CAPABILITY;
         static const std::string HDMI_CAPABILITY;
         static const std::string LID_CAPABILITY;
+        static const std::string PWRLED_CAPABILITY;
         static const std::string WIFI_CAPABILITY;
         static const std::string BLUETOOTH_CAPABILITY;
         static const std::string ANALOG_STICK_CAPABILITY;
