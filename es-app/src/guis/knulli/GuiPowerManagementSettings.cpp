@@ -86,10 +86,12 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 	// Power LED toggle switch
 	auto powerLedSwitch = std::make_shared<SwitchComponent>(mWindow);
 	if (CapabilityCheck::hasCapability(CapabilityCheck::PWRLED_CAPABILITY)) {
-		bool powerLedEnabled = SystemConf::getInstance()->getBool("system.power.led");
+		bool powerLedEnabled = true;
+		if (!SystemConf::getInstance()->get("system.power.led").empty()) {
+			powerLedEnabled = SystemConf::getInstance()->getBool("system.power.led");
+		}
 		powerLedSwitch->setState(powerLedEnabled);
-
-		addWithLabel(_("POWER LED"), powerLedSwitch);
+		addWithDescription(_("POWER LED"),_("Enable/disable the power LED."), powerLedSwitch);
 	}
 
 	// Lid close mode
