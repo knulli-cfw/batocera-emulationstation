@@ -387,13 +387,20 @@ namespace Utils
 
 	const std::string pctPath = "/tmp/battery.percent";
 	if (Utils::FileSystem::exists(pctPath)) {
-		std::string s = Utils::String::trim(Utils::FileSystem::readAllText(pctPath));
+		std::string s = Utils::FileSystem::readAllText(pctPath);
+
+		// Strip all trailing whitespaces
+		while (!s.empty() && std::isspace(static_cast<unsigned char>(s.back()))) {
+			s.pop_back();
+		}
 
 		bool isPercentValid = false;
 		int val = 0;
 
 		if (!s.empty() &&
-			std::all_of(s.begin(), s.end(), [](unsigned char c){ return std::isdigit(c); }))
+			std::all_of(s.begin(), s.end(), [](unsigned char c) {
+				return std::isdigit(c);
+			}))
 		{
 			int parsed = Utils::String::toInteger(s);
 			if (parsed >= 0 && parsed <= 100) {
