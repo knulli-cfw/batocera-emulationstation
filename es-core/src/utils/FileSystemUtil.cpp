@@ -1216,10 +1216,20 @@ namespace Utils
 				return;
 
 			char bom[3];
-			if (file.read(bom, 3) && bom[0] == '\xEF' && bom[1] == '\xBB' && bom[2] == '\xBF')			
+			// Attempt to read 3 bytes
+			if (file.read(bom, 3) && bom[0] == '\xEF' && bom[1] == '\xBB' && bom[2] == '\xBF')
+			{
+				// BOM found. The file pointer is already in the correct place (past the BOM).
 				return;
-			
-			file.seekg(0);
+			}
+			else
+			{	
+				// Clear the error flags (like EOF/failbit) if the read failed to avoid issues with files with less than 3 chars.
+				file.clear(); 
+				
+				// Rewind to the beginning to read the file content from scratch.
+				file.seekg(0);
+			}
 		}
 
 		std::list<std::string> readAllLines(const std::string& fileName)
