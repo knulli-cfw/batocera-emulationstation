@@ -1121,7 +1121,7 @@ void GuiMenu::openDeveloperSettings()
 	s->addWithLabel(_("CONTROL EMULATIONSTATION WITH FIRST JOYSTICK ONLY"), firstJoystickOnly);
 	s->addSaveFunc([this, firstJoystickOnly] { Settings::getInstance()->setBool("FirstJoystickOnly", firstJoystickOnly->getState()); });
 
-//#if !defined(WIN32)
+#ifndef KNULLI
 	{
 	  auto gun_mt = std::make_shared<SliderComponent>(mWindow, 0.f, 10.f, 0.1f, "%");
 	  gun_mt->setValue(Settings::getInstance()->getFloat("GunMoveTolerence"));
@@ -1130,7 +1130,7 @@ void GuiMenu::openDeveloperSettings()
 	    Settings::getInstance()->setFloat("GunMoveTolerence", gun_mt->getValue());
 	  });
 	}
-//#endif
+#endif
 
 #if defined(BATOCERA)
 	// PS3 controller enable
@@ -1997,10 +1997,10 @@ void GuiMenu::openSystemSettings()
 	// backup
 	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::BACKUP))
 		s->addEntry(_("BACKUP USER DATA"), true, [this] { mWindow->pushGui(new GuiBackupStart(mWindow)); });
-
+#ifndef KNULLI
 	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::INSTALL))
 		s->addEntry(_("INSTALL ON A NEW DISK"), true, [this] { mWindow->pushGui(new GuiInstallStart(mWindow)); });
-
+#endif
 	s->addGroup(_("ADVANCED"));
 
 	if(ApiSystem::getInstance()->isScriptingSupported(ApiSystem::SERVICES)) {
@@ -3529,7 +3529,7 @@ void GuiMenu::openThemeConfiguration(Window* mWindow, GuiComponent* s, std::shar
 				if (Settings::getInstance()->setString(system->getName() + ".ShowCheevosIcon", showCheevos->getSelected()))
 					themeconfig->setVariable("reloadAll", true);
 			});
-
+#ifndef KNULLI
 		// Show gun icons
 		auto defGI = Settings::getInstance()->getBool("ShowGunIconOnGames") ? _("YES") : _("NO");
 		auto curGI = Settings::getInstance()->getString(system->getName() + ".ShowGunIconOnGames");
@@ -3543,7 +3543,7 @@ void GuiMenu::openThemeConfiguration(Window* mWindow, GuiComponent* s, std::shar
 				if (Settings::getInstance()->setString(system->getName() + ".ShowGunIconOnGames", showGun->getSelected()))
 					themeconfig->setVariable("reloadAll", true);
 			});
-
+#endif
 		// Show wheel icons
 		auto defWI = Settings::getInstance()->getBool("ShowWheelIconOnGames") ? _("YES") : _("NO");
 		auto curWI = Settings::getInstance()->getString(system->getName() + ".ShowWheelIconOnGames");
@@ -3924,7 +3924,9 @@ void GuiMenu::openUISettings()
 	s->addSwitch(_("SHOW SAVESTATE ICON"), "ShowSaveStates", true, [s] { s->setVariable("reloadAll", true); });
 	s->addSwitch(_("SHOW MANUAL ICON"), "ShowManualIcon", true, [s] { s->setVariable("reloadAll", true); });
 	s->addSwitch(_("SHOW RETROACHIEVEMENTS ICON"), "ShowCheevosIcon", true, [s] { s->setVariable("reloadAll", true); });
+#ifndef KNULLI
 	s->addSwitch(_("SHOW GUN ICON"), "ShowGunIconOnGames", true, [s] { s->setVariable("reloadAll", true); });
+#endif
 	s->addSwitch(_("SHOW WHEEL ICON"), "ShowWheelIconOnGames", true, [s] { s->setVariable("reloadAll", true); });
 	s->addSwitch(_("SHOW TRACKBALL ICON"), "ShowTrackballIconOnGames", true, [s] { s->setVariable("reloadAll", true); });
 	s->addSwitch(_("SHOW SPINNER ICON"), "ShowSpinnerIconOnGames", true, [s] { s->setVariable("reloadAll", true); });
@@ -4229,13 +4231,13 @@ void GuiMenu::openQuitMenu_static(Window *window, bool quickAccessMenu, bool ani
 			_("YES"), [] { Utils::Platform::quitES(Utils::Platform::QuitMode::SHUTDOWN); },
 			_("NO"), nullptr));
 	}, "iconShutdown");
-
+#ifndef KNULLI
 	s->addWithDescription(_("FAST SHUTDOWN SYSTEM"), _("Shutdown without saving metadata."), nullptr, [window] {
 		window->pushGui(new GuiMsgBox(window, _("REALLY SHUTDOWN WITHOUT SAVING METADATA?"),
 			_("YES"), [] { Utils::Platform::quitES(Utils::Platform::QuitMode::FAST_SHUTDOWN); },
 			_("NO"), nullptr));
 	}, "iconFastShutdown");
-
+#endif
 #ifdef WIN32
 	if (Settings::getInstance()->getBool("ShowExit"))
 	{
