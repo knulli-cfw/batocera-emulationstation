@@ -114,6 +114,7 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 	auto optionsFanMode = std::make_shared<OptionListComponent<std::string> >(mWindow, _("FAN MODE"), false);
 	// TODO: do not even instantiate if fan is not supported
 	if (CapabilityCheck::hasCapability(CapabilityCheck::FAN_CAPABILITY)) {
+		addGroup(_("FAN CONTROL"));
 		std::string selectedFanMode = SystemConf::getInstance()->get("system.fan");
 		if (selectedFanMode.empty())
 			selectedFanMode = "normal";
