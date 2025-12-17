@@ -19,6 +19,7 @@ const std::string CapabilityCheck::RUMBLE_CAPABILITY = "rumble";
 const std::string CapabilityCheck::ADB_CAPABILITY = "adb";
 const std::string CapabilityCheck::MTP_CAPABILITY = "mtp";
 const std::string CapabilityCheck::BEZEL_PROJECT_CAPABILITY = "bezelproject";
+const std::string CapabilityCheck::FAN_CAPABILITY = "fan";
 
 const std::string CAPABILITY_CHECK_COMMAND_NAME = "/usr/bin/knulli-board-capability";
 const std::string SEPARATOR = " ";

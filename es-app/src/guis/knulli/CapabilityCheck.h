@@ -15,6 +15,7 @@ public:
         static const std::string ADB_CAPABILITY;
         static const std::string MTP_CAPABILITY;
         static const std::string BEZEL_PROJECT_CAPABILITY;
+        static const std::string FAN_CAPABILITY;
 
         static bool hasCapability(const std::string capability);
 
