@@ -110,6 +110,23 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 		addWithLabel(_("LID CLOSE MODE"), optionsLidCloseMode);
 	}
 
+	// Fan mode
+	auto optionsFanMode = std::make_shared<OptionListComponent<std::string> >(mWindow, _("FAN MODE"), false);
+	// TODO: do not even instantiate if fan is not supported
+	if (CapabilityCheck::hasCapability(CapabilityCheck::FAN_CAPABILITY)) {
+		addGroup(_("FAN CONTROL"));
+		std::string selectedFanMode = SystemConf::getInstance()->get("system.fan");
+		if (selectedFanMode.empty())
+			selectedFanMode = "normal";
+
+		optionsFanMode->add(_("NORMAL"),           "normal", selectedFanMode == "normal");
+		optionsFanMode->add(_("QUIET"),             "quiet", selectedFanMode == "quiet");
+		optionsFanMode->add(_("PERFORMANCE"),       "performance", selectedFanMode == "performance");
+
+		addWithLabel(_("FAN MODE"), optionsFanMode);
+	}
+
+
 	addSaveFunc([this,
 	             optionsBatterySaveMode,
 	             sliderIdleWatcherTimer,
@@ -117,7 +134,9 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 	             sliderIdleWatcherExtendedTime,
 	             aggressiveBatterySaveMode,
 	             powerLedSwitch,
-	             optionsLidCloseMode]
+	             optionsLidCloseMode,
+				 optionsFanMode
+	             ]
 	{
 		int newIdleWatcherTimeSeconds = (int)Math::round(sliderIdleWatcherTimer->getValue()*60.f);
 		int newIdleWatcherExtendedTimeSeconds = (int)Math::round(sliderIdleWatcherExtendedTime->getValue()*60.f);
@@ -131,6 +150,9 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 		}
 		if (CapabilityCheck::hasCapability(CapabilityCheck::LID_CAPABILITY)) {
 			SystemConf::getInstance()->set("system.lid", optionsLidCloseMode->getSelected());
+		}
+		if (CapabilityCheck::hasCapability(CapabilityCheck::FAN_CAPABILITY)) {
+			SystemConf::getInstance()->set("system.fan", optionsFanMode->getSelected());
 		}
 		SystemConf::getInstance()->saveSystemConf();
 		Scripting::fireEvent("powermanagement-changed");
