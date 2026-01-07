@@ -28,7 +28,7 @@ GuiDisplaySettings::GuiDisplaySettings(Window* window) : ExtendedGuiSettings(win
 	std::vector<std::string> capabilities = DisplaySettings::getCapabilities();
 	if (capabilities.size() == 0)
 		return;
-	
+
 	for (const std::string& capability : capabilities)
 	{
 
@@ -39,7 +39,7 @@ GuiDisplaySettings::GuiDisplaySettings(Window* window) : ExtendedGuiSettings(win
         // make an uppercase copy safely
         std::string label = capability;
         std::transform(label.begin(), label.end(), label.begin(), [](unsigned char c){ return std::toupper(c); });
-		std::shared_ptr<SliderComponent> slider = createSlider(_(label.c_str()), 0.f, 99.f, 5.f, "", _(""), true);
+		std::shared_ptr<SliderComponent> slider = createSlider(_(label.c_str()), 0.f, 100.f, 5.f, "", _(""), true);
 		setConfigValueForSlider(slider, 50.f, CONF_PREFIX + capability);
 
 		// on change, set the value via DisplaySettings syscall
