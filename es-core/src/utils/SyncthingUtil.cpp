@@ -15,7 +15,6 @@
 #include <rapidjson/rapidjson.h>
 #include <rapidjson/pointer.h>
 #include <rapidjson/document.h>
-#include "ApiSystem.h"
 #include "FileSystemUtil.h"
 #include "LocaleES.h"
 #include "components/AsyncNotificationComponent.h"
@@ -24,21 +23,23 @@
 
 const std::string SYNCTHING_CONFIG_XML = "/userdata/system/configs/syncthing/config.xml";
 
-
+// Creates a new SyncthingUtil instance and attempts to connect to the syncthing API.
 SyncthingUtil::SyncthingUtil()
 {
 	connect();
 }
 
+// Returns true if syncthing is enabled and reachable and the respective config file exists.
 bool SyncthingUtil::isEnabled()
 {
-	// Check if syncthing service is enabled
-	auto services = ApiSystem::getInstance()->getServices();
-	for (auto service : services) {
-		if (service.name == "syncthing" && !service.enabled) {
-			return false;
-		}
+
+	// Check if syncthing API is up
+	HttpReq* req = new HttpReq("http://127.0.0.1:8384");
+	if (!req->wait())
+	{
+		return false;
 	}
+
 	// Check if config file exists
 	if (!Utils::FileSystem::exists(SYNCTHING_CONFIG_XML)) {
 		return false;
@@ -46,6 +47,8 @@ bool SyncthingUtil::isEnabled()
 	return true;
 }
 
+// Establishes a connection to the syncthing API by verifying the syncthing API
+// is reachable and loading all relevant devices and folders from the config XML.
 bool SyncthingUtil::connect()
 {
 	if (mConnected)
@@ -107,6 +110,7 @@ bool SyncthingUtil::connect()
 	return true;
 }
 
+// Disconnects from the syncthing API by clearing all configuration data.
 void SyncthingUtil::disconnect()
 {
 	mConnected = false;
@@ -128,12 +132,14 @@ void SyncthingUtil::disconnect()
 	mFolders.clear();
 }
 
+// Reconnects to the syncthing API by first disconnecting and then connecting again.
 bool SyncthingUtil::reconnect()
 {
 	disconnect();
 	return connect();
 }
 
+// Starts a rescan of all folders or of a specific folder if folderId is provided.
 void SyncthingUtil::scan(Window* window, std::string const* folderId)
 {
 	if (!reconnect()) {
@@ -177,8 +183,18 @@ void SyncthingUtil::scan(Window* window, std::string const* folderId)
 		wndNotification->close();
 		wndNotification = nullptr;
 	}
+	else
+	{
+		wndNotification->updateText("Error starting scan: " + req->getErrorMsg());
+		std::this_thread::sleep_for(std::chrono::seconds(3));
+		wndNotification->close();
+		wndNotification = nullptr;
+		disconnect();
+		LOG(LogError) << "Syncthing: Scan request failed - " << req->getErrorMsg();
+	}
 }
 
+// Retrieves the current synchronization state from the syncthing API.
 SyncthingState SyncthingUtil::getState() {
 
 	SyncthingState state;
@@ -233,6 +249,7 @@ SyncthingState SyncthingUtil::getState() {
 
 }
 
+// Retrieves a device by its ID, or nullptr if not found.
 Device* SyncthingUtil::getDeviceById(const std::string& deviceId) {
 	for (auto& device : mDevices) {
 		if (device.id == deviceId) {
@@ -242,6 +259,7 @@ Device* SyncthingUtil::getDeviceById(const std::string& deviceId) {
 	return nullptr;
 }
 
+// Retrieves a folder by its ID, or nullptr if not found.
 Folder* SyncthingUtil::getFolderById(const std::string& folderId) {
 	for (auto& folder : mFolders) {
 		if (folder.id == folderId) {
@@ -251,6 +269,7 @@ Folder* SyncthingUtil::getFolderById(const std::string& folderId) {
 	return nullptr;
 }
 
+// Retrieves own device ID from the syncthing API.
 std::string SyncthingUtil::getMyId()
 {
 	HttpReqOptions options;
@@ -273,6 +292,7 @@ std::string SyncthingUtil::getMyId()
 	return "OWN_ID_UNKNOWN";
 }
 
+// Retrieves a list of IDs of currently connected devices from the syncthing API.
 std::vector<std::string> SyncthingUtil::getConnectedDeviceIds() {
 	std::vector<std::string> deviceIds;
 
@@ -308,6 +328,7 @@ std::vector<std::string> SyncthingUtil::getConnectedDeviceIds() {
 	return deviceIds;
 }
 
+// Updates the status of a specific device by querying the syncthing API.
 void SyncthingUtil::updateDevice(Device* device)
 {
 	if (!device) return;
