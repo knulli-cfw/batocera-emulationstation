@@ -60,7 +60,7 @@ public:
 		bool reconnect();
 
 private:
-
+        SyncthingUtil() {} // Purposely hidden, use getInstance() instead!
 		SyncthingUtil(const SyncthingUtil&);  // Purposely hidden, don't implement!
 		void operator=(const SyncthingUtil&); // Purposely hidden, don't implement!
 
@@ -81,8 +81,6 @@ private:
                 .needBytes = 0,
                 .transferSpeed = 0
         };
-
-        SyncthingUtil();
 
         std::string getMyId();
         std::vector<std::string> getConnectedDeviceIds();
