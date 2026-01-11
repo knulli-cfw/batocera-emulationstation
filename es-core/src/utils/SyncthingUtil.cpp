@@ -111,15 +111,15 @@ void SyncthingUtil::disconnect()
 
 	// Reset status of own device
 	self = Device {
-                .id = "self",
-                .name = "self",
-                .paused = false,
-                .completion = 0,
-                .needItems = 0,
-                .globalItems = 0,
-                .needBytes = 0,
-                .transferSpeed = 0
-		};
+		.id = "self",
+		.name = "self",
+		.paused = false,
+		.completion = 0,
+		.needItems = 0,
+		.globalItems = 0,
+		.needBytes = 0,
+		.transferSpeed = 0
+	};
 
 	// Clear existing devices and folders
 	mDevices.clear();
@@ -154,6 +154,8 @@ void SyncthingUtil::scan(Window* window, std::string const* folderId)
 		} else {
 			wndNotification->updateText("Scanning all folders...");
 		}
+	} else {
+		wndNotification->updateText("Scanning all folders...");
 	}
 	LOG(LogError) << "Syncthing: Starting scan request";
 	
