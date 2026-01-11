@@ -2663,7 +2663,7 @@ void GuiMenu::openGamesSettings()
 
 #ifdef KNULLI
 	// SET SRM FILE UPDATE INTERVAL
-	auto autosaveInterval = std::make_shared<OptionListComponent<std::string>>(mWindow, _("SRM UPDATE INTERVAL (MINUTES)"));
+	auto autosaveInterval = std::make_shared<OptionListComponent<std::string>>(mWindow, _("SRM FILE UPDATE INTERVAL (MINUTES)"));
 	autosaveInterval->addRange({
 		{ _("ONLY ON GAME EXIT (DEFAULT)"), "" },
 		{ _("1"), "1" },
@@ -2674,7 +2674,7 @@ void GuiMenu::openGamesSettings()
 		{ _("60"), "60" } },
 		SystemConf::getInstance()->get("global.autosave_interval"));
 
-	s->addWithDescription(_("SRM UPDATE INTERVAL (MINUTES)"), _("For libretro cores, if your game allows in-game saving, the corresponding SRM file is updated every X minutes."), autosaveInterval);
+	s->addWithDescription(_("SRM FILE UPDATE INTERVAL (MINUTES)"), _("For libretro cores, if your game allows in-game saving, the corresponding SRM file is updated every X minutes."), autosaveInterval);
 	s->addSaveFunc([autosaveInterval] { SystemConf::getInstance()->set("global.autosave_interval", autosaveInterval->getSelected()); });
 #endif
 
