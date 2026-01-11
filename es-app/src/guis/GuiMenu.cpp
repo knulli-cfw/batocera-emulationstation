@@ -2661,6 +2661,24 @@ void GuiMenu::openGamesSettings()
 	s->addWithDescription(_("AUTO SAVE/LOAD"), _("Load latest savestate on game launch and savestate when exiting game."), autosave_enabled);
 	s->addSaveFunc([autosave_enabled] { SystemConf::getInstance()->set("global.autosave", autosave_enabled->getState() ? "1" : ""); });
 
+#ifdef KNULLI
+	// SET AUTOSAVE INTERVAL
+	auto autosaveInterval = std::make_shared<OptionListComponent<std::string>>(mWindow, _("AUTO SAVE INTERVAL (MINUTES)"));
+	autosaveInterval->addRange({
+		{ _("AUTO"), "" },
+		{ _("NONE"), "0" },
+		{ _("1"), "1" },
+		{ _("5"), "5" },
+		{ _("10"), "10" },
+		{ _("15"), "15" },
+		{ _("30"), "30" },
+		{ _("60"), "60" } },
+		SystemConf::getInstance()->get("global.autosave_interval"));
+
+	s->addWithDescription(_("AUTO SAVE INTERVAL (MINUTES)"), _("Libretro cores will save the game state automatically every X minutes."), autosaveInterval);
+	s->addSaveFunc([autosaveInterval] { SystemConf::getInstance()->set("global.autosave_interval", autosaveInterval->getSelected()); });
+#endif
+
 	// INCREMENTAL SAVESTATES
 	auto incrementalSaveStates = std::make_shared<OptionListComponent<std::string>>(mWindow, _("INCREMENTAL SAVESTATES"));
 	incrementalSaveStates->addRange({
