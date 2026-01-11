@@ -61,8 +61,8 @@ public:
 
 private:
 		SyncthingUtil() {} // Purposely hidden, use getInstance() instead!
-		SyncthingUtil(const SyncthingUtil&);  // Purposely hidden, don't implement!
-		void operator=(const SyncthingUtil&); // Purposely hidden, don't implement!
+		SyncthingUtil(const SyncthingUtil&) {};  // Purposely hidden
+		SyncthingUtil& operator=(const SyncthingUtil&) {}; // Purposely hidden
 
 		bool mConnected = false;
 
