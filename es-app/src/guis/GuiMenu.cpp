@@ -2665,7 +2665,8 @@ void GuiMenu::openGamesSettings()
 	// SET SRM FILE UPDATE INTERVAL
 	auto autosaveInterval = std::make_shared<OptionListComponent<std::string>>(mWindow, _("SRM FILE UPDATE INTERVAL (MINUTES)"));
 	autosaveInterval->addRange({
-		{ _("ONLY ON GAME EXIT (DEFAULT)"), "" },
+		{ _("AUTO"), "" },
+		{ _("ONLY ON GAME EXIT (DEFAULT)"), "0" },
 		{ _("1"), "1" },
 		{ _("5"), "5" },
 		{ _("10"), "10" },
