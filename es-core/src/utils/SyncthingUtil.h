@@ -72,6 +72,7 @@ private:
         SyncthingUtil& operator=(SyncthingUtil&&) = delete;
 
 		bool mConnected = false;
+		int mCurrentTransferNeededFiles = 0;
 
 		// Syncthing configuration
 		std::string mApiKey;

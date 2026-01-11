@@ -228,7 +228,6 @@ SyncthingState SyncthingUtil::getState() {
 
 	int syncedItems = globalItems - needItems;
 	std::string idx = std::to_string(syncedItems) + "/" + std::to_string(globalItems);
-	int percentDone = (syncedItems * 100) / (globalItems + 1);
 
 	if (needItems == 0) {
 		return state;

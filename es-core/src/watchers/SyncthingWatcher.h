@@ -23,4 +23,5 @@ private:
 	SyncthingUtil& mSyncthingUtil;
 	Window* mWindow;
 	AsyncNotificationComponent* wndNotification = nullptr;
+	int mCurrentTransferNeededFiles = 0;
 };

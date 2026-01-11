@@ -30,14 +30,18 @@ bool SyncthingWatcher::check()
 	{
 		if (wndNotification == nullptr)
 		{
+			mCurrentTransferNeededFiles = state.itemsTotal - state.itemsSynced;
 			wndNotification = mWindow->createAsyncNotificationComponent();
 			wndNotification->updateTitle(GUIICON + _("SYNCTHING"));
 		}
-		std::string idx = std::to_string(state.itemsSynced) + "/" + std::to_string(state.itemsTotal);
-		wndNotification->updateText(_("Synchronizing file") + " " + idx);
-		wndNotification->updatePercent(state.getPercentDone());
+		int currentTransferTransferredFiles = mCurrentTransferNeededFiles - (state.itemsTotal - state.itemsSynced);
+		std::string idx = std::to_string(currentTransferTransferredFiles) + "/" + std::to_string(mCurrentTransferNeededFiles);
+		int percentDone = currentTransferTransferredFiles * 100 / mCurrentTransferNeededFiles;
+		wndNotification->updateText(_("Transferring file") + " " + idx);
+		wndNotification->updatePercent(percentDone);
 		return true;
 	} else {
+		mCurrentTransferNeededFiles = 0;
 		if (wndNotification != nullptr)
 		{
 			wndNotification->close();
