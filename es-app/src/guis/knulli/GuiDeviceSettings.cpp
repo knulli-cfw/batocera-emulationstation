@@ -24,7 +24,7 @@
 #include "BoardCheck.h"
 #include "CapabilityCheck.h"
 #include "UsbService.h"
-#include "SyncthingUtil.h"
+#include "utils/SyncthingUtil.h"
 
 const std::vector<std::string> BOARDS_WITH_TOGGLE_SWITCH = {"trimui-brick", "trimui-smart-pro"};
 
