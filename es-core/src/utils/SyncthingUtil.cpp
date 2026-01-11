@@ -19,7 +19,7 @@
 #include "LocaleES.h"
 #include "components/AsyncNotificationComponent.h"
 
-#define GUIICON _U("\uF03E ")
+#define GUIICON _U("\uF07C ")
 
 const std::string SYNCTHING_CONFIG_XML = "/userdata/system/configs/syncthing/config.xml";
 

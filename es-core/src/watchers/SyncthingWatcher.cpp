@@ -1,7 +1,7 @@
 #include "SyncthingWatcher.h"
 #include "LocaleES.h"
 
-#define GUIICON _U("\uF03E ")
+#define GUIICON _U("\uF07C ")
 
 SyncthingWatcher::SyncthingWatcher(Window* window) : mWindow(window)
 	, mSyncthingUtil(SyncthingUtil::getInstance())
