@@ -2672,10 +2672,10 @@ void GuiMenu::openGamesSettings()
 		{ _("15"), "15" },
 		{ _("30"), "30" },
 		{ _("60"), "60" } },
-		SystemConf::getInstance()->get("global.autosave_interval"));
+		SystemConf::getInstance()->get("global.srm_update_interval"));
 
 	s->addWithDescription(_("SRM FILE UPDATE INTERVAL (MINUTES)"), _("For libretro cores, if your game allows in-game saving, the corresponding SRM file is updated every X minutes."), autosaveInterval);
-	s->addSaveFunc([autosaveInterval] { SystemConf::getInstance()->set("global.autosave_interval", autosaveInterval->getSelected()); });
+	s->addSaveFunc([autosaveInterval] { SystemConf::getInstance()->set("global.srm_update_interval", autosaveInterval->getSelected()); });
 #endif
 
 	// INCREMENTAL SAVESTATES
