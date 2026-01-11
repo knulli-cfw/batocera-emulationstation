@@ -21,5 +21,5 @@ private:
 	std::thread*				mHandle;
 	static ThreadedSyncthing*	mInstance;
 
-	SyncthingUtil				mSyncthingUtil = SyncthingUtil::getInstance();
+	SyncthingUtil&				mSyncthingUtil = SyncthingUtil::getInstance();
 };
