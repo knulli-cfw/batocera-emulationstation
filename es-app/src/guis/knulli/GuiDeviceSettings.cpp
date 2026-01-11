@@ -57,7 +57,6 @@ GuiDeviceSettings::GuiDeviceSettings(Window* window) : ExtendedGuiSettings(windo
 	}
 
 	if(SyncthingUtil::isEnabled()) {
-		mSyncthing = Syncthing(window);
 		addGroup(_("SYNCTHING"));
 
 		addWithDescription(_("Synchronize now"), _("Attempt to synchronize your devices with Syncthing."), nullptr, [this]
