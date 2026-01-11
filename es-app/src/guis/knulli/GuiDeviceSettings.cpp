@@ -72,6 +72,14 @@ GuiDeviceSettings::GuiDeviceSettings(Window* window) : ExtendedGuiSettings(windo
 					_("NO"), nullptr));
 			}
 		});
+
+		switchSyncthingScanOnGameExit = createSwitch(_("AUTO-SCAN ON GAME EXIT"), "syncthing.autoscan", _("Scan for changed files after exiting a game."), true, false, true);
+		addSaveFunc([this] {
+			// Set the telemetry settings in batocera.conf
+			SystemConf::getInstance()->set("syncthing.autoscan", switchSyncthingScanOnGameExit->getState() ? "1" : "0");
+			SystemConf::getInstance()->saveSystemConf();
+		});
+
 	}
 
 	if(Pico8Installer::hasInstaller()) {
