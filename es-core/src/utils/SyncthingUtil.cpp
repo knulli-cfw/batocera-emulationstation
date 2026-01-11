@@ -196,6 +196,7 @@ SyncthingState SyncthingUtil::getState() {
 	SyncthingState state;
 	state.itemsSynced = 0;
 	state.itemsTotal = 0;
+	state.transferSpeed = 0;
 
 	if (!mConnected && !connect()) {
 		LOG(LogError) << "Syncthing: Not connected, cannot get state";
@@ -241,6 +242,7 @@ SyncthingState SyncthingUtil::getState() {
 
 	state.itemsSynced = syncedItems;
 	state.itemsTotal = globalItems;
+	state.transferSpeed = totalSpeed;
 	return state;
 
 }

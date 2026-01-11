@@ -37,7 +37,7 @@ bool SyncthingWatcher::check()
 		wndNotification->updateText(_("Synchronizing file") + " " + idx);
 		wndNotification->updatePercent(state.getPercentDone());
 		return true;
-	} else{
+	} else {
 		if (wndNotification != nullptr)
 		{
 			wndNotification->close();

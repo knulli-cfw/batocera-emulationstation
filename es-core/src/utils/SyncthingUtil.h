@@ -27,9 +27,10 @@ struct SyncthingState
 {
 	int itemsSynced;
 	int itemsTotal;
+	int transferSpeed;
 
 	int isSyncing() {
-		return itemsSynced < itemsTotal;
+		return transferSpeed > 0;
 	}
 
 	int getPercentDone() {
