@@ -60,9 +60,15 @@ public:
 		bool reconnect();
 
 private:
-		SyncthingUtil() {} // Purposely hidden, use getInstance() instead!
-		SyncthingUtil(const SyncthingUtil&) {};  // Purposely hidden
-		SyncthingUtil& operator=(const SyncthingUtil&) {}; // Purposely hidden
+        SyncthingUtil() = default; // Private constructor for singleton pattern
+
+        // Disable copying and assignment
+        SyncthingUtil(const SyncthingUtil&) = delete;
+        SyncthingUtil& operator=(const SyncthingUtil&) = delete;
+
+        // Optional: Disable moving as well
+        SyncthingUtil(SyncthingUtil&&) = delete;
+        SyncthingUtil& operator=(SyncthingUtil&&) = delete;
 
 		bool mConnected = false;
 
