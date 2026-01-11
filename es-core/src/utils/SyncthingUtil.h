@@ -59,10 +59,10 @@ public:
 		void disconnect();
 		bool reconnect();
 
-        SyncthingUtil(const SyncthingUtil&) = delete;
-        void operator=(const SyncthingUtil&) = delete;
-
 private:
+
+		SyncthingUtil(const SyncthingUtil&);  // Purposely hidden, don't implement!
+		void operator=(const SyncthingUtil&); // Purposely hidden, don't implement!
 
 		bool mConnected = false;
 
