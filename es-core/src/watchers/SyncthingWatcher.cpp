@@ -41,12 +41,17 @@ bool SyncthingWatcher::check()
 		wndNotification->updatePercent(percentDone);
 		return true;
 	} else {
-		mCurrentTransferNeededFiles = 0;
 		if (wndNotification != nullptr)
 		{
-			wndNotification->close();
-			wndNotification = nullptr;
+			if (mCurrentTransferNeededFiles > 0) {
+				wndNotification->updateText(_("Synchronization complete."));
+				wndNotification->updatePercent(100);
+			} else {
+				wndNotification->close();
+				wndNotification = nullptr;
+			}
 		}
+		mCurrentTransferNeededFiles = 0;
 		return false;
 	}
 
