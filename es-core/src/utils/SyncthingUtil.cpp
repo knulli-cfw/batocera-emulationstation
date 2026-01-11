@@ -221,6 +221,7 @@ SyncthingState SyncthingUtil::getState() {
 		Device* device = getDeviceById(deviceId);
 		if (!device) continue;
 		updateDevice(device);
+		if (device->paused) continue;
 		globalItems += device->globalItems;
 		needItems += device->needItems;
 		totalSpeed += device->transferSpeed;
