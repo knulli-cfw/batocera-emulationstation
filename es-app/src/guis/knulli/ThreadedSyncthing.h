@@ -2,7 +2,7 @@
 
 #include <thread>
 #include "components/AsyncNotificationComponent.h"
-#include "guis/knulli/syncthing/Syncthing.h"
+#include "SyncthingUtil.h"
 
 class ThreadedSyncthing
 {
