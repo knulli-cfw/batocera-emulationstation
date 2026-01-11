@@ -23,12 +23,6 @@
 
 const std::string SYNCTHING_CONFIG_XML = "/userdata/system/configs/syncthing/config.xml";
 
-// Creates a new SyncthingUtil instance and attempts to connect to the syncthing API.
-SyncthingUtil::SyncthingUtil()
-{
-	connect();
-}
-
 // Returns true if syncthing is enabled and reachable and the respective config file exists.
 bool SyncthingUtil::isEnabled()
 {
