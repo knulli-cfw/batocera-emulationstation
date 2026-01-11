@@ -17,7 +17,7 @@ NetworkThread::NetworkThread(Window* window) : mWindow(window)
 
 	mgr->RegisterComponent(new BatteryLevelWatcher());
 	mgr->RegisterComponent(new NetworkStateWatcher());
-	mgr->RegisterComponent(new SyncthingWatcher());
+	mgr->RegisterComponent(new SyncthingWatcher(mWindow));
 	
 	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::UPGRADE))
 		mgr->RegisterComponent(&mCheckUpdatesComponent);
