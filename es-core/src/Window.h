@@ -163,6 +163,8 @@ private:
 	std::shared_ptr<VolumeInfoComponent> mVolumeInfo;
 	std::shared_ptr<BatteryIndicatorComponent>	mBatteryIndicator;	
 
+	float mNotificationOffsetY = 0.02f;
+
 	bool mNormalizeNextUpdate;
 
 	bool mAllowSleep;
