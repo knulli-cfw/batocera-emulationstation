@@ -2662,22 +2662,11 @@ void GuiMenu::openGamesSettings()
 	s->addSaveFunc([autosave_enabled] { SystemConf::getInstance()->set("global.autosave", autosave_enabled->getState() ? "1" : ""); });
 
 #ifdef KNULLI
-	// SET SRM FILE UPDATE INTERVAL
-	auto autosaveInterval = std::make_shared<OptionListComponent<std::string>>(mWindow, _("SRM FILE UPDATE INTERVAL"));
-	autosaveInterval->addRange({
-		{ _("AUTO"), "" },
-		{ _("5 Sec."), "5" },
-		{ _("10 Sec."), "10" },
-		{ _("15 Sec."), "15" },
-		{ _("30 Sec."), "30" },
-		{ _("1 Min. (DEFAULT)"), "60" },
-		{ _("5 Min."), "300" },
-		{ _("10 Min."), "600" },
-		{ _("ONLY ON GAME EXIT"), "0" } },
-		SystemConf::getInstance()->get("global.srm_update_interval"));
-
-	s->addWithDescription(_("SRM FILE UPDATE INTERVAL"), _("For libretro cores, if your game allows in-game saving, the corresponding SRM file is updated every X seconds/minutes."), autosaveInterval);
-	s->addSaveFunc([autosaveInterval] { SystemConf::getInstance()->set("global.srm_update_interval", autosaveInterval->getSelected()); });
+	// SET SRM FILE DUMP WHILE IN-GAME
+	auto srmDumpInGame = std::make_shared<SwitchComponent>(mWindow);
+	srmDumpInGame->setState(SystemConf::getInstance()->get("global.srm_dump_ingame") == "1");
+	s->addWithDescription(_("WRITE IN-GAME SAVES TO DISK WHILE IN GAME"), _("For libretro cores, if your game allows in-game saving, the corresponding SRM file is updated either within 10 seconds after saved or only on game exit."), srmDumpInGame);
+	s->addSaveFunc([srmDumpInGame] { SystemConf::getInstance()->set("global.srm_dump_ingame", srmDumpInGame->getState() ? "1" : ""); });
 #endif
 
 	// INCREMENTAL SAVESTATES
