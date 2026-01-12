@@ -1131,7 +1131,7 @@ void Window::renderAsyncNotifications(const Transform4x4f& trans)
 
 #define PADDING_H  (Renderer::getScreenWidth()*0.01)
 
-	float posY = Renderer::getScreenHeight() * 0.02f;
+	float posY = Renderer::getScreenHeight() * mNotificationOffsetY;
 
 	bool first = true;
 	for (auto child : mAsyncNotificationComponent)
@@ -1261,6 +1261,15 @@ void Window::onThemeChanged(const std::shared_ptr<ThemeData>& theme)
 
 	if (mBackgroundOverlay)
 		mBackgroundOverlay->setImage(ThemeData::getMenuTheme()->Background.fadePath);
+
+	auto elem = theme->getElement("screen", "notification", "notification");
+	if (elem && elem->has("y"))
+		mNotificationOffsetY = elem->get<float>("y");
+	else
+	{
+		// default value
+		mNotificationOffsetY = 0.02f;
+	}
 
 	if (mClock)
 	{
