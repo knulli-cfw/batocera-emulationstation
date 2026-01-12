@@ -6,7 +6,6 @@
 SyncthingWatcher::SyncthingWatcher(Window* window) : mWindow(window)
 	, mSyncthingUtil(SyncthingUtil::getInstance())
 {
-	// Do nothing
 }
 
 bool SyncthingWatcher::enabled()
@@ -20,6 +19,7 @@ bool SyncthingWatcher::check()
 	{
 		if (wndNotification != nullptr) {
 			wndNotification->close();
+			delete wndNotification; // Fixed: Explicitly free the UI component
 			wndNotification = nullptr;
 		}
 		return false;
@@ -34,10 +34,13 @@ bool SyncthingWatcher::check()
 			wndNotification = mWindow->createAsyncNotificationComponent();
 			wndNotification->updateTitle(GUIICON + _("SYNCTHING"));
 		}
+		
 		int currentTransferTransferredFiles = mCurrentTransferNeededFiles - (state.itemsTotal - state.itemsSynced);
+		
+		// Ensure we don't divide by zero if Syncthing reports 0 total items
 		if (mCurrentTransferNeededFiles > 0) {
 			std::string idx = std::to_string(currentTransferTransferredFiles) + "/" + std::to_string(mCurrentTransferNeededFiles);
-			int percentDone = currentTransferTransferredFiles * 100 / mCurrentTransferNeededFiles;
+			int percentDone = (currentTransferTransferredFiles * 100) / mCurrentTransferNeededFiles;
 			wndNotification->updateText(_("Transferring file") + " " + idx);
 			wndNotification->updatePercent(percentDone);
 		}
@@ -45,18 +48,17 @@ bool SyncthingWatcher::check()
 	} else {
 		if (wndNotification != nullptr)
 		{
+			// If we were just syncing, show completion briefly before deleting
 			if (mCurrentTransferNeededFiles > 0) {
 				wndNotification->updateText(_("Synchronization complete."));
 				wndNotification->updatePercent(100);
-				// We leave it visible for one more tick (10s) so user sees the "Complete" message
 				mCurrentTransferNeededFiles = 0; 
 			} else {
 				wndNotification->close();
+				delete wndNotification; // Fixed: Explicitly free the UI component
 				wndNotification = nullptr;
 			}
 		}
 		return false;
 	}
-
-	return false;
 }
