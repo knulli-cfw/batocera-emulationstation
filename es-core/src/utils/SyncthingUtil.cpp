@@ -10,6 +10,7 @@
 #include <pugixml/src/pugixml.hpp>
 #include <chrono>
 #include <thread>
+#include <memory>
 #include "Window.h"
 #include "guis/GuiMsgBox.h"
 #include <rapidjson/rapidjson.h>
@@ -28,7 +29,7 @@ bool SyncthingUtil::isEnabled()
 {
 
 	// Check if syncthing API is up
-	HttpReq* req = new HttpReq("http://127.0.0.1:8384");
+	std::unique_ptr<HttpReq> req(new HttpReq("http://127.0.0.1:8384"));
 	if (!req->wait())
 	{
 		return false;
@@ -163,14 +164,14 @@ void SyncthingUtil::scan(Window* window, std::string const* folderId)
 	options.customHeaders.push_back("X-Api-Key: " + mApiKey);
 	options.dataToPost = "scan"; // TODO: Make sure this works
 
-	HttpReq* req;
+	std::unique_ptr<HttpReq> req;
 
 	if(!folder) {
 		// Sync all folders
-		req = new HttpReq("http://127.0.0.1:8384/rest/db/scan", &options);
+		req.reset(new HttpReq("http://127.0.0.1:8384/rest/db/scan", &options));
 	} else {
 		// Sync only specified folder
-		req = new HttpReq("http://127.0.0.1:8384/rest/db/scan?folder=" + folder->id, &options);
+		req.reset(new HttpReq("http://127.0.0.1:8384/rest/db/scan?folder=" + folder->id, &options));
 	}
 
 	LOG(LogError) << "Syncthing: Scan request sent";
@@ -273,7 +274,7 @@ std::string SyncthingUtil::getMyId()
 	HttpReqOptions options;
 	options.customHeaders.push_back("X-Api-Key: " + mApiKey);
 
-	HttpReq* req = new HttpReq("http://127.0.0.1:8384/rest/system/status", &options);
+	std::unique_ptr<HttpReq> req(new HttpReq("http://127.0.0.1:8384/rest/system/status", &options));
 	
 	if (req->wait())
 	{
@@ -297,7 +298,7 @@ std::vector<std::string> SyncthingUtil::getConnectedDeviceIds() {
 	HttpReqOptions options;
 	options.customHeaders.push_back("X-Api-Key: " + mApiKey);
 
-	HttpReq* req = new HttpReq("http://127.0.0.1:8384/rest/system/connections", &options);
+	std::unique_ptr<HttpReq> req(new HttpReq("http://127.0.0.1:8384/rest/system/connections", &options));
 
 	if (req->wait())
 	{
@@ -334,7 +335,7 @@ void SyncthingUtil::updateDevice(Device* device)
 	HttpReqOptions options;
 	options.customHeaders.push_back("X-Api-Key: " + mApiKey);
 
-	HttpReq* req = new HttpReq("http://127.0.0.1:8384/rest/db/completion?device=" + device->id, &options);
+	std::unique_ptr<HttpReq> req(new HttpReq("http://127.0.0.1:8384/rest/db/completion?device=" + device->id, &options));
 
 	if (req->wait())
 	{
