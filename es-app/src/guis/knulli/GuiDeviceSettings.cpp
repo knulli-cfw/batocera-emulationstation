@@ -6,6 +6,7 @@
 #include "guis/knulli/GuiPowerManagementSettings.h"
 #include "guis/knulli/GuiRgbSettings.h"
 #include "guis/knulli/Pico8Installer.h"
+#include "guis/knulli/ThreadedSyncthing.h"
 #include "guis/knulli/syscalls/DisplaySettings.h"
 #include "components/OptionListComponent.h"
 #include "components/SliderComponent.h"
@@ -23,6 +24,7 @@
 #include "BoardCheck.h"
 #include "CapabilityCheck.h"
 #include "UsbService.h"
+#include "utils/SyncthingUtil.h"
 
 const std::vector<std::string> BOARDS_WITH_TOGGLE_SWITCH = {"trimui-brick", "trimui-smart-pro"};
 
@@ -53,6 +55,33 @@ GuiDeviceSettings::GuiDeviceSettings(Window* window) : ExtendedGuiSettings(windo
 	
 		}
 	}
+
+	if(SyncthingUtil::isEnabled()) {
+		addGroup(_("SYNCTHING"));
+
+		addWithDescription(_("Synchronize now"), _("Attempt to synchronize your devices with Syncthing."), nullptr, [this]
+		{
+			if (ThreadedSyncthing::isRunning())
+				mWindow->pushGui(new GuiMsgBox(mWindow, _("SYNCHRONIZATION IS ALREADY RUNNING.")));
+			else
+			{
+				mWindow->pushGui(new GuiMsgBox(mWindow, _("SYNCHRONIZE NOW?"), _("YES"), [this]
+					{
+						ThreadedSyncthing::start(mWindow);
+					},
+					_("NO"), nullptr));
+			}
+		});
+
+		switchSyncthingScanOnGameExit = createSwitch(_("AUTO-SCAN ON GAME EXIT"), "syncthing.autoscan", _("Scan for changed files after exiting a game."), true, false, true);
+		addSaveFunc([this] {
+			// Set the telemetry settings in batocera.conf
+			SystemConf::getInstance()->set("syncthing.autoscan", switchSyncthingScanOnGameExit->getState() ? "1" : "0");
+			SystemConf::getInstance()->saveSystemConf();
+		});
+
+	}
+
 	if(Pico8Installer::hasInstaller()) {
 		addGroup(_("NATIVE PICO-8"));
 		addEntry(_("INSTALL PICO-8"), true, [this] { installPico8(); });
