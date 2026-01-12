@@ -15,7 +15,7 @@ protected:
 	bool enabled() override;
 
 	int  initialUpdateTime() override { return 0; }		// Immediate
-	int  updateTime() override { return 5 * 1000; }		// 5 seconds
+	int  updateTime() override { return 10 * 1000; }	// 10 seconds
 
 	bool check() override;
 
