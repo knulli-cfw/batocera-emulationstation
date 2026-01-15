@@ -49,7 +49,6 @@ bool SyncthingUtil::connect()
 	if (mConnected)
 		return true;
 
-	LOG(LogError) << "Syncthing: Initializing Syncthing integration";
 	if (!SyncthingUtil::isEnabled()) {
 		mConnected = false;
 		return false;
@@ -64,30 +63,29 @@ bool SyncthingUtil::connect()
 		mConnected = false;
 		return false;
 	}
-	LOG(LogError) << "Syncthing: Loaded configuration XML";
 
 	pugi::xml_node configurationNode = document.child("configuration");
 
 	mApiKey = configurationNode.child("gui").child("apikey").text().get();
-	LOG(LogError) << "Syncthing: API key is " << mApiKey;
+	LOG(LogDebug) << "Syncthing: API key is " << mApiKey;
 
 	// Determine own device ID
 	self.id = getMyId();
-	LOG(LogError) << "Syncthing: Own device ID is " << self.id;
+	LOG(LogInfo) << "Syncthing: Own device ID is " << self.id;
 
 	// Load devices
 	for (pugi::xml_node deviceNode = configurationNode.child("device"); deviceNode; deviceNode = deviceNode.next_sibling("device")) {
 		if (std::string(deviceNode.attribute("id").as_string()) == self.id) {
 			self.name = deviceNode.attribute("name").as_string();
 			self.paused = deviceNode.child("paused").text().as_bool();
-			LOG(LogError) << "Syncthing: Determined own device name " << self.name;
+			LOG(LogInfo) << "Syncthing: Determined own device name " << self.name;
 			continue; // Don't add self to device list
 		}
 		Device device;
 		device.id = deviceNode.attribute("id").as_string();
 		device.name = deviceNode.attribute("name").as_string();
 		device.paused = deviceNode.child("paused").text().as_bool();
-		LOG(LogError) << "Syncthing: Added device with name " << device.name;
+		LOG(LogInfo) << "Syncthing: Added device with name " << device.name;
 		mDevices.push_back(device);
 	}
 	// Load folders
@@ -97,7 +95,7 @@ bool SyncthingUtil::connect()
 		folder.label = folderNode.attribute("label").as_string();
 		folder.path = folderNode.attribute("path").as_string();
 		folder.fsWatcherEnabled = folderNode.attribute("fsWatcherEnabled").as_bool();
-		LOG(LogError) << "Syncthing: Added folder with label " << folder.label;
+		LOG(LogInfo) << "Syncthing: Added folder with label " << folder.label;
 		mFolders.push_back(folder);
 	}
 
@@ -142,9 +140,9 @@ void SyncthingUtil::scan(Window* window, std::string const* folderId)
 		return;
 	}
 
-	LOG(LogError) << "Syncthing: Starting scan";
+	LOG(LogDebug) << "Syncthing: Starting scan";
 	AsyncNotificationComponent* wndNotification = window->createAsyncNotificationComponent();
-	LOG(LogError) << "Syncthing: Created notification window";
+	LOG(LogDebug) << "Syncthing: Created notification window";
 	wndNotification->updateTitle(GUIICON + _("SYNCTHING"));
 
 	Folder* folder = nullptr;
@@ -158,7 +156,7 @@ void SyncthingUtil::scan(Window* window, std::string const* folderId)
 	} else {
 		wndNotification->updateText("Scanning all folders...");
 	}
-	LOG(LogError) << "Syncthing: Starting scan request";
+	LOG(LogDebug) << "Syncthing: Starting scan request";
 	
 	HttpReqOptions options;
 	options.customHeaders.push_back("X-Api-Key: " + mApiKey);
@@ -174,7 +172,7 @@ void SyncthingUtil::scan(Window* window, std::string const* folderId)
 		req.reset(new HttpReq("http://127.0.0.1:8384/rest/db/scan?folder=" + folder->id, &options));
 	}
 
-	LOG(LogError) << "Syncthing: Scan request sent";
+	LOG(LogDebug) << "Syncthing: Scan request sent";
 	if (req->wait())
 	{
 		wndNotification->close();
@@ -236,7 +234,7 @@ SyncthingState SyncthingUtil::getState() {
 	}
 
 	if (totalSpeed == 0) {
-		LOG(LogError) << "Syncthing: No transfer speed detected, assuming sync is complete even though " << needItems << " files have not been synced yet.";
+		LOG(LogDebug) << "Syncthing: No transfer speed detected, assuming sync is complete even though " << needItems << " files have not been synced yet.";
 		return state;
 	
 	}
