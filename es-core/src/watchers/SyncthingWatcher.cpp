@@ -92,7 +92,7 @@ bool SyncthingWatcher::check() {
 			}
 		}
 		// If we know how many files need to be transferred, show progress
-if (mCurrentTransferNeededFiles > 0) {
+		if (mCurrentTransferNeededFiles > 0) {
             int64_t currentTransferTransferredFiles = mCurrentTransferNeededFiles - (state.itemsTotal - state.itemsSynced);
             // Clamp to avoid negative numbers if Syncthing updates totals mid-sync
             if (currentTransferTransferredFiles < 0) currentTransferTransferredFiles = 0;
