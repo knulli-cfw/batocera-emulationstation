@@ -38,21 +38,13 @@ bool SyncthingWatcher::check() {
         return true;
     }
 
-    // Secure the baseline
-    if (mTotalBytesTransferred == 0) {
-        mTotalBytesTransferred = state.totalBytesTransferred;
-        LOG(LogInfo) << "Syncthing: Initial baseline set to " << mTotalBytesTransferred;
-        return true; // EXIT HERE. Do not process deltas until the NEXT 5s tick.
-    }
+	// Check if initialization is complete
+    if (!isInitialized(state)) {
+		return true;
+	}
 
     // Calculate the delta
     int64_t transferredBytesSinceLastCheck = state.totalBytesTransferred - mTotalBytesTransferred;
-    
-    // Safety check: if Syncthing resets its session counter, reset our baseline
-    if (transferredBytesSinceLastCheck < 0) {
-        mTotalBytesTransferred = state.totalBytesTransferred;
-        return true;
-    }
 
     mTotalBytesTransferred = state.totalBytesTransferred;
 	
@@ -74,7 +66,7 @@ bool SyncthingWatcher::check() {
 
 	// Debug logging
 	if (transferredBytesSinceLastCheck > 0) {
-		LOG(LogInfo) << "Syncthing: Total bytes transferred updated to " << mTotalBytesTransferred;
+		LOG(LogDebug) << "Syncthing: Total bytes transferred updated to " << mTotalBytesTransferred;
 	}
 
 	// If nothing is syncing and only 1024 bytes or less have been transferred since last check, skip or close notification
@@ -108,7 +100,7 @@ bool SyncthingWatcher::check() {
         mkillNotificationInNextCycle = false;
 
 		// Start new syncing notification
-		LOG(LogInfo) << "Syncthing: Starting new syncing notification at state itemsSynced=" << state.itemsSynced << " itemsTotal=" << state.itemsTotal << " transferSpeed=" << state.transferSpeed << " transferredBytesSinceLastCheck=" << transferredBytesSinceLastCheck << " dirtyDevices=" << mDirtyDevices.size();
+		LOG(LogDebug) << "Syncthing: Starting new syncing notification at state itemsSynced=" << state.itemsSynced << " itemsTotal=" << state.itemsTotal << " transferSpeed=" << state.transferSpeed << " transferredBytesSinceLastCheck=" << transferredBytesSinceLastCheck << " dirtyDevices=" << mDirtyDevices.size();
 		
 		// Create notification window if not existing yet
 		if (wndNotification == nullptr) {
@@ -186,7 +178,6 @@ std::string SyncthingWatcher::toSyncedDevicesNameString(const std::vector<std::s
         if (!first) {
             names += ", ";
         }
-        
         names += deviceName;
         first = false;
     }
@@ -199,4 +190,31 @@ std::string SyncthingWatcher::toSyncedDevicesNameString(const std::vector<std::s
 			return Utils::String::format(_("Syncing with %s.").c_str(), names.c_str());
 		}
 	}
+}
+
+// During launch, syncthing creates a lot of background noise as it scans the database and checks file states.
+// We need to ignore this noise until the initial sync is complete.
+bool SyncthingWatcher::isInitialized(const SyncthingState& state) {
+
+	if (mInitialized) {
+		return true;
+	}
+
+    // Secure the baseline
+    if (mTotalBytesTransferred == 0) {
+        mTotalBytesTransferred = state.totalBytesTransferred;
+        LOG(LogInfo) << "Syncthing: Initial baseline set to " << mTotalBytesTransferred;
+        return false;
+    }
+
+	// Syncthing has determined a steady baseline, initialization seems to be complete.
+	if (state.totalBytesTransferred <= mTotalBytesTransferred) {
+		mTotalBytesTransferred = state.totalBytesTransferred;
+		mInitialized = true;
+		LOG(LogInfo) << "Syncthing: Initialization complete. Baseline reset to " << mTotalBytesTransferred;
+		return false; // Return false this cycle to avoid showing a notification immediately.
+	}
+
+	return false;
+
 }
