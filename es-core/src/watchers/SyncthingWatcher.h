@@ -27,9 +27,11 @@ private:
 	std::vector<std::string> mDirtyDevices;
 	std::vector<std::string> mSyncedDevices;
 
+	bool mInitialized = false;
 	bool mkillNotificationInNextCycle = false;
 	int64_t mCurrentTransferNeededFiles = 0;
     int64_t mTotalBytesTransferred = 0;
 
 	std::string toSyncedDevicesNameString(const std::vector<std::string>& deviceNames, bool synced = true);
+	bool isInitialized(const SyncthingState& state);
 };
