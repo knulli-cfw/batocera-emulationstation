@@ -357,15 +357,15 @@ void SyncthingUtil::updateDeviceCompletion(Device* device) {
 			device->paused = doc.GetObject()["paused"].GetBool();
 		if (doc.GetObject().HasMember("needBytes") && doc.GetObject()["needBytes"].GetInt64()) {
 			int64_t currentNeedBytes = doc.GetObject()["needBytes"].GetInt64();
-            int64_t distance = 0;
-            
-            // If needBytes decreased, we have transferred data
-            if (currentNeedBytes < device->needBytes) {
-                distance = device->needBytes - currentNeedBytes;
-            }
-            
+
+			// Only record speed if the change is significant (e.g., > 1KB)
+			// and if we actually have items left to sync
+			if (currentNeedBytes < device->needBytes && (device->needItems > 0)) {
+				device->transferSpeed = device->needBytes - currentNeedBytes;
+			} else {
+				device->transferSpeed = 0; // Explicitly reset to zero
+			}
             device->needBytes = currentNeedBytes;
-            device->transferSpeed = distance;
 		}
 	}
 }

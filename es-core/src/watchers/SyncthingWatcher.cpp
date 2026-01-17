@@ -2,6 +2,7 @@
 #include "LocaleES.h"
 #include "Log.h"
 #include <algorithm>
+#include "utils/StringUtil.h"
 
 #define GUIICON _U("\uF07C ")
 
@@ -22,13 +23,45 @@ bool SyncthingWatcher::check() {
 		return true;
 	}
 
+	// Check if we are scheduled to kill the notification from the last cycle
+    if (wndNotification != nullptr && mkillNotificationInNextCycle) {
+        wndNotification->close();
+        wndNotification = nullptr;
+        mSyncedDevices.clear();
+        mkillNotificationInNextCycle = false;
+    }
+
 	SyncthingState state = mSyncthingUtil.getState();
-	std::vector<std::string> syncedDevices;
+
+	// Ignore invalid/empty states
+    if (state.totalBytesTransferred <= 0) {
+        return true;
+    }
+
+    // Secure the baseline
+    if (mTotalBytesTransferred == 0) {
+        mTotalBytesTransferred = state.totalBytesTransferred;
+        LOG(LogError) << "Syncthing: Initial baseline set to " << mTotalBytesTransferred;
+        return true; // EXIT HERE. Do not process deltas until the NEXT 5s tick.
+    }
+
+    // Calculate the delta
+    int64_t transferredBytesSinceLastCheck = state.totalBytesTransferred - mTotalBytesTransferred;
+    
+    // Safety check: if Syncthing resets its session counter, reset our baseline
+    if (transferredBytesSinceLastCheck < 0) {
+        mTotalBytesTransferred = state.totalBytesTransferred;
+        return true;
+    }
+
+    mTotalBytesTransferred = state.totalBytesTransferred;
+	
+
 	// Check if any devices have become dirty or are no longer dirty
 	for (const auto& dev : mDirtyDevices) {
 		if (std::find(state.dirtyDevices.begin(), state.dirtyDevices.end(), dev) == state.dirtyDevices.end()) {
-			LOG(LogInfo) << "Syncthing: Device " << dev << " is no longer dirty.";
-			syncedDevices.push_back(dev);
+			LOG(LogError) << "Syncthing: Device " << dev << " is no longer dirty.";
+			mSyncedDevices.push_back(dev);
 		}
 	}
 	mDirtyDevices = state.dirtyDevices;
@@ -39,45 +72,43 @@ bool SyncthingWatcher::check() {
 		}
 	}
 
-	// Calculate number of bytes transferred since last check
-	int64_t transferredBytesSinceLastCheck = state.totalBytesTransferred - mTotalBytesTransferred;
-
-	// Update total bytes transferred
-	mTotalBytesTransferred = state.totalBytesTransferred;
-
 	// Debug logging
 	if (transferredBytesSinceLastCheck > 0) {
-		LOG(LogInfo) << "Syncthing: Total bytes transferred updated to " << mTotalBytesTransferred;
+		LOG(LogError) << "Syncthing: Total bytes transferred updated to " << mTotalBytesTransferred;
 	}
 
-	// If nothing is syncing and no devices are dirty, and only 128 bytes or less have been transferred since last check, skip or close notification
-	if (!state.isSyncing() && transferredBytesSinceLastCheck <= 128) {
+	// If nothing is syncing and only 1024 bytes or less have been transferred since last check, skip or close notification
+	if (!state.isSyncing() && transferredBytesSinceLastCheck <= 1024) {
 		if (wndNotification != nullptr)
 		{
-			// If previous cycle already showed finished message, close notification
-			if (mkillNotificationInNextCycle) {
-				wndNotification->close();
-				wndNotification = nullptr;
-				mkillNotificationInNextCycle = false;
-			// Show finished message
-			} else {
-				if (syncedDevices.size() == 0 && mDirtyDevices.size() > 0) {
-					wndNotification->updateText(_("No device available for sync."));
-					wndNotification->updatePercent(0);
-				} else if (syncedDevices.size() == 0 && mDirtyDevices.size() == 0) {
-					wndNotification->updateText(_("Synchronization complete."));
-					wndNotification->updatePercent(100);
-				} else {
-					wndNotification->updateText(_("Synced with") + " " + toSyncedDevicesNameString(syncedDevices) + ".");
-					wndNotification->updatePercent(100);
-				}
+			// Display a final synced/complete message before closing
+			if (mDirtyDevices.size() > 0 && transferredBytesSinceLastCheck == 0) {
+				// If devices are dirty but none are connected, it's not "syncing"
+				wndNotification->updateText(_("All devices disconnected."));
+				wndNotification->updatePercent(0);
 				mCurrentTransferNeededFiles = 0;
-				mkillNotificationInNextCycle = true;
+			} else if (mDirtyDevices.size() == 0) {
+				wndNotification->updateText(_("Synchronization complete."));
+				wndNotification->updatePercent(100);
+			} else {
+				wndNotification->updateText(toSyncedDevicesNameString(mSyncedDevices, true));
+				wndNotification->updatePercent(100);
 			}
+			// Schedule notification to be executed in next cycle.
+			mkillNotificationInNextCycle = true;
+			return true;
 		}
 	} else {
+		// Let's make sure we aren't showing a notification for background noise.
+		if (!state.isSyncing() && transferredBytesSinceLastCheck <= 1024) {
+            return true; 
+        }
+
+        // If we got here, it's a real sync.
+        mkillNotificationInNextCycle = false;
+
 		// Start new syncing notification
-		LOG(LogInfo) << "Syncthing: Starting new syncing notification at state itemsSynced=" << state.itemsSynced << " itemsTotal=" << state.itemsTotal << " transferSpeed=" << state.transferSpeed << " transferredBytesSinceLastCheck=" << transferredBytesSinceLastCheck << " dirtyDevices=" << mDirtyDevices.size();
+		LOG(LogError) << "Syncthing: Starting new syncing notification at state itemsSynced=" << state.itemsSynced << " itemsTotal=" << state.itemsTotal << " transferSpeed=" << state.transferSpeed << " transferredBytesSinceLastCheck=" << transferredBytesSinceLastCheck << " dirtyDevices=" << mDirtyDevices.size();
 		
 		// Create notification window if not existing yet
 		if (wndNotification == nullptr) {
@@ -104,20 +135,29 @@ bool SyncthingWatcher::check() {
 			wndNotification->updatePercent(percentDone);
 		// If we know which devices are dirty, but not how many files need to be transferred, list dirty devices
 		} else if (mDirtyDevices.size() > 0) {
-			wndNotification->updateText(_("Syncing with") + " " + toSyncedDevicesNameString(mDirtyDevices) + ".");
+			wndNotification->updateText(toSyncedDevicesNameString(mDirtyDevices, false));
 			wndNotification->updatePercent(0);
 		// If we don't know which devices are dirty, but bytes have been transferred since last check, show generic syncing message
 		} else if (state.isSyncing()) {
-			wndNotification->updateText(_("Transfer in progress."));
-			wndNotification->updatePercent(0);
+			// If the API says we are syncing but the file counts are zero/equal,
+			// it's likely just a database scan. Don't let it hang forever.
+			if (state.itemsTotal > 0 && state.itemsTotal > state.itemsSynced) {
+				wndNotification->updateText(_("Transfer in progress..."));
+				wndNotification->updatePercent(state.getPercentDone());
+			} else {
+				// If it's just a scan with no actual file backlog, treat it as finished
+				wndNotification->updateText(_("Synchronization complete."));
+				wndNotification->updatePercent(100);
+				mkillNotificationInNextCycle = true;
+			}
 		// If no devices are dirty and no transfer is in progress, but at least one device has finished syncing
-		} else if (syncedDevices.size() > 0) {
-			wndNotification->updateText(_("Synced with") + " " + toSyncedDevicesNameString(syncedDevices) + ".");
+		} else if (mSyncedDevices.size() > 0) {
+			wndNotification->updateText(toSyncedDevicesNameString(mSyncedDevices, true));
 			wndNotification->updatePercent(100);
 			mkillNotificationInNextCycle = true;
-		// If no devices are dirty and no transfer is in progress, but more than 128 bytes have been transferred since last check
-		} else if (transferredBytesSinceLastCheck > 128) {
-			wndNotification->updateText(_("Synced with") + " " + toSyncedDevicesNameString(cleanDevices) + ".");
+		// If no devices are dirty and no transfer is in progress, but more than 1024 bytes have been transferred since last check
+		} else if (transferredBytesSinceLastCheck > 1024) {
+			wndNotification->updateText(toSyncedDevicesNameString(cleanDevices, true));
 			wndNotification->updatePercent(100);
 			mkillNotificationInNextCycle = true;
 		} else if (transferredBytesSinceLastCheck == 0 && (mCurrentTransferNeededFiles > 0 || mDirtyDevices.size() > 0)) {
@@ -132,13 +172,31 @@ bool SyncthingWatcher::check() {
 	return true;
 }
 
-std::string SyncthingWatcher::toSyncedDevicesNameString(const std::vector<std::string>& deviceNames) {
-	std::string result;
-	for (size_t i = 0; i < deviceNames.size(); i++) {
-		result += deviceNames[i];
-		if (i < deviceNames.size() - 1) {
-			result += ", ";
+std::string SyncthingWatcher::toSyncedDevicesNameString(const std::vector<std::string>& deviceNames, bool synced) {
+
+	std::string names;
+    bool first = true;
+
+    for (const auto& deviceName : deviceNames) {
+        // Skip IDs that haven't been resolved to names yet
+        if (deviceName.length() > 20 || deviceName.find("-") != std::string::npos) {
+            continue; 
+        }
+
+        if (!first) {
+            names += ", ";
+        }
+        
+        names += deviceName;
+        first = false;
+    }
+	if (names.empty()) {
+		return synced ?  _("Synchronization complete.") : _("Transfer in progress...");
+	} else {
+		if (synced) {
+			return Utils::String::format(_("Synced with %s.").c_str(), names.c_str());
+		} else {
+			return Utils::String::format(_("Syncing with %s.").c_str(), names.c_str());
 		}
 	}
-	return result;
 }
