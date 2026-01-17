@@ -1,13 +1,13 @@
 #pragma once
 
+#include <string>
+#include <vector>
 #include "WatchersManager.h"
 #include "utils/Platform.h"
 #include "utils/SyncthingUtil.h"
 #include "components/AsyncNotificationComponent.h"
 
-class SyncthingWatcher : public IWatcher
-{
-
+class SyncthingWatcher : public IWatcher {
 public:
 	SyncthingWatcher(Window* window);
 
@@ -23,5 +23,12 @@ private:
 	SyncthingUtil& mSyncthingUtil;
 	Window* mWindow;
 	AsyncNotificationComponent* wndNotification = nullptr;
-	int mCurrentTransferNeededFiles = 0;
+
+	std::vector<std::string> mDirtyDevices;
+
+	bool mkillNotificationInNextCycle = false;
+	int64_t mCurrentTransferNeededFiles = 0;
+    int64_t mTotalBytesTransferred = 0;
+
+	std::string toSyncedDevicesNameString(const std::vector<std::string>& deviceNames);
 };
