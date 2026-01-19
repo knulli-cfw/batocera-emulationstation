@@ -77,11 +77,18 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 	sliderIdleWatcherExtendedTime->setValue((float)(selectedIdleWatcherExtendedTimeMinutes));
 	addWithDescription(_("EXTENDED IDLE TIME"),_("Secondary timer which starts after initial idle time has passed without any input."), sliderIdleWatcherExtendedTime);
 
+	// Bypass battery saving when charging toggle
+	auto bypassBatterySavingWhenCharging = std::make_shared<SwitchComponent>(mWindow);
+
+	bypassBatterySavingWhenCharging->setState(SystemConf::getInstance()->getBool("system.batterysaver.chargingbypass"));
+	addWithDescription(_("DISABLE BATTERY SAVING WHEN CHARGING"),_("While the device is plugged to a power source, battery saving measures are disabled."), bypassBatterySavingWhenCharging);
+
 	// Aggressive battery save mode toggle
 	auto aggressiveBatterySaveMode = std::make_shared<SwitchComponent>(mWindow);
 
 	aggressiveBatterySaveMode->setState(SystemConf::getInstance()->getBool("system.batterysaver.aggressive"));
 	addWithDescription(_("AGGRESSIVE BATTERY SAVER"),_("Optimizes battery life with extra power-saving measures during system idle."), aggressiveBatterySaveMode);
+
 
 	// Power LED toggle switch
 	auto powerLedSwitch = std::make_shared<SwitchComponent>(mWindow);
@@ -132,6 +139,7 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 	             sliderIdleWatcherTimer,
 	             optionsBatterySaveExtendedMode,
 	             sliderIdleWatcherExtendedTime,
+				 bypassBatterySavingWhenCharging,
 	             aggressiveBatterySaveMode,
 	             powerLedSwitch,
 	             optionsLidCloseMode,
@@ -144,6 +152,7 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 		SystemConf::getInstance()->set("system.batterysaver.mode", optionsBatterySaveMode->getSelected());
 		SystemConf::getInstance()->set("system.idlewatcher.extendedtimer", std::to_string(newIdleWatcherExtendedTimeSeconds));
 		SystemConf::getInstance()->set("system.batterysaver.extendedmode", optionsBatterySaveExtendedMode->getSelected());
+		SystemConf::getInstance()->setBool("system.batterysaver.chargingbypass", bypassBatterySavingWhenCharging->getState());
 		SystemConf::getInstance()->setBool("system.batterysaver.aggressive", aggressiveBatterySaveMode->getState());
 		if (CapabilityCheck::hasCapability(CapabilityCheck::PWRLED_CAPABILITY)) {
 			SystemConf::getInstance()->setBool("system.power.led", powerLedSwitch->getState());
