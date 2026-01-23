@@ -2,6 +2,10 @@
 #include <string>
 #include <vector>
 #include "Window.h"
+#include "watchers/WatchersManager.h"
+#include <map>
+#include <memory>
+#include <mutex>
 
 struct Device {
 	std::string id;
@@ -32,7 +36,7 @@ struct SyncthingState {
 	std::vector<std::string> connectedDevices;
 	std::vector<std::string> dirtyDevices; // IDs of devices with unsynced changes
 
-	int isSyncing() {
+	bool isSyncing() {
 		return transferSpeed > 0 && itemsSynced < itemsTotal;
 	}
 
@@ -44,23 +48,28 @@ struct SyncthingState {
 	}
 };
 
-class SyncthingUtil {
+class SyncthingUtil : public IWatcherNotify {
 public:
 	static SyncthingUtil& getInstance() {
 		static SyncthingUtil instance;
-		if (!instance.isConnected()) {
-			instance.connect();
-		}
+		std::call_once(mOnceFlag, []() {
+			instance.init();
+			if (!instance.isConnected()) {
+				instance.connect();
+			}
+		});
 		return instance;
 	}
 
+	void init();
 	void scan(Window* window, std::string const* folderId = nullptr);
 	SyncthingState getState();
 	static bool isEnabled();
-	bool isConnected() { return mConnected; }
+	bool isConnected() { return mConnected && mWifiConnected; }
 	bool connect();
 	void disconnect();
 	bool reconnect();
+	void OnWatcherChanged(IWatcher* component) override;
 
 private:
 	SyncthingUtil() = default; // Private constructor for singleton pattern
@@ -73,12 +82,16 @@ private:
 	SyncthingUtil(SyncthingUtil&&) = delete;
 	SyncthingUtil& operator=(SyncthingUtil&&) = delete;
 
+	static std::once_flag mOnceFlag;
+	std::mutex mConnectMutex;
+	bool mInitialized = false;
 	bool mConnected = false;
+	bool mWifiConnected = false;
 	int mCurrentTransferNeededFiles = 0;
 
 	// Syncthing configuration
 	std::string mApiKey;
-	std::vector<Device> mDevices;
+	std::map<std::string, std::shared_ptr<Device>> mDevicesMap;
 	std::vector<Folder> mFolders;
 
 	Device self {
@@ -98,6 +111,6 @@ private:
 	std::string getMyId();
 	std::vector<std::string> getConnectedDeviceIds();
 	void updateDeviceCompletion(Device* device);
-	Device *getDeviceById(const std::string& deviceId);
+	std::shared_ptr<Device> getDeviceById(const std::string& deviceId);
 	Folder *getFolderById(const std::string& folderId);
 };

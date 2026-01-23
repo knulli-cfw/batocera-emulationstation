@@ -15,7 +15,7 @@ bool SyncthingWatcher::enabled() {
 
 bool SyncthingWatcher::check() {
 
-	if (!SyncthingUtil::isEnabled() || !mSyncthingUtil.isConnected()) {
+	if (!SyncthingUtil::isEnabled()) {
 		if (wndNotification != nullptr) {
 			wndNotification->close();
 			wndNotification = nullptr;
@@ -30,6 +30,14 @@ bool SyncthingWatcher::check() {
         mSyncedDevices.clear();
         mkillNotificationInNextCycle = false;
     }
+
+	if(!mSyncthingUtil.isConnected()) {
+		if (wndNotification != nullptr) {
+			wndNotification->updateText(_("No connected devices available."));
+			mkillNotificationInNextCycle = true;
+		}
+		return true;
+	}
 
 	SyncthingState state = mSyncthingUtil.getState();
 
