@@ -86,13 +86,15 @@ set(ES_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiDeviceSettings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiDisplaySettings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiPowerManagementSettings.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiRgbSettings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/Pico8Installer.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/RgbService.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/UsbService.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/ThreadedDiskCheck.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/ThreadedSyncthing.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/KnulliThemeCheck.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/rgb/LegacyGuiRgbSettings.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/rgb/LegacyRgbService.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/rgb/SilkyGuiRgbSettings.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/rgb/SilkyRgbService.h
 
     # Scrapers
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scrapers/Scraper.h
@@ -206,13 +208,15 @@ set(ES_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiDeviceSettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiDisplaySettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiPowerManagementSettings.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiRgbSettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/Pico8Installer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/RgbService.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/UsbService.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/ThreadedDiskCheck.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/ThreadedSyncthing.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/KnulliThemeCheck.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/rgb/LegacyGuiRgbSettings.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/rgb/LegacyRgbService.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/rgb/SilkyGuiRgbSettings.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/rgb/SilkyRgbService.cpp
 
     # Scrapers
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scrapers/Scraper.cpp

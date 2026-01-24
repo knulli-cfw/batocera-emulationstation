@@ -1,6 +1,6 @@
 #pragma once
 
-class RgbService
+class LegacyRgbService
 {
 public:
         static void start();
