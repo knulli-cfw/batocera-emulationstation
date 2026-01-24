@@ -40,7 +40,7 @@ SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(w
             || hasRequiredSetting("palette.invert") || hasRequiredSetting("palette.invert.secondary")
             || hasRequiredSetting("brightness") == true || hasRequiredSetting("brightness.adaptive") == true)
     {
-        addGroup(_("REGULAR LED MODE AND COLOR"));
+        addGroup(_("LED MODE AND COLOR"));
     }
 
     // LED Mode Options
