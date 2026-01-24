@@ -1,15 +1,15 @@
 #pragma once
-#include "ExtendedGuiSettings.h"
+#include "guis/knulli/ExtendedGuiSettings.h"
 #include "components/SliderComponent.h"
 #include "components/OptionListComponent.h"
 #include "components/SwitchComponent.h"
 #include <array>
 #include <memory>
 
-class GuiRgbSettings : public ExtendedGuiSettings
+class LegacyGuiRgbSettings : public ExtendedGuiSettings
 {
 public:
-    GuiRgbSettings(Window* window);
+    LegacyGuiRgbSettings(Window* window);
 
 private:
     std::shared_ptr<OptionListComponent<std::string>> createModeOptionList();
@@ -19,9 +19,11 @@ private:
     void initializeOnChangeListeners();
     void applyValues();
     void restoreDefaultColors();
+    bool isSupportedMode(const std::string& mode);
 
     bool isH700;
     bool isA133;
+    bool isA523;
     std::shared_ptr<OptionListComponent<std::string>> optionListMode;
     std::shared_ptr<SliderComponent> sliderLedBrightness;
     std::shared_ptr<SliderComponent> sliderLedSpeed;

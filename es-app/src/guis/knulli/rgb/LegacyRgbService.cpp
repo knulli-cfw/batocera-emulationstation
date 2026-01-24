@@ -1,4 +1,4 @@
-#include "guis/knulli/RgbService.h"
+#include "guis/knulli/rgb/LegacyRgbService.h"
 #include "utils/Platform.h"
 #include "Paths.h"
 #include "utils/FileSystemUtil.h"
@@ -13,14 +13,14 @@ const std::string SEPARATOR = " ";
 const std::string START = "start clear";
 const std::string STOP = "stop";
 
-void RgbService::start()
+void LegacyRgbService::start()
 {
 	if (Utils::FileSystem::exists(RGB_SERVICE_NAME)) {
 		system((RGB_SERVICE_NAME + SEPARATOR + START).c_str());
 	}
 }
 
-void RgbService::stop()
+void LegacyRgbService::stop()
 {
 	if (Utils::FileSystem::exists(RGB_SERVICE_NAME)) {
 		system((RGB_SERVICE_NAME + SEPARATOR + STOP).c_str());
@@ -28,7 +28,7 @@ void RgbService::stop()
 }
 
 // TODO: This is a prototype. First improve the RGB bash scripts, then adopt the changes here.
-void RgbService::setRgb(int mode, int brightness, int speed, int r, int g, int b) {
+void LegacyRgbService::setRgb(int mode, int brightness, int speed, int r, int g, int b) {
 	
 	std::string modeString = std::to_string(mode);
 	std::string brightnessString = std::to_string(brightness);

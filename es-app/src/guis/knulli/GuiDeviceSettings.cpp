@@ -4,7 +4,9 @@
 #include "guis/knulli/FactorySettings.h"
 #include "guis/knulli/GuiDisplaySettings.h"
 #include "guis/knulli/GuiPowerManagementSettings.h"
-#include "guis/knulli/GuiRgbSettings.h"
+#include "guis/knulli/rgb/LegacyGuiRgbSettings.h"
+#include "guis/knulli/rgb/SilkyGuiRgbSettings.h"
+#include "guis/knulli/rgb/SilkyRgbService.h"
 #include "guis/knulli/Pico8Installer.h"
 #include "guis/knulli/ThreadedSyncthing.h"
 #include "guis/knulli/syscalls/DisplaySettings.h"
@@ -140,7 +142,11 @@ void GuiDeviceSettings::openDisplaySettings()
 
 void GuiDeviceSettings::openRgbLedSettings()
 {
-	mWindow->pushGui(new GuiRgbSettings(mWindow));
+	if (SilkyRgbService::isInstalled()) {
+		mWindow->pushGui(new SilkyGuiRgbSettings(mWindow));
+	} else {
+		mWindow->pushGui(new LegacyGuiRgbSettings(mWindow));
+	}
 }
 
 void GuiDeviceSettings::installPico8()

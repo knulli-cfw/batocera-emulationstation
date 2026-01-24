@@ -40,6 +40,9 @@ public:
 	void setAuto(bool autoMode);
 	bool getAuto() const;
 
+	float getMin() const { return mMin; }
+	float getMax() const { return mMax; }
+
 private:
 	void onValueChanged();
 	unsigned int getCurColor() const;
