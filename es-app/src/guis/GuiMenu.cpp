@@ -2664,9 +2664,9 @@ void GuiMenu::openGamesSettings()
 #ifdef KNULLI
 	// SET SRM FILE DUMP WHILE IN-GAME
 	auto srmDumpInGame = std::make_shared<SwitchComponent>(mWindow);
-	srmDumpInGame->setState(SystemConf::getInstance()->get("global.srm_dump_ingame") == "1");
-	s->addWithDescription(_("WRITE IN-GAME SAVES TO DISK WHILE IN GAME"), _("For libretro cores, if your game allows in-game saving, the corresponding SRM file is updated either within 10 seconds after saved or only on game exit."), srmDumpInGame);
-	s->addSaveFunc([srmDumpInGame] { SystemConf::getInstance()->set("global.srm_dump_ingame", srmDumpInGame->getState() ? "1" : ""); });
+	srmDumpInGame->setState(SystemConf::getInstance()->get("global.srm_dump_ingame_disabled") == "1");
+	s->addWithDescription(_("DISABLE SRM DUMPS WHILE IN GAME"), _("For libretro cores, if your game allows in-game saving, the corresponding SRM file is updated within 10 seconds after you saved. Disabling might increase performance, however, your SRM will only be dumped when you exit the game."), srmDumpInGame);
+	s->addSaveFunc([srmDumpInGame] { SystemConf::getInstance()->set("global.srm_dump_ingame_disabled", srmDumpInGame->getState() ? "1" : "0"); });
 #endif
 
 	// INCREMENTAL SAVESTATES
