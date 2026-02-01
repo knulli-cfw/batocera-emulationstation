@@ -18,6 +18,7 @@
 #include <rapidjson/document.h>
 #include "FileSystemUtil.h"
 #include "LocaleES.h"
+#include "SystemConf.h"
 #include "components/AsyncNotificationComponent.h"
 #include "watchers/NetworkStateWatcher.h"
 
@@ -43,6 +44,11 @@ void SyncthingUtil::init() {
 
 // Returns true if syncthing is enabled and reachable and the respective config file exists.
 bool SyncthingUtil::isEnabled() {
+
+	// Check if syncthing service is enabled in system configuration
+	if (SystemConf::isServiceActive("syncthing") == false) {
+		return false;
+	}
 
 	// Check if syncthing API is up
 	std::unique_ptr<HttpReq> req(new HttpReq("http://127.0.0.1:8384"));
