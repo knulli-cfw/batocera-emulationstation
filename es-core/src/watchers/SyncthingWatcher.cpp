@@ -1,21 +1,28 @@
 #include "SyncthingWatcher.h"
 #include "LocaleES.h"
 #include "Log.h"
+#include "SystemConf.h"
 #include <algorithm>
 #include "utils/StringUtil.h"
 
 #define GUIICON _U("\uF07C ")
 
 SyncthingWatcher::SyncthingWatcher(Window* window) : mWindow(window), mSyncthingUtil(SyncthingUtil::getInstance()) {
+	// Check if syncthing service is enabled in system configuration
+	if (SystemConf::isServiceActive("syncthing") == true) {
+		mSyncthingEnabled = true;
+	} else {
+		mSyncthingEnabled = false;
+	}
 }
 
 bool SyncthingWatcher::enabled() {
-	return mSyncthingUtil.isEnabled();
+	return mSyncthingEnabled && mSyncthingUtil.isEnabled();
 }
 
 bool SyncthingWatcher::check() {
 
-	if (!SyncthingUtil::isEnabled()) {
+	if (!enabled()) {
 		if (wndNotification != nullptr) {
 			wndNotification->close();
 			wndNotification = nullptr;
@@ -225,4 +232,16 @@ bool SyncthingWatcher::isInitialized(const SyncthingState& state) {
 
 	return false;
 
+}
+
+void SyncthingWatcher::handleEvent(const std::string& event, const std::string& value)
+{
+    if (event == "syncthing") {
+		if (value == "enabled") {
+			mSyncthingEnabled = true;
+
+		} else if (value == "disabled") {
+			mSyncthingEnabled = false;
+		}
+	}
 }

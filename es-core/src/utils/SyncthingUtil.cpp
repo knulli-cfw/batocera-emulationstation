@@ -44,11 +44,6 @@ void SyncthingUtil::init() {
 // Returns true if syncthing is enabled and reachable and the respective config file exists.
 bool SyncthingUtil::isEnabled() {
 
-	// Check if syncthing service is enabled in system configuration
-	if (!SyncthingUtil::isSyncthingServiceEnabled()) {
-		return false;
-	}
-
 	// Check if syncthing API is up
 	std::unique_ptr<HttpReq> req(new HttpReq("http://127.0.0.1:8384"));
 	if (!req->wait()) {
@@ -431,27 +426,4 @@ void SyncthingUtil::OnWatcherChanged(IWatcher* component)
 	{
 		mWifiConnected = watcher->isConnected();
 	}
-}
-
-bool SyncthingUtil::isSyncthingServiceEnabled()
-{
-    FILE *pipe = popen("knulli-services list 2>/dev/null", "r");
-    if (!pipe) return false;
-
-    bool result = false;
-    char line[256];
-    
-    while (fgets(line, sizeof(line), pipe))
-    {
-        std::string serviceLine(line);
-        serviceLine.erase(serviceLine.find_last_not_of(" \n\r\t") + 1);
-        auto splitted = Utils::String::split(serviceLine, ';');
-        if (splitted.size() >= 2 && splitted[0] == "syncthing" && splitted[1] == "*") {
-            result = true;
-            break; 
-        }
-    }
-
-    pclose(pipe);
-    return result;
 }

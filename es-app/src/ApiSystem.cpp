@@ -12,6 +12,7 @@
 #include "utils/FileSystemUtil.h"
 #include "utils/StringUtil.h"
 #include "utils/ThreadPool.h"
+#include "watchers/WatchersManager.h"
 #include "RetroAchievements.h"
 #include "utils/ZipFile.h"
 #include "Paths.h"
@@ -2335,5 +2336,7 @@ bool ApiSystem::enableService(std::string name, bool enable)
 	if (res)
 		res = executeScript("knulli-services " + std::string(enable ? "start" : "stop") + " " + serviceName);
 
+	WatchersManager* mgr = WatchersManager::getInstance();
+	mgr->FireEvent(name, enable ? "enabled" : "disabled");
 	return res;
 }

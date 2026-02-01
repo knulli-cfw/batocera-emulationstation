@@ -27,6 +27,7 @@ private:
 	std::vector<std::string> mDirtyDevices;
 	std::vector<std::string> mSyncedDevices;
 
+	bool mSyncthingEnabled = false;
 	bool mInitialized = false;
 	bool mkillNotificationInNextCycle = false;
 	int64_t mCurrentTransferNeededFiles = 0;

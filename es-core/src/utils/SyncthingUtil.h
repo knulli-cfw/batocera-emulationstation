@@ -113,5 +113,4 @@ private:
 	void updateDeviceCompletion(Device* device);
 	std::shared_ptr<Device> getDeviceById(const std::string& deviceId);
 	Folder *getFolderById(const std::string& folderId);
-	static bool isSyncthingServiceEnabled();
 };
