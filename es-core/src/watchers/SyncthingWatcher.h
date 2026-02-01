@@ -11,6 +11,8 @@ class SyncthingWatcher : public IWatcher {
 public:
 	SyncthingWatcher(Window* window);
 
+	void handleEvent(const std::string& event, const std::string& value) override;
+
 protected:
 	bool enabled() override;
 
@@ -27,6 +29,7 @@ private:
 	std::vector<std::string> mDirtyDevices;
 	std::vector<std::string> mSyncedDevices;
 
+	bool mSyncthingEnabled = false;
 	bool mInitialized = false;
 	bool mkillNotificationInNextCycle = false;
 	int64_t mCurrentTransferNeededFiles = 0;

@@ -103,6 +103,16 @@ void WatchersManager::NotifyComponentChanged(IWatcher* component)
 		n->OnWatcherChanged(component);
 }
 
+void WatchersManager::FireEvent(const std::string& event, const std::string& value)
+{
+    std::unique_lock<std::mutex> lock(mWatchersLock);
+    for (auto info : mWatchers)
+    {
+        if (info->component)
+            info->component->handleEvent(event, value);
+    }
+}
+
 WatchersManager::~WatchersManager()
 {
 	if (mThread == nullptr)
