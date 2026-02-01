@@ -18,7 +18,6 @@
 #include <rapidjson/document.h>
 #include "FileSystemUtil.h"
 #include "LocaleES.h"
-#include "SystemConf.h"
 #include "components/AsyncNotificationComponent.h"
 #include "watchers/NetworkStateWatcher.h"
 
@@ -46,7 +45,7 @@ void SyncthingUtil::init() {
 bool SyncthingUtil::isEnabled() {
 
 	// Check if syncthing service is enabled in system configuration
-	if (SystemConf::isServiceActive("syncthing") == false) {
+	if (!SyncthingUtil::isSyncthingServiceEnabled()) {
 		return false;
 	}
 
@@ -432,4 +431,27 @@ void SyncthingUtil::OnWatcherChanged(IWatcher* component)
 	{
 		mWifiConnected = watcher->isConnected();
 	}
+}
+
+bool SyncthingUtil::isSyncthingServiceEnabled()
+{
+    FILE *pipe = popen("knulli-services list 2>/dev/null", "r");
+    if (!pipe) return false;
+
+    bool result = false;
+    char line[256];
+    
+    while (fgets(line, sizeof(line), pipe))
+    {
+        std::string serviceLine(line);
+        serviceLine.erase(serviceLine.find_last_not_of(" \n\r\t") + 1);
+        auto splitted = Utils::String::split(serviceLine, ';');
+        if (splitted.size() >= 2 && splitted[0] == "syncthing" && splitted[1] == "*") {
+            result = true;
+            break; 
+        }
+    }
+
+    pclose(pipe);
+    return result;
 }

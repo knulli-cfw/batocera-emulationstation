@@ -13,7 +13,6 @@ public:
 	
 	static bool getIncrementalSaveStates();
 	static bool getIncrementalSaveStatesUseCurrentSlot();
-	static bool isServiceActive(const std::string &name);
 
     bool loadSystemConf();
     bool saveSystemConf();
