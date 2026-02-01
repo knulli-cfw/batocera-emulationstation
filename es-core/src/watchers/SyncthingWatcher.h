@@ -11,6 +11,8 @@ class SyncthingWatcher : public IWatcher {
 public:
 	SyncthingWatcher(Window* window);
 
+	void handleEvent(const std::string& event, const std::string& value) override;
+
 protected:
 	bool enabled() override;
 
