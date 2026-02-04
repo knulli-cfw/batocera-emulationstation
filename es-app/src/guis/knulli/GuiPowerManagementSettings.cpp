@@ -89,6 +89,14 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 	aggressiveBatterySaveMode->setState(SystemConf::getInstance()->getBool("system.batterysaver.aggressive"));
 	addWithDescription(_("AGGRESSIVE BATTERY SAVER"),_("Optimizes battery life with extra power-saving measures during system idle."), aggressiveBatterySaveMode);
 
+	// Keep audio alive when idle toggle
+	auto muteBatterySavingModeSwitch = std::make_shared<SwitchComponent>(mWindow);
+	bool mute = true;
+	if (!SystemConf::getInstance()->get("system.batterysaver.mute").empty()) {
+		mute = SystemConf::getInstance()->getBool("system.batterysaver.mute");
+	}
+	muteBatterySavingModeSwitch->setState(mute);
+	addWithDescription(_("MUTE AUDIO WHEN IDLE"),_("Mutes all audio output in battery save mode."), muteBatterySavingModeSwitch);
 
 	// Power LED toggle switch
 	auto powerLedSwitch = std::make_shared<SwitchComponent>(mWindow);
@@ -141,6 +149,7 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 	             sliderIdleWatcherExtendedTime,
 				 bypassBatterySavingWhenCharging,
 	             aggressiveBatterySaveMode,
+				 muteBatterySavingModeSwitch,
 	             powerLedSwitch,
 	             optionsLidCloseMode,
 				 optionsFanMode
@@ -154,6 +163,7 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 		SystemConf::getInstance()->set("system.batterysaver.extendedmode", optionsBatterySaveExtendedMode->getSelected());
 		SystemConf::getInstance()->setBool("system.batterysaver.chargingbypass", bypassBatterySavingWhenCharging->getState());
 		SystemConf::getInstance()->setBool("system.batterysaver.aggressive", aggressiveBatterySaveMode->getState());
+		SystemConf::getInstance()->setBool("system.batterysaver.mute", muteBatterySavingModeSwitch->getState());
 		if (CapabilityCheck::hasCapability(CapabilityCheck::PWRLED_CAPABILITY)) {
 			SystemConf::getInstance()->setBool("system.power.led", powerLedSwitch->getState());
 		}
