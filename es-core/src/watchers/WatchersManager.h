@@ -12,6 +12,9 @@ class IWatcher
 {
 	friend class WatchersManager;
 
+public:
+	virtual void handleEvent(const std::string& event, const std::string& value) {};
+
 protected:
 	virtual bool enabled() = 0;
 	virtual int  updateTime() = 0;
@@ -43,6 +46,8 @@ public:
 
 		return nullptr;
 	}
+
+	static void FireEvent(const std::string& event, const std::string& value);
 
 	static void RegisterComponent(IWatcher* instance);
 	static void UnregisterComponent(IWatcher* instance);
