@@ -4,7 +4,6 @@
 #include "guis/knulli/FactorySettings.h"
 #include "guis/knulli/GuiDisplaySettings.h"
 #include "guis/knulli/GuiPowerManagementSettings.h"
-#include "guis/knulli/rgb/LegacyGuiRgbSettings.h"
 #include "guis/knulli/rgb/SilkyGuiRgbSettings.h"
 #include "guis/knulli/rgb/SilkyRgbService.h"
 #include "guis/knulli/Pico8Installer.h"
