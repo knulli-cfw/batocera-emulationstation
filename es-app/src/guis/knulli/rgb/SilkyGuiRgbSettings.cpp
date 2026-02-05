@@ -36,6 +36,8 @@ SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(w
     switchEnableRgb = createSwitchRgbEnabled();
     switchEnableRgb->setOnChangedCallback([this]() {
         if (switchEnableRgb->getState()) {
+            SystemConf::getInstance()->set("led.enabled", "1");
+            SystemConf::getInstance()->saveSystemConf();
             SilkyRgbService::start();
         } else {
             SilkyRgbService::stop();
@@ -106,24 +108,51 @@ SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(w
     switchRetroAchievements = createSwitch(_("ACHIEVEMENT EFFECT"), "led.retroachievements", _("Honor your retro achievements with a LED effect."), true, false, hasRequiredSetting("retroachievements"));
 
     addSaveFunc([this] {
-        // Read all variables from the respective UI elements and set the respective values in batocera.conf
-        SystemConf::getInstance()->set("led.enabled", switchEnableRgb->getState() ? "1" : "0");
-        SystemConf::getInstance()->set("led.mode", optionListMode->getSelected());
-        SystemConf::getInstance()->set("led.palette", optionListPalettePrimary->getSelected());
-        SystemConf::getInstance()->set("led.brightness", std::to_string((int) sliderLedBrightness->getValue()));
-        SystemConf::getInstance()->set("led.brightness.adaptive", (switchAdaptiveBrightness->getState() ? "1" : "0"));
-        SystemConf::getInstance()->set("led.battery.low.threshold", std::to_string((int) sliderLowBatteryThreshold->getValue()));
-        SystemConf::getInstance()->set("led.battery.low", optionListBatteryLow->getSelected());
-        SystemConf::getInstance()->set("led.battery.charging", optionListBatteryCharging->getSelected());
-        SystemConf::getInstance()->set("led.retroachievements", (switchRetroAchievements->getState() ? "1" : "0"));
-        SystemConf::getInstance()->set("led.palette.invert", (switchPaletteInvert->getState() ? "1" : "0"));
-        SystemConf::getInstance()->set("led.palette.invert.secondary", (switchPaletteInvertSecondary->getState() ? "1" : "0"));
-        SystemConf::getInstance()->set("led.palette.mod", optionListPaletteMod->getSelected());
+        // Read all variables from the respective UI elements and set the respective values in knulli.conf
+        if (switchEnableRgb != nullptr) {
+            SystemConf::getInstance()->set("led.enabled", switchEnableRgb->getState() ? "1" : "0");
+        }
+        if (optionListMode != nullptr) {
+            SystemConf::getInstance()->set("led.mode", optionListMode->getSelected());
+        }
+        if (optionListPalettePrimary != nullptr) {
+            SystemConf::getInstance()->set("led.palette", optionListPalettePrimary->getSelected());
+        }
+        if (sliderLedBrightness != nullptr) {
+            SystemConf::getInstance()->set("led.brightness", std::to_string((int) sliderLedBrightness->getValue()));
+        }
+        if (switchAdaptiveBrightness != nullptr) {
+            SystemConf::getInstance()->set("led.brightness.adaptive", (switchAdaptiveBrightness->getState() ? "1" : "0"));
+        }
+        if (sliderLowBatteryThreshold != nullptr) {
+            SystemConf::getInstance()->set("led.battery.low.threshold", std::to_string((int) sliderLowBatteryThreshold->getValue()));
+        }
+        if (optionListBatteryLow != nullptr) {
+            SystemConf::getInstance()->set("led.battery.low", optionListBatteryLow->getSelected());
+        }
+        if (optionListBatteryCharging != nullptr) {
+            SystemConf::getInstance()->set("led.battery.charging", optionListBatteryCharging->getSelected());
+        }
+        if (switchRetroAchievements != nullptr) {
+            SystemConf::getInstance()->set("led.retroachievements", (switchRetroAchievements->getState() ? "1" : "0"));
+        }
+        if (switchPaletteInvert != nullptr) {
+            SystemConf::getInstance()->set("led.palette.invert", (switchPaletteInvert->getState() ? "1" : "0"));
+        }
+        if (switchPaletteInvertSecondary != nullptr) {
+            SystemConf::getInstance()->set("led.palette.invert.secondary", (switchPaletteInvertSecondary->getState() ? "1" : "0"));
+        }
+        if (optionListPaletteMod != nullptr) {
+            SystemConf::getInstance()->set("led.palette.mod", optionListPaletteMod->getSelected());
+        }
 		SystemConf::getInstance()->saveSystemConf();
 		Scripting::fireEvent(MENU_EVENT_NAME);
 
-        // Force reloading settings for the RGB service
-        SilkyRgbService::reloadConfig();
+        if (switchEnableRgb != nullptr) {
+            if (switchEnableRgb->getState()) {
+                SilkyRgbService::reloadConfig();
+            }
+        }        
     });
 
 }
