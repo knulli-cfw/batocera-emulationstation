@@ -13,6 +13,7 @@ public:
 
 private:
     
+    std::shared_ptr<SwitchComponent> createSwitchRgbEnabled();
     std::shared_ptr<OptionListComponent<std::string>> createModeOptionList();
     std::shared_ptr<OptionListComponent<std::string>> createPaletteOptionList(const std::string& configKey, const std::string& title, const std::string& description);
     std::shared_ptr<OptionListComponent<std::string>> createPaletteModOptionList();
@@ -28,6 +29,7 @@ private:
     std::shared_ptr<OptionListComponent<std::string>> optionListBatteryLow;
     std::shared_ptr<OptionListComponent<std::string>> optionListPaletteMod;
 
+    std::shared_ptr<SwitchComponent> switchEnableRgb;
     std::shared_ptr<SliderComponent> sliderLedBrightness;
     std::shared_ptr<SliderComponent> sliderLedSpeed;
     std::shared_ptr<SwitchComponent> switchAdaptiveBrightness;

@@ -33,6 +33,15 @@ SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(w
 {
     requiredSettings = SilkyRgbService::requiredSettings();
 
+    switchEnableRgb = createSwitchRgbEnabled();
+    switchEnableRgb->setOnChangedCallback([this]() {
+        if (switchEnableRgb->getState()) {
+            SilkyRgbService::start();
+        } else {
+            SilkyRgbService::stop();
+        }
+    });
+
     if (requiredSettings.empty()) {
         LOG(LogWarning) << "No required RGB settings available from SilkyRgbService, RGB settings menu will be empty.";
     }
@@ -98,6 +107,7 @@ SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(w
 
     addSaveFunc([this] {
         // Read all variables from the respective UI elements and set the respective values in batocera.conf
+        SystemConf::getInstance()->set("led.enabled", switchEnableRgb->getState() ? "1" : "0");
         SystemConf::getInstance()->set("led.mode", optionListMode->getSelected());
         SystemConf::getInstance()->set("led.palette", optionListPalettePrimary->getSelected());
         SystemConf::getInstance()->set("led.brightness", std::to_string((int) sliderLedBrightness->getValue()));
@@ -116,6 +126,20 @@ SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(w
         SilkyRgbService::reloadConfig();
     });
 
+}
+
+std::shared_ptr<SwitchComponent> SilkyGuiRgbSettings::createSwitchRgbEnabled()
+{
+	auto switchRgbEnabled = std::make_shared<SwitchComponent>(mWindow);
+	bool enabled = true; // default to enabled if setting is not present
+	if (!SystemConf::getInstance()->get("led.enabled").empty()) {
+		enabled = SystemConf::getInstance()->getBool("led.enabled");
+	}
+	switchRgbEnabled->setState(enabled);
+	return switchRgbEnabled;
+	addWithDescription(_("ENABLE RGB LED"),_("Enable or disable the RGB LED."), switchRgbEnabled);
+
+    return switchRgbEnabled;
 }
 
 // Creates a new mode option list

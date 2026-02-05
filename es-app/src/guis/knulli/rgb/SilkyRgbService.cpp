@@ -11,6 +11,8 @@
 #include <cctype>
 #include "Log.h"
 
+const std::string DAEMON_NAME = "/etc/init.d/S25silky-rgb";
+
 const std::string API_BASE_PATH = "http://localhost:1235/";
 const std::string API_GET_SETTINGS = "get-settings";
 const std::string API_GET_MODES = "get-modes";
@@ -18,6 +20,16 @@ const std::string API_GET_PALETTES = "get-palettes";
 const std::string API_RELOAD_CONFIG = "reload-config";
 const std::string API_SET_CONFIG = "set-config";
 const std::string API_UPDATE_SCREEN_STATE = "update-screen-state";
+
+void SilkyRgbService::start()
+{
+	SysCalls::execute(DAEMON_NAME + " start");
+}
+
+void SilkyRgbService::stop()
+{
+	SysCalls::execute(DAEMON_NAME + " stop");
+}
 
 bool SilkyRgbService::isInstalled() {
 	HttpReq* req = new HttpReq(API_BASE_PATH + API_GET_SETTINGS);
