@@ -63,7 +63,7 @@ SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(w
     optionListPaletteMod->setSelectedChangedCallback([this](std::string value) { SilkyRgbService::applyValue("palette.mod", value); }); 
 
     // LED Brightness Slider
-    sliderLedBrightness = createSlider(_("BRIGHTNESS"), 0.f, 10.f, 1.f, "", "", hasRequiredSetting("brightness"));
+    sliderLedBrightness = createSlider(_("BRIGHTNESS"), 0.f, 100.f, 10.f, "%", "", hasRequiredSetting("brightness"));
     setConfigValueForSlider(sliderLedBrightness, DEFAULT_BRIGHTNESS, "led.brightness");
     sliderLedBrightness->setOnValueChanged([this](float value) { SilkyRgbService::applyValue("brightness", std::to_string((int)value)); });
 
