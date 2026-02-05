@@ -19,7 +19,6 @@ class SilkyRgbService
 public:
         static void start();
         static void stop();
-        static bool isInstalled();
         static void reloadConfig();
         static std::vector<std::string> requiredSettings();
         static std::vector<ModeInfo> getAvailableModes();

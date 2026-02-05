@@ -31,11 +31,6 @@ void SilkyRgbService::stop()
 	SysCalls::execute(DAEMON_NAME + " stop");
 }
 
-bool SilkyRgbService::isInstalled() {
-	HttpReq* req = new HttpReq(API_BASE_PATH + API_GET_SETTINGS);
-	return req->wait();
-}
-
 void SilkyRgbService::reloadConfig()
 {
 	HttpReq* req = new HttpReq(API_BASE_PATH + API_RELOAD_CONFIG);
