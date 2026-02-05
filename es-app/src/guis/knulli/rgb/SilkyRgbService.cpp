@@ -5,8 +5,13 @@
 #include <rapidjson/rapidjson.h>
 #include <rapidjson/pointer.h>
 #include <rapidjson/document.h>
-
+#include "guis/knulli/syscalls/SysCalls.h"
+#include <algorithm>
+#include <string>
+#include <cctype>
 #include "Log.h"
+
+const std::string DAEMON_NAME = "/etc/init.d/S25silky-rgb";
 
 const std::string API_BASE_PATH = "http://localhost:1235/";
 const std::string API_GET_SETTINGS = "get-settings";
@@ -14,10 +19,16 @@ const std::string API_GET_MODES = "get-modes";
 const std::string API_GET_PALETTES = "get-palettes";
 const std::string API_RELOAD_CONFIG = "reload-config";
 const std::string API_SET_CONFIG = "set-config";
+const std::string API_UPDATE_SCREEN_STATE = "update-screen-state";
 
-bool SilkyRgbService::isInstalled() {
-	HttpReq* req = new HttpReq(API_BASE_PATH + API_GET_SETTINGS);
-	return req->wait();
+void SilkyRgbService::start()
+{
+	SysCalls::execute(DAEMON_NAME + " start");
+}
+
+void SilkyRgbService::stop()
+{
+	SysCalls::execute(DAEMON_NAME + " stop");
 }
 
 void SilkyRgbService::reloadConfig()
@@ -135,4 +146,31 @@ void SilkyRgbService::applyValue(std::string key, std::string value)
 	{
 		// TODO: Handle response if needed
 	}
+}
+
+void SilkyRgbService::updateScreenBrightness()
+{
+
+	std::string brightness = SysCalls::executeAndCatchOutput("knulli-brightness");
+
+	if (brightness.empty() || !SilkyRgbService::isNumeric(brightness) || std::stof(brightness) < 0 || std::stof(brightness) > 100)
+	{
+		LOG(LogError) << "SilkyRgbService: Failed to get screen brightness from knulli-brightness.";
+		return;
+	}
+
+	HttpReqOptions options;
+	options.dataToPost = brightness;
+	HttpReq* req = new HttpReq(API_BASE_PATH + API_UPDATE_SCREEN_STATE, &options);
+
+	if (req->wait())
+	{
+		// TODO: Handle response if needed
+	}
+}
+
+bool SilkyRgbService::isNumeric(const std::string& s) {
+    return !s.empty() && std::all_of(s.begin(), s.end(), [](unsigned char c) {
+        return std::isdigit(c);
+    });
 }
