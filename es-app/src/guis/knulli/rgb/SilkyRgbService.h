@@ -23,5 +23,6 @@ public:
         static std::vector<ModeInfo> getAvailableModes();
         static std::vector<PaletteInfo> getAvailablePalettes();
         static void applyValue(std::string key, std::string value);
+        static void updateScreenBrightness();
 
 };

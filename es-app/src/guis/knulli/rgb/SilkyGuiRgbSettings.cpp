@@ -68,8 +68,16 @@ SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(w
     sliderLedBrightness->setOnValueChanged([this](float value) { SilkyRgbService::applyValue("brightness", std::to_string((int)value)); });
 
     // Adaptive Brightness switch
-    switchAdaptiveBrightness = createSwitch(_("ADAPTIVE BRIGHTNESS"), "led.brightness.adaptive", _("Automatically adapts LED brightness to screen brightness (based on the brightness setting above)."), true, false, hasRequiredSetting("brightness.adaptive"));
-    switchAdaptiveBrightness->setOnChangedCallback([this]() { SilkyRgbService::applyValue("brightness.adaptive", switchAdaptiveBrightness->getState() ? "1" : "0"); });
+    switchAdaptiveBrightness = createSwitch(_("ADAPTIVE BRIGHTNESS"), "led.brightness.adaptive", _("Automatically adapts LED brightness to screen brightness. (Overrides the setting above.)"), true, false, hasRequiredSetting("brightness.adaptive"));
+    switchAdaptiveBrightness->setOnChangedCallback([this]() {
+        SilkyRgbService::applyValue("brightness.adaptive", switchAdaptiveBrightness->getState() ? "1" : "0");
+        if (switchAdaptiveBrightness->getState()) {
+            SilkyRgbService::updateScreenBrightness();
+        } else {
+            // If adaptive brightness is turned off, immediately apply the brightness value from the slider
+            SilkyRgbService::applyValue("brightness", std::to_string((int)sliderLedBrightness->getValue()));
+        }
+    });
 
     if (hasRequiredSetting("battery.low") == true || hasRequiredSetting("battery.charging") == true || hasRequiredSetting("battery.low.threshold") == true)
         addGroup(_("BATTERY CHARGE INDICATION"));

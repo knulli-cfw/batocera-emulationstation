@@ -5,6 +5,7 @@
 #include <rapidjson/rapidjson.h>
 #include <rapidjson/pointer.h>
 #include <rapidjson/document.h>
+#include "guis/knulli/syscalls/SysCalls.h"
 
 #include "Log.h"
 
@@ -14,6 +15,7 @@ const std::string API_GET_MODES = "get-modes";
 const std::string API_GET_PALETTES = "get-palettes";
 const std::string API_RELOAD_CONFIG = "reload-config";
 const std::string API_SET_CONFIG = "set-config";
+const std::string API_UPDATE_SCREEN_STATE = "update-screen-state";
 
 bool SilkyRgbService::isInstalled() {
 	HttpReq* req = new HttpReq(API_BASE_PATH + API_GET_SETTINGS);
@@ -136,3 +138,25 @@ void SilkyRgbService::applyValue(std::string key, std::string value)
 		// TODO: Handle response if needed
 	}
 }
+
+void SilkyRgbService::updateScreenBrightness()
+{
+
+	std::string brightness = SysCalls::executeAndCatchOutput("knulli-brightness");
+
+	if (brightness.empty() || !Utils::String::isNumeric(brightness) || std::stof(brightness) < 0 || std::stof(brightness) > 100)
+	{
+		LOG(LogError) << "SilkyRgbService: Failed to get screen brightness from knulli-brightness.";
+		return;
+	}
+
+	HttpReqOptions options;
+	options.dataToPost = brightness;
+	HttpReq* req = new HttpReq(API_BASE_PATH + API_UPDATE_SCREEN_STATE, &options);
+
+	if (req->wait())
+	{
+		// TODO: Handle response if needed
+	}
+}
+
