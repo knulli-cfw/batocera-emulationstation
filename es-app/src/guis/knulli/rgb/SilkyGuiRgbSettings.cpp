@@ -51,11 +51,11 @@ SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(w
     optionListPalettePrimary->setSelectedChangedCallback([this](std::string value) { SilkyRgbService::applyValue("palette", value); });
     
     // Swap colors switch
-    switchPaletteInvert = createSwitch(_("INVERT COLORS"), "led.palette.invert", _("Inverts primary and secondary color of the color palette."), false, false, hasRequiredSetting("palette.invert"));
+    switchPaletteInvert = createSwitch(_("INVERT COLORS"), "led.palette.invert", _("Inverts palette colors for all RGB LEDs."), false, false, hasRequiredSetting("palette.invert"));
     switchPaletteInvert->setOnChangedCallback([this]() { SilkyRgbService::applyValue("palette.invert", switchPaletteInvert->getState() ? "1" : "0"); });
 
     // Swap colors switch
-    switchPaletteInvertSecondary = createSwitch(_("INVERT COLORS (SECONDARY)"), "led.palette.invert.secondary", _("Inverts primary and secondary color of the color palette on secondary LEDs."), false, false, hasRequiredSetting("palette.invert.secondary"));
+    switchPaletteInvertSecondary = createSwitch(_("INVERT COLORS (SECONDARY ZONE)"), "led.palette.invert.secondary", _("Inverts palette colors for secondary RGB LED zone."), false, false, hasRequiredSetting("palette.invert.secondary"));
     switchPaletteInvertSecondary->setOnChangedCallback([this]() { SilkyRgbService::applyValue("palette.invert.secondary", switchPaletteInvertSecondary->getState() ? "1" : "0"); });
 
     // Palette modification options
