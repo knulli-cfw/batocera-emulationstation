@@ -31,8 +31,6 @@ constexpr const char* MENU_EVENT_NAME = "rgb-changed";
 // Constructor creates a new SilkyGuiRgbSettings menu.
 SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(window, "RGB LED SETTINGS")
 {
-    requiredSettings = SilkyRgbService::requiredSettings();
-
     switchEnableRgb = createSwitchRgbEnabled();
     switchEnableRgb->setOnChangedCallback([this]() {
         if (switchEnableRgb->getState()) {
@@ -44,13 +42,13 @@ SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(w
         }
     });
 
-    if (switchEnableRgb->getState() && requiredSettings.empty()) {
-        LOG(LogWarning) << "No required RGB settings available from SilkyRgbService, RGB settings menu will be empty.";
+    if (switchEnableRgb->getState()) {
+        requiredSettings = SilkyRgbService::requiredSettings();
     }
-    if ((hasRequiredSetting("mode") == true || hasRequiredSetting("palette") == true)
-            || hasRequiredSetting("palette.invert") || hasRequiredSetting("palette.invert.secondary")
-            || hasRequiredSetting("brightness") == true || hasRequiredSetting("brightness.adaptive") == true)
-    {
+
+    if (requiredSettings.empty()) {
+        LOG(LogWarning) << "No required RGB settings available from SilkyRgbService, RGB settings menu will be empty.";
+    } else {
         addGroup(_("LED MODE AND COLOR"));
 
         // LED Mode Options
