@@ -6,7 +6,9 @@
 #include <rapidjson/pointer.h>
 #include <rapidjson/document.h>
 #include "guis/knulli/syscalls/SysCalls.h"
-
+#include <algorithm>
+#include <string>
+#include <cctype>
 #include "Log.h"
 
 const std::string API_BASE_PATH = "http://localhost:1235/";
@@ -144,7 +146,7 @@ void SilkyRgbService::updateScreenBrightness()
 
 	std::string brightness = SysCalls::executeAndCatchOutput("knulli-brightness");
 
-	if (brightness.empty() || !Utils::String::isNumeric(brightness) || std::stof(brightness) < 0 || std::stof(brightness) > 100)
+	if (brightness.empty() || !SilkyRgbService::isNumeric(brightness) || std::stof(brightness) < 0 || std::stof(brightness) > 100)
 	{
 		LOG(LogError) << "SilkyRgbService: Failed to get screen brightness from knulli-brightness.";
 		return;
@@ -160,3 +162,8 @@ void SilkyRgbService::updateScreenBrightness()
 	}
 }
 
+bool SilkyRgbService::isNumeric(const std::string& s) {
+    return !s.empty() && std::all_of(s.begin(), s.end(), [](unsigned char c) {
+        return std::isdigit(c);
+    });
+}
