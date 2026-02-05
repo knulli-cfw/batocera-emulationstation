@@ -136,7 +136,6 @@ std::shared_ptr<SwitchComponent> SilkyGuiRgbSettings::createSwitchRgbEnabled()
 		enabled = SystemConf::getInstance()->getBool("led.enabled");
 	}
 	switchRgbEnabled->setState(enabled);
-	return switchRgbEnabled;
 	addWithDescription(_("ENABLE RGB LED"),_("Enable or disable the RGB LED."), switchRgbEnabled);
 
     return switchRgbEnabled;
