@@ -142,11 +142,7 @@ void GuiDeviceSettings::openDisplaySettings()
 
 void GuiDeviceSettings::openRgbLedSettings()
 {
-	if (SilkyRgbService::isInstalled()) {
-		mWindow->pushGui(new SilkyGuiRgbSettings(mWindow));
-	} else {
-		mWindow->pushGui(new LegacyGuiRgbSettings(mWindow));
-	}
+	mWindow->pushGui(new SilkyGuiRgbSettings(mWindow));
 }
 
 void GuiDeviceSettings::installPico8()

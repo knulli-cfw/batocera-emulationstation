@@ -91,8 +91,6 @@ set(ES_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/ThreadedDiskCheck.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/ThreadedSyncthing.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/KnulliThemeCheck.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/rgb/LegacyGuiRgbSettings.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/rgb/LegacyRgbService.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/rgb/SilkyGuiRgbSettings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/rgb/SilkyRgbService.h
 
@@ -213,8 +211,6 @@ set(ES_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/ThreadedDiskCheck.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/ThreadedSyncthing.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/KnulliThemeCheck.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/rgb/LegacyGuiRgbSettings.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/rgb/LegacyRgbService.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/rgb/SilkyGuiRgbSettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/rgb/SilkyRgbService.cpp
 
