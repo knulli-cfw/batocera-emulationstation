@@ -76,7 +76,7 @@ SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(w
         sliderLedBrightness->setOnValueChanged([this](float value) { SilkyRgbService::applyValue("brightness", std::to_string((int)value)); });
     
         // Adaptive Brightness switch
-        switchAdaptiveBrightness = createSwitch(_("ADAPTIVE BRIGHTNESS"), "led.brightness.adaptive", _("Automatically adapts LED brightness to screen brightness. (Overrides the setting above.)"), true, false, hasRequiredSetting("brightness.adaptive"));
+        switchAdaptiveBrightness = createSwitch(_("ADAPTIVE BRIGHTNESS"), "led.brightness.adaptive", _("Automatically adapts LED brightness to screen brightness. (Overrides the setting above.)"), false, false, hasRequiredSetting("brightness.adaptive"));
         switchAdaptiveBrightness->setOnChangedCallback([this]() {
             SilkyRgbService::applyValue("brightness.adaptive", switchAdaptiveBrightness->getState() ? "1" : "0");
             if (switchAdaptiveBrightness->getState()) {
