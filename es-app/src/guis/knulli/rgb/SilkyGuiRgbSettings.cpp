@@ -20,7 +20,7 @@
 
 #include "Log.h"
 
-constexpr const char* DEFAULT_LED_MODE = "static";
+constexpr const char* DEFAULT_LED_MODE = "shimmer";
 constexpr const char* DEFAULT_LED_PALETTE = "Knulli";
 constexpr const char* DEFAULT_BATTERY_MODE = "continuous";
 constexpr float DEFAULT_LOW_BATTERY_THRESHOLD = 20;
