@@ -8,11 +8,16 @@
 #define GUIICON _U("\uF07C ")
 
 SyncthingWatcher::SyncthingWatcher(Window* window) : mWindow(window), mSyncthingUtil(SyncthingUtil::getInstance()) {
+	
+	LOG(LogDebug) << "Syncthing: Creating syncthing watcher.";
+
 	// Check if syncthing service is enabled in system configuration
 	if (SystemConf::isServiceActive("syncthing") == true) {
 		mSyncthingEnabled = true;
+		LOG(LogDebug) << "Syncthing: Starting watcher with service enabled.";
 	} else {
 		mSyncthingEnabled = false;
+		LOG(LogDebug) << "Syncthing: Starting watcher with service disabled.";
 	}
 }
 
@@ -22,11 +27,14 @@ bool SyncthingWatcher::enabled() {
 
 bool SyncthingWatcher::check() {
 
+	LOG(LogDebug) << "Syncthing: Beginning a new watcher cycle.";
+
 	if (!enabled()) {
 		if (wndNotification != nullptr) {
 			wndNotification->close();
 			wndNotification = nullptr;
 		}
+		LOG(LogDebug) << "Syncthing: Watcher is not enabled.";
 		return true;
 	}
 
@@ -50,11 +58,13 @@ bool SyncthingWatcher::check() {
 
 	// Ignore invalid/empty states
     if (state.totalBytesTransferred <= 0) {
+		LOG(LogDebug) << "Syncthing: Nothing to do, only " << state.totalBytesTransferred << "total bytes transferred.";
         return true;
     }
 
 	// Check if initialization is complete
     if (!isInitialized(state)) {
+		LOG(LogDebug) << "Syncthing: Initialization is not yet complete, skipping a cycle.";
 		return true;
 	}
 
@@ -103,6 +113,7 @@ bool SyncthingWatcher::check() {
 			}
 			// Schedule notification to be executed in next cycle.
 			mkillNotificationInNextCycle = true;
+			LOG(LogDebug) << "Syncthing: Cycle ended, will kill notification window in next cycle.";
 			return true;
 		}
 	} else {
