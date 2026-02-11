@@ -277,6 +277,7 @@ bool SystemConf::isServiceActive(const std::string &name)
 	auto services = SystemConf::getInstance()->get("system.services");
 	if (services.empty())
 		return false;
+	LOG(LogDebug) << "SystemConf: Currently active services: " << services
 	std::vector<std::string> serviceList = Utils::String::split(services, ';');
 	return std::find(serviceList.begin(), serviceList.end(), name) != serviceList.end();
 }
