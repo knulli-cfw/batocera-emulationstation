@@ -74,10 +74,21 @@ GuiDeviceSettings::GuiDeviceSettings(Window* window) : ExtendedGuiSettings(windo
 			}
 		});
 
+		addWithDescription(_("Reload configuration"), _("If you changed your Syncthing configuration recently, you can reload it here."), nullptr, [this]
+		{
+			if (SyncthingUtil::getInstance().reloadConfig()) {
+				mWindow->pushGui(new GuiMsgBox(mWindow, _("SYNCTHING CONFIGURATION RELOADED SUCCESSFULLY.")));
+			 } else {
+				mWindow->pushGui(new GuiMsgBox(mWindow, _("FAILED TO RELOAD SYNCTHING CONFIGURATION.")));
+			}
+		});
+
 		switchSyncthingScanOnGameExit = createSwitch(_("AUTO-SCAN ON GAME EXIT"), "syncthing.autoscan", _("Scan for changed files after exiting a game."), true, false, true);
+		switchSyncthingNotifications = createSwitch(_("NOTIFICATIONS"), "syncthing.notifications", _("Show notifications when Syncthing is syncing."), true, false, true);
 		addSaveFunc([this] {
 			// Set the telemetry settings in batocera.conf
 			SystemConf::getInstance()->set("syncthing.autoscan", switchSyncthingScanOnGameExit->getState() ? "1" : "0");
+			SystemConf::getInstance()->set("syncthing.notifications", switchSyncthingNotifications->getState() ? "1" : "0");
 			SystemConf::getInstance()->saveSystemConf();
 		});
 

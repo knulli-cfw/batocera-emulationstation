@@ -22,7 +22,7 @@ SyncthingWatcher::SyncthingWatcher(Window* window) : mWindow(window), mSyncthing
 }
 
 bool SyncthingWatcher::enabled() {
-	return mSyncthingEnabled && mSyncthingUtil.isEnabled();
+	return mSyncthingEnabled && SystemConf::getInstance()->getBool("syncthing.notifications", true) && mSyncthingUtil.isEnabled();
 }
 
 bool SyncthingWatcher::check() {
