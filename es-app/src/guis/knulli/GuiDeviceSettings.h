@@ -19,6 +19,7 @@ private:
         std::shared_ptr<OptionListComponent<std::string>> optionsToggleSwitchMode;
 
         std::shared_ptr<SwitchComponent> switchSyncthingScanOnGameExit;
+        std::shared_ptr<SwitchComponent> switchSyncthingNotifications;
         std::shared_ptr<SwitchComponent> switchTelemetryStatistics;
 
 };

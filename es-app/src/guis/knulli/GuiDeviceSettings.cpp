@@ -84,9 +84,11 @@ GuiDeviceSettings::GuiDeviceSettings(Window* window) : ExtendedGuiSettings(windo
 		});
 
 		switchSyncthingScanOnGameExit = createSwitch(_("AUTO-SCAN ON GAME EXIT"), "syncthing.autoscan", _("Scan for changed files after exiting a game."), true, false, true);
+		switchSyncthingNotifications = createSwitch(_("NOTIFICATIONS"), "syncthing.notifications", _("Show notifications when Syncthing is syncing."), true, false, true);
 		addSaveFunc([this] {
 			// Set the telemetry settings in batocera.conf
 			SystemConf::getInstance()->set("syncthing.autoscan", switchSyncthingScanOnGameExit->getState() ? "1" : "0");
+			SystemConf::getInstance()->set("syncthing.notifications", switchSyncthingNotifications->getState() ? "1" : "0");
 			SystemConf::getInstance()->saveSystemConf();
 		});
 
