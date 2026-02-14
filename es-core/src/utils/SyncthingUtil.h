@@ -1,11 +1,13 @@
 #pragma once
 #include <string>
 #include <vector>
+#include "HttpReq.h"
 #include "Window.h"
 #include "watchers/WatchersManager.h"
 #include <map>
 #include <memory>
 #include <mutex>
+#include <atomic>
 
 struct Device {
 	std::string id;
@@ -26,6 +28,8 @@ struct Folder {
 	std::string label;
 	std::string path;
 	bool fsWatcherEnabled;
+	bool paused;
+	bool shared;
 };
 
 struct SyncthingState {
@@ -62,6 +66,7 @@ public:
 	}
 
 	void init();
+	bool reloadConfig();
 	void scan(Window* window, std::string const* folderId = nullptr);
 	SyncthingState getState();
 	static bool isEnabled();
@@ -82,12 +87,17 @@ private:
 	SyncthingUtil(SyncthingUtil&&) = delete;
 	SyncthingUtil& operator=(SyncthingUtil&&) = delete;
 
+	static bool mEnabled;
+
+	// Access control
 	static std::once_flag mOnceFlag;
+	std::atomic<bool> mApiBusy{false};
 	std::mutex mConnectMutex;
+	std::mutex mDataMutex;
+
 	bool mInitialized = false;
 	bool mConnected = false;
 	bool mWifiConnected = false;
-	int mCurrentTransferNeededFiles = 0;
 
 	// Syncthing configuration
 	std::string mApiKey;
@@ -108,9 +118,13 @@ private:
 		.transferSpeed = 0
 	};
 
+	SyncthingState mLastState;
+
+	void executeScan(Window* window, std::string const* folderId = nullptr);
+	SyncthingState getStateFromApi();
 	std::string getMyId();
 	std::vector<std::string> getConnectedDeviceIds();
+	bool parseConfig();
 	void updateDeviceCompletion(Device* device);
-	std::shared_ptr<Device> getDeviceById(const std::string& deviceId);
-	Folder *getFolderById(const std::string& folderId);
+	long getCurrentTimeMillis();
 };
