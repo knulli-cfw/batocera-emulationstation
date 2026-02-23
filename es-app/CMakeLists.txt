@@ -87,6 +87,7 @@ set(ES_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiDisplaySettings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiPowerManagementSettings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/Pico8Installer.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/PortMasterInstaller.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/UsbService.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/ThreadedDiskCheck.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/ThreadedSyncthing.h
@@ -207,6 +208,7 @@ set(ES_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiDisplaySettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiPowerManagementSettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/Pico8Installer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/PortMasterInstaller.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/UsbService.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/ThreadedDiskCheck.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/ThreadedSyncthing.cpp

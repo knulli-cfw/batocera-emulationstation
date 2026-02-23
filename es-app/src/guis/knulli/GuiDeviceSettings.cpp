@@ -1,12 +1,12 @@
 #include "guis/knulli/GuiDeviceSettings.h"
 #include "guis/knulli/ExtendedGuiSettings.h"
-
 #include "guis/knulli/FactorySettings.h"
 #include "guis/knulli/GuiDisplaySettings.h"
 #include "guis/knulli/GuiPowerManagementSettings.h"
 #include "guis/knulli/rgb/SilkyGuiRgbSettings.h"
 #include "guis/knulli/rgb/SilkyRgbService.h"
 #include "guis/knulli/Pico8Installer.h"
+#include "guis/knulli/PortMasterInstaller.h"
 #include "guis/knulli/ThreadedSyncthing.h"
 #include "guis/knulli/syscalls/DisplaySettings.h"
 #include "components/OptionListComponent.h"
@@ -93,10 +93,19 @@ GuiDeviceSettings::GuiDeviceSettings(Window* window) : ExtendedGuiSettings(windo
 		});
 
 	}
-
-	if(Pico8Installer::hasInstaller()) {
-		addGroup(_("NATIVE PICO-8"));
-		addEntry(_("INSTALL PICO-8"), true, [this] { installPico8(); });
+	// Only add additional software options if at least one installer is available.
+	if (Pico8Installer::hasInstaller() || PortMasterInstaller::hasInstaller()) {
+		addGroup(_("ADDITIONAL SOFTWARE"));
+		if (Pico8Installer::hasInstaller()) {
+			addEntry(_("INSTALL NATIVE PICO-8"), true, [this] { installPico8(); });
+		}
+		if (PortMasterInstaller::hasInstaller()) {
+			if(PortMasterInstaller::isInstalled()) {
+				addEntry(_("REINSTALL PORTMASTER"), true, [this] { PortMasterInstaller::install(); });
+			} else {
+				addEntry(_("INSTALL PORTMASTER"), true, [this] { PortMasterInstaller::install(); });
+			}
+		}
 	}
 	// Only add USB MODE options if USB service is available on this device.
 	if (UsbService::hasService() && (CapabilityCheck::hasCapability(CapabilityCheck::ADB_CAPABILITY) || CapabilityCheck::hasCapability(CapabilityCheck::MTP_CAPABILITY))) {
