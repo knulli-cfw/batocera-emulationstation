@@ -101,9 +101,9 @@ GuiDeviceSettings::GuiDeviceSettings(Window* window) : ExtendedGuiSettings(windo
 		}
 		if (PortMasterInstaller::hasInstaller()) {
 			if(PortMasterInstaller::isInstalled()) {
-				addEntry(_("REINSTALL PORTMASTER"), true, [this] { installPortMaster(); });
+				addEntry(_("REINSTALL PORTMASTER"), true, [this] { PortMasterInstaller::install(); });
 			} else {
-				addEntry(_("INSTALL PORTMASTER"), true, [this] { installPortMaster(); });
+				addEntry(_("INSTALL PORTMASTER"), true, [this] { PortMasterInstaller::install(); });
 			}
 		}
 	}
