@@ -18,7 +18,7 @@
 #include <stdio.h>
 #include <sys/wait.h>
 
-const std::string PORTMASTER_INSTALLER_PATH = "/usr/share/knulli/datainit/roms/ports/Install.PortMaster.sh";
+const std::string PORTMASTER_INSTALLER_PATH = "/usr/share/portmaster/Install.PortMaster.sh";
 const std::string PORTMASTER_INSTALLATION_PATH = "/userdata/system/.local/share/PortMaster";
 
 int PortMasterInstaller::install()
