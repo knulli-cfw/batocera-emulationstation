@@ -24,7 +24,7 @@ const std::string PORTMASTER_INSTALLATION_PATH = "/userdata/system/.local/share/
 int PortMasterInstaller::install()
 {
 	if (hasInstaller()) {
-		int result = system("/usr/bin/knulli-install-pico8");
+		int result = system(PORTMASTER_INSTALLER_PATH.c_str());
 		return WEXITSTATUS(result);
 	}
 	// Installer is missing
