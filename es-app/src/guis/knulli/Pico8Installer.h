@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Window.h"
+
 class Pico8Installer
 {
 public:
