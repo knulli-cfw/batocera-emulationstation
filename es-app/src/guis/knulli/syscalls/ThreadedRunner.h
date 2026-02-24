@@ -12,13 +12,12 @@ public:
 private:
 	void run();
 
-	ThreadedRunner(Window* window);
+	ThreadedRunner(Window* window, std::string title, std::string text, std::string command);
 	~ThreadedRunner();
 
 	Window*						mWindow;
 	AsyncNotificationComponent* mWndNotification;
 	std::string					mCommand;
 
-	std::thread*				mHandle;
 	static ThreadedRunner*	mInstance;
 };

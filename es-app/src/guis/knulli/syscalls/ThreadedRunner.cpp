@@ -23,22 +23,26 @@ ThreadedRunner::ThreadedRunner(Window* window, std::string title, std::string te
 	mWndNotification->updateTitle(ICONINDEX + title);
 	mWndNotification->updateText(text);
 
-	mHandle = new std::thread(&ThreadedRunner::run, this);
+	std::thread(&ThreadedRunner::run, this).detach();
 }
 
 ThreadedRunner::~ThreadedRunner()
 {
-	mWndNotification->close();
-	mWndNotification = nullptr;
-
+	// Kill notification if still open
+	if (mWndNotification != nullptr)
+	{
+		mWndNotification->close();
+		mWndNotification = nullptr;
+	}
+	// Set instance to null so that new processes can be started
 	ThreadedRunner::mInstance = nullptr;
 }
 
 void ThreadedRunner::run()
 {
 	LOG(LogInfo) << "Running " << mCommand;
-	result = system((mCommand + " 2>&1 >/dev/null").c_str());
-	if (result == 0)
+	int result = system((mCommand + " 2>&1 >/dev/null").c_str());
+	if (result == 0 && mWndNotification != nullptr)
 	{
 		mWndNotification->updatePercent(100);
 		mWndNotification->updateText(_("Operation completed."));
@@ -46,11 +50,11 @@ void ThreadedRunner::run()
 	else
 	{
 		LOG(LogError) << "Error executing " << mCommand;
-		mWndNotification->updateText(_("Operation failed."));
+		if (mWndNotification != nullptr)
+			mWndNotification->updateText(_("Operation failed."));
 	}
 	std::this_thread::sleep_for(std::chrono::seconds(5));
 	delete this;
-	ThreadedRunner::mInstance = nullptr;
 }
 
 void ThreadedRunner::start(Window* window, std::string title, std::string text, std::string command)
