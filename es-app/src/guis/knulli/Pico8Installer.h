@@ -3,7 +3,7 @@
 class Pico8Installer
 {
 public:
-        static void install();
+        static void install(Window* window);
         static bool hasInstaller();
 
 };

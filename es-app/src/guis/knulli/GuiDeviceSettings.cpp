@@ -97,13 +97,13 @@ GuiDeviceSettings::GuiDeviceSettings(Window* window) : ExtendedGuiSettings(windo
 	if (Pico8Installer::hasInstaller() || PortMasterInstaller::hasInstaller()) {
 		addGroup(_("ADDITIONAL SOFTWARE"));
 		if (Pico8Installer::hasInstaller()) {
-			addEntry(_("INSTALL NATIVE PICO-8"), true, [this] { Pico8Installer::install(); });
+			addEntry(_("INSTALL NATIVE PICO-8"), true, [this] { Pico8Installer::install(mWindow); });
 		}
 		if (PortMasterInstaller::hasInstaller()) {
 			if(PortMasterInstaller::isInstalled()) {
-				addEntry(_("REINSTALL PORTMASTER"), true, [this] { PortMasterInstaller::install(); });
+				addEntry(_("REINSTALL PORTMASTER"), true, [this] { PortMasterInstaller::install(mWindow); });
 			} else {
-				addEntry(_("INSTALL PORTMASTER"), true, [this] { PortMasterInstaller::install(); });
+				addEntry(_("INSTALL PORTMASTER"), true, [this] { PortMasterInstaller::install(mWindow); });
 			}
 		}
 	}

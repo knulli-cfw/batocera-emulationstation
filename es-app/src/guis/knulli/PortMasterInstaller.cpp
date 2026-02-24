@@ -22,10 +22,10 @@
 const std::string PORTMASTER_INSTALLER_PATH = "/usr/share/portmaster/Install.PortMaster.sh";
 const std::string PORTMASTER_INSTALLATION_PATH = "/userdata/system/.local/share/PortMaster";
 
-void PortMasterInstaller::install()
+void PortMasterInstaller::install(Window* window)
 {
 	if (hasInstaller()) {
-		ThreadedRunner::start(nullptr, _("INSTALLING PORTMASTER"), _("Installing PortMaster..."), PORTMASTER_INSTALLER_PATH.c_str());
+		ThreadedRunner::start(window, _("INSTALLING PORTMASTER"), _("Installing PortMaster..."), PORTMASTER_INSTALLER_PATH.c_str());
 	}
 }
 

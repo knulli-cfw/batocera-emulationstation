@@ -19,10 +19,10 @@
 #include <stdio.h>
 #include <sys/wait.h>
 
-void Pico8Installer::install()
+void Pico8Installer::install(Window* window)
 {
 	if (hasInstaller()) {
-		ThreadedRunner::start(nullptr, _("INSTALLING PICO-8"), _("Installing Pico-8..."), "/usr/bin/knulli-install-pico8");
+		ThreadedRunner::start(window, _("INSTALLING PICO-8"), _("Installing Pico-8..."), "/usr/bin/knulli-install-pico8");
 	}
 }
 
