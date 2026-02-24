@@ -1,4 +1,5 @@
 #include "guis/knulli/PortMasterInstaller.h"
+#include "guis/knulli/syscalls/ThreadedRunner.h"
 #include "components/OptionListComponent.h"
 #include "components/SliderComponent.h"
 #include "components/SwitchComponent.h"
@@ -21,14 +22,11 @@
 const std::string PORTMASTER_INSTALLER_PATH = "/usr/share/portmaster/Install.PortMaster.sh";
 const std::string PORTMASTER_INSTALLATION_PATH = "/userdata/system/.local/share/PortMaster";
 
-int PortMasterInstaller::install()
+void PortMasterInstaller::install()
 {
 	if (hasInstaller()) {
-		int result = system(PORTMASTER_INSTALLER_PATH.c_str());
-		return WEXITSTATUS(result);
+		ThreadedRunner::start(nullptr, _("INSTALLING PORTMASTER"), _("Installing PortMaster..."), PORTMASTER_INSTALLER_PATH.c_str());
 	}
-	// Installer is missing
-	return 2;
 }
 
 

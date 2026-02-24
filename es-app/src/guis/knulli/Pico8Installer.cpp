@@ -1,4 +1,5 @@
 #include "guis/knulli/Pico8Installer.h"
+#include "guis/knulli/syscalls/ThreadedRunner.h"
 #include "components/OptionListComponent.h"
 #include "components/SliderComponent.h"
 #include "components/SwitchComponent.h"
@@ -18,14 +19,11 @@
 #include <stdio.h>
 #include <sys/wait.h>
 
-int Pico8Installer::install()
+void Pico8Installer::install()
 {
 	if (hasInstaller()) {
-		int result = system("/usr/bin/knulli-install-pico8");
-		return WEXITSTATUS(result);
+		ThreadedRunner::start(nullptr, _("INSTALLING PICO-8"), _("Installing Pico-8..."), "/usr/bin/knulli-install-pico8");
 	}
-	// Installer is missing
-	return 2;
 }
 
 
