@@ -79,6 +79,7 @@ set(ES_HEADERS
     # Knulli-related GUIs
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/syscalls/DisplaySettings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/syscalls/SysCalls.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/syscalls/ThreadedRunner.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/BoardCheck.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/CapabilityCheck.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/ExtendedGuiSettings.h
@@ -200,6 +201,7 @@ set(ES_SOURCES
     # Knulli-related GUIs
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/syscalls/DisplaySettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/syscalls/SysCalls.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/syscalls/ThreadedRunner.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/BoardCheck.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/CapabilityCheck.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/ExtendedGuiSettings.cpp

@@ -1,9 +1,11 @@
 #pragma once
 
+#include "Window.h"
+
 class PortMasterInstaller
 {
 public:
-        static int install();
+        static void install(Window* window);
         static bool isInstalled();
         static bool hasInstaller();
 

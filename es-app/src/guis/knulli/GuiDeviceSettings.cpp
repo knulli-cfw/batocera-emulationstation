@@ -97,13 +97,13 @@ GuiDeviceSettings::GuiDeviceSettings(Window* window) : ExtendedGuiSettings(windo
 	if (Pico8Installer::hasInstaller() || PortMasterInstaller::hasInstaller()) {
 		addGroup(_("ADDITIONAL SOFTWARE"));
 		if (Pico8Installer::hasInstaller()) {
-			addEntry(_("INSTALL NATIVE PICO-8"), true, [this] { installPico8(); });
+			addEntry(_("INSTALL NATIVE PICO-8"), true, [this] { Pico8Installer::install(mWindow); });
 		}
 		if (PortMasterInstaller::hasInstaller()) {
 			if(PortMasterInstaller::isInstalled()) {
-				addEntry(_("REINSTALL PORTMASTER"), true, [this] { PortMasterInstaller::install(); });
+				addEntry(_("REINSTALL PORTMASTER"), true, [this] { PortMasterInstaller::install(mWindow); });
 			} else {
-				addEntry(_("INSTALL PORTMASTER"), true, [this] { PortMasterInstaller::install(); });
+				addEntry(_("INSTALL PORTMASTER"), true, [this] { PortMasterInstaller::install(mWindow); });
 			}
 		}
 	}
@@ -162,18 +162,6 @@ void GuiDeviceSettings::openDisplaySettings()
 void GuiDeviceSettings::openRgbLedSettings()
 {
 	mWindow->pushGui(new SilkyGuiRgbSettings(mWindow));
-}
-
-void GuiDeviceSettings::installPico8()
-{
-	int result = Pico8Installer::install();
-	if(result == 0) {
-		mWindow->pushGui(new GuiMsgBox(mWindow, _("Native Pico-8 was successfully installed."), _("OK"), nullptr));
-	} else if(result == 1) {
-		mWindow->pushGui(new GuiMsgBox(mWindow, _("Unable to install: An unknown error occurred. If the error persists, try installing Pico-8 manually."), _("OK"), nullptr));
-	} else if(result == 2) {
-		mWindow->pushGui(new GuiMsgBox(mWindow, _("Unable to install: Pico-8 installer files missing. Please download the Raspberry Pi version of Pico-8 and place the ZIP file in the roms/pico8 folder and try again."), _("OK"), nullptr));
-	}
 }
 
 // Creates a new USB mode option list
