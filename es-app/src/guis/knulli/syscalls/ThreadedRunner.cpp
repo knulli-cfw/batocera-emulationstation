@@ -15,13 +15,16 @@ ThreadedRunner* ThreadedRunner::mInstance = nullptr;
 ThreadedRunner::ThreadedRunner(Window* window, std::string title, std::string text, std::string command)
 	: mWindow(window), mCommand(command)
 {
-	mWndNotification = mWindow->createAsyncNotificationComponent();
-	if (title.empty())
-		title = _("WORK IN PROGRESS");
-	if (text.empty())
-		text = _("Please wait...");
-	mWndNotification->updateTitle(ICONINDEX + title);
-	mWndNotification->updateText(text);
+	if (mWindow != nullptr)
+	{
+		mWndNotification = mWindow->createAsyncNotificationComponent();
+		if (title.empty())
+			title = _("WORK IN PROGRESS");
+		if (text.empty())
+			text = _("Please wait...");
+		mWndNotification->updateTitle(ICONINDEX + title);
+		mWndNotification->updateText(text);
+	}
 
 	std::thread(&ThreadedRunner::run, this).detach();
 }
