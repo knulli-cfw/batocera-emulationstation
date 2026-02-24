@@ -1,5 +1,6 @@
 #include "ThreadedRunner.h"
 #include "Window.h"
+#include "Log.h"
 #include "components/AsyncNotificationComponent.h"
 #include "guis/GuiMsgBox.h"
 #include "ApiSystem.h"
