@@ -92,16 +92,12 @@ SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(w
         });
         
         // Swap colors switch
-        switchPaletteInvert = createSwitch(_("INVERT COLORS"), "led.palette.invert", _("Inverts palette colors for all RGB LEDs."), false, false, hasRequiredSetting("palette.invert"));
-        switchPaletteInvert->setOnChangedCallback([this]() { SilkyRgbService::applyValue("palette.invert", switchPaletteInvert->getState() ? "1" : "0"); });
-    
-        // Swap colors switch
-        switchPaletteInvertSecondary = createSwitch(_("INVERT COLORS (SECONDARY ZONE)"), "led.palette.invert.secondary", _("Inverts palette colors for secondary RGB LED zone."), false, false, hasRequiredSetting("palette.invert.secondary"));
-        switchPaletteInvertSecondary->setOnChangedCallback([this]() { SilkyRgbService::applyValue("palette.invert.secondary", switchPaletteInvertSecondary->getState() ? "1" : "0"); });
+        switchPaletteInvertSecondary = createSwitch(_("INVERT COLORS (SECONDARY ZONE)"), "led.color.invert.secondary", _("Inverts color for secondary RGB LED zone."), false, false, hasRequiredSetting("color.invert.secondary"));
+        switchPaletteInvertSecondary->setOnChangedCallback([this]() { SilkyRgbService::applyValue("color.invert.secondary", switchPaletteInvertSecondary->getState() ? "1" : "0"); });
     
         // Palette modification options
         optionListPaletteMod = createPaletteModOptionList();
-        optionListPaletteMod->setSelectedChangedCallback([this](std::string value) { SilkyRgbService::applyValue("palette.mod", value); }); 
+        optionListPaletteMod->setSelectedChangedCallback([this](std::string value) { SilkyRgbService::applyValue("color.mod", value); }); 
     
         // LED Brightness Slider
         sliderLedBrightness = createSlider(_("BRIGHTNESS"), 0.f, 100.f, 10.f, "%", "", hasRequiredSetting("brightness"));
@@ -174,14 +170,11 @@ SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(w
         if (switchRetroAchievements != nullptr) {
             SystemConf::getInstance()->set("led.retroachievements", (switchRetroAchievements->getState() ? "1" : "0"));
         }
-        if (switchPaletteInvert != nullptr) {
-            SystemConf::getInstance()->set("led.palette.invert", (switchPaletteInvert->getState() ? "1" : "0"));
-        }
         if (switchPaletteInvertSecondary != nullptr) {
-            SystemConf::getInstance()->set("led.palette.invert.secondary", (switchPaletteInvertSecondary->getState() ? "1" : "0"));
+            SystemConf::getInstance()->set("led.color.invert.secondary", (switchPaletteInvertSecondary->getState() ? "1" : "0"));
         }
         if (optionListPaletteMod != nullptr) {
-            SystemConf::getInstance()->set("led.palette.mod", optionListPaletteMod->getSelected());
+            SystemConf::getInstance()->set("led.color.mod", optionListPaletteMod->getSelected());
         }
 		SystemConf::getInstance()->saveSystemConf();
 		Scripting::fireEvent(MENU_EVENT_NAME);
@@ -315,7 +308,7 @@ std::shared_ptr<OptionListComponent<std::string>> SilkyGuiRgbSettings::createPal
 {
     auto optionsPaletteMod = std::make_shared<OptionListComponent<std::string>>(mWindow, _("PALETTE MODIFICATION"), false);
 
-    std::string selectedPaletteMod = SystemConf::getInstance()->get("led.palette.mod");
+    std::string selectedPaletteMod = SystemConf::getInstance()->get("led.color.mod");
     if (selectedPaletteMod.empty())
         selectedPaletteMod = "none";
 
@@ -324,7 +317,7 @@ std::shared_ptr<OptionListComponent<std::string>> SilkyGuiRgbSettings::createPal
     optionsPaletteMod->add(_("Sparkle"), "sparkle", selectedPaletteMod == "sparkle");
     optionsPaletteMod->add(_("Haze"), "haze", selectedPaletteMod == "haze");
 
-    if (hasRequiredSetting("palette.mod") == true)
+    if (hasRequiredSetting("color.mod") == true)
         addWithDescription(_("PALETTE MOD"), _("Select a modification effect for the color palette."), optionsPaletteMod);
     return optionsPaletteMod;
 }
