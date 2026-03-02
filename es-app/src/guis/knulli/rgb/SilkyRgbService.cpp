@@ -1,5 +1,6 @@
 #include "guis/knulli/rgb/SilkyRgbService.h"
 #include "utils/Platform.h"
+#include "utils/StringUtil.h"
 #include "Paths.h"
 #include "HttpReq.h"
 #include <rapidjson/rapidjson.h>
@@ -11,12 +12,14 @@
 #include <cctype>
 #include "Log.h"
 
+
 const std::string DAEMON_NAME = "/etc/init.d/S25silky-rgb";
 
 const std::string API_BASE_PATH = "http://localhost:1235/";
 const std::string API_GET_SETTINGS = "get-settings";
 const std::string API_GET_MODES = "get-modes";
 const std::string API_GET_PALETTES = "get-palettes";
+const std::string API_GET_COLORS = "get-colors";
 const std::string API_RELOAD_CONFIG = "reload-config";
 const std::string API_SET_CONFIG = "set-config";
 const std::string API_UPDATE_SCREEN_STATE = "update-screen-state";
@@ -33,9 +36,9 @@ void SilkyRgbService::stop()
 
 void SilkyRgbService::reloadConfig()
 {
-	HttpReq* req = new HttpReq(API_BASE_PATH + API_RELOAD_CONFIG);
+	HttpReq req(API_BASE_PATH + API_RELOAD_CONFIG);
 
-	if (req->wait())
+	if (req.wait())
 	{
 		// TODO: Handle response if needed
 	}
@@ -45,11 +48,11 @@ std::vector<std::string> SilkyRgbService::requiredSettings()
 {
 	std::vector<std::string> settings;
 
-	HttpReq* req = new HttpReq(API_BASE_PATH + API_GET_SETTINGS);
-	if (req->wait())
+	HttpReq req(API_BASE_PATH + API_GET_SETTINGS);
+	if (req.wait())
 	{
 		rapidjson::Document doc;
-		doc.Parse(req->getContent().c_str());
+		doc.Parse(req.getContent().c_str());
 		if (doc.HasParseError())
 			return settings;
 
@@ -64,18 +67,17 @@ std::vector<std::string> SilkyRgbService::requiredSettings()
 			}
 		}
 	}
-
 	return settings;
 }
 
 std::vector<ModeInfo> SilkyRgbService::getAvailableModes()
 {
 	std::vector<ModeInfo> modes;
-	HttpReq* req = new HttpReq(API_BASE_PATH + API_GET_MODES);
-	if (req->wait())
+	HttpReq req(API_BASE_PATH + API_GET_MODES);
+	if (req.wait())
 	{
 		rapidjson::Document doc;
-		doc.Parse(req->getContent().c_str());
+		doc.Parse(req.getContent().c_str());
 		if (doc.HasParseError())
 			return modes;
 		
@@ -98,18 +100,50 @@ std::vector<ModeInfo> SilkyRgbService::getAvailableModes()
 		}
 		
 	}
-
 	return modes;
+}
+
+std::vector<ColorInfo> SilkyRgbService::getAvailableColors()
+{
+	std::vector<ColorInfo> colors;
+	HttpReq req(API_BASE_PATH + API_GET_COLORS);
+	if (req.wait())
+	{
+		rapidjson::Document doc;
+		doc.Parse(req.getContent().c_str());
+		if (doc.HasParseError())
+			return colors;
+		
+		
+		if (doc.IsObject() == false)
+			return colors;
+
+		for (auto& member : doc.GetObject())
+		{
+
+			if (member.name.IsString())
+			{
+				ColorInfo color;
+				color.id = std::string(member.name.GetString());
+				if (member.value.IsObject() && member.value.HasMember("name") && member.value["name"].IsString()) {
+					color.name = member.value["name"].GetString();
+					colors.push_back(color);
+				}
+			}
+		}
+		
+	}
+	return colors;
 }
 
 std::vector<PaletteInfo> SilkyRgbService::getAvailablePalettes()
 {
 	std::vector<PaletteInfo> palettes;
-	HttpReq* req = new HttpReq(API_BASE_PATH + API_GET_PALETTES);
-	if (req->wait())
+	HttpReq req(API_BASE_PATH + API_GET_PALETTES);
+	if (req.wait())
 	{
 		rapidjson::Document doc;
-		doc.Parse(req->getContent().c_str());
+		doc.Parse(req.getContent().c_str());
 		if (doc.HasParseError())
 			return palettes;
 		
@@ -126,13 +160,18 @@ std::vector<PaletteInfo> SilkyRgbService::getAvailablePalettes()
 				palette.id = std::string(member.name.GetString());
 				if (member.value.IsObject() && member.value.HasMember("name") && member.value["name"].IsString()) {
 					palette.name = member.value["name"].GetString();
+					if (member.value.HasMember("color.primary") && member.value["color.primary"].IsString()) {
+						palette.colorPrimary = member.value["color.primary"].GetString();
+					}
+					if (member.value.HasMember("color.secondary") && member.value["color.secondary"].IsString()) {
+						palette.colorSecondary = member.value["color.secondary"].GetString();
+					}
 					palettes.push_back(palette);
 				}
 			}
 		}
 		
 	}
-
 	return palettes;
 }
 
@@ -140,9 +179,9 @@ void SilkyRgbService::applyValue(std::string key, std::string value)
 {
 	HttpReqOptions options;
 	options.dataToPost = key + " " + value;
-	HttpReq* req = new HttpReq(API_BASE_PATH + API_SET_CONFIG, &options);
+	HttpReq req(API_BASE_PATH + API_SET_CONFIG, &options);
 
-	if (req->wait())
+	if (req.wait())
 	{
 		// TODO: Handle response if needed
 	}
@@ -150,8 +189,8 @@ void SilkyRgbService::applyValue(std::string key, std::string value)
 
 void SilkyRgbService::updateScreenBrightness()
 {
-
 	std::string brightness = SysCalls::executeAndCatchOutput("knulli-brightness");
+	brightness = Utils::String::trim(brightness);
 
 	if (brightness.empty() || !SilkyRgbService::isNumeric(brightness) || std::stof(brightness) < 0 || std::stof(brightness) > 100)
 	{
@@ -161,9 +200,9 @@ void SilkyRgbService::updateScreenBrightness()
 
 	HttpReqOptions options;
 	options.dataToPost = brightness;
-	HttpReq* req = new HttpReq(API_BASE_PATH + API_UPDATE_SCREEN_STATE, &options);
+	HttpReq req(API_BASE_PATH + API_UPDATE_SCREEN_STATE, &options);
 
-	if (req->wait())
+	if (req.wait())
 	{
 		// TODO: Handle response if needed
 	}

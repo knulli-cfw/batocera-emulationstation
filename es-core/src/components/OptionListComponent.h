@@ -537,6 +537,16 @@ public:
 		onSelectedChanged();
 	}
 
+	void selectItemByName(std::string name)
+	{
+		for (unsigned int i = 0; i < mEntries.size(); i++)
+			if (mEntries.at(i).name == name)
+				mEntries.at(i).selected = true;
+			else if (!mMultiSelect)
+				mEntries.at(i).selected = false;
+		onSelectedChanged();
+	}
+
 	void clear() {
 		mEntries.clear();
 	}

@@ -22,6 +22,7 @@
 
 constexpr const char* DEFAULT_LED_MODE = "shimmer";
 constexpr const char* DEFAULT_LED_PALETTE = "Knulli";
+constexpr const char* CUSTOM_LED_PALETTE = "Custom";
 constexpr const char* DEFAULT_BATTERY_MODE = "continuous";
 constexpr float DEFAULT_LOW_BATTERY_THRESHOLD = 20;
 constexpr float DEFAULT_BRIGHTNESS = 100;
@@ -55,20 +56,48 @@ SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(w
         optionListMode = createModeOptionList();
         optionListMode->setSelectedChangedCallback([this](std::string value) { SilkyRgbService::applyValue("mode", value); });
     
-        optionListPalettePrimary = createPaletteOptionList("palette", "COLOR PALETTE", "Select the color palette.");
-        optionListPalettePrimary->setSelectedChangedCallback([this](std::string value) { SilkyRgbService::applyValue("palette", value); });
+        optionListPalette = createPaletteOptionList("palette", "COLOR PALETTE", "Select the color palette.");
+        optionListPalette->setSelectedChangedCallback([this](std::string value) {
+            std::shared_ptr<PaletteInfo> paletteInfo = getPaletteInfoById(value);
+            if (optionListColorPrimary != nullptr && paletteInfo != nullptr) {
+                optionListColorPrimary->selectItemByName(paletteInfo->colorPrimary);
+                SilkyRgbService::applyValue("color.primary", paletteInfo->colorPrimary);
+            }
+            if (optionListColorSecondary != nullptr && paletteInfo != nullptr) {
+                optionListColorSecondary->selectItemByName(paletteInfo->colorSecondary);
+                SilkyRgbService::applyValue("color.secondary", paletteInfo->colorSecondary);
+            }
+        });
+
+        optionListColorPrimary = createColorOptionList("color.primary", "PRIMARY COLOR", "Select the primary color.");
+        optionListColorPrimary->setSelectedChangedCallback([this](std::string value) {
+            if (optionListPalette != nullptr) {
+                std::shared_ptr<PaletteInfo> paletteInfo = getPaletteInfoById(optionListPalette->getSelected());
+                if (paletteInfo != nullptr && paletteInfo->colorPrimary != value) {
+                    optionListPalette->selectItemByName(CUSTOM_LED_PALETTE);
+                }
+            }
+            SilkyRgbService::applyValue("color.primary", value);
+        });
+
+        optionListColorSecondary = createColorOptionList("color.secondary", "SECONDARY COLOR", "Select the secondary color (for dual-color modes).");
+        optionListColorSecondary->setSelectedChangedCallback([this](std::string value) {
+            if (optionListPalette != nullptr) {
+                std::shared_ptr<PaletteInfo> paletteInfo = getPaletteInfoById(optionListPalette->getSelected());
+                if (paletteInfo != nullptr && paletteInfo->colorSecondary != value) {
+                    optionListPalette->selectItemByName(CUSTOM_LED_PALETTE);
+                }
+            }
+            SilkyRgbService::applyValue("color.secondary", value);
+        });
         
         // Swap colors switch
-        switchPaletteInvert = createSwitch(_("INVERT COLORS"), "led.palette.invert", _("Inverts palette colors for all RGB LEDs."), false, false, hasRequiredSetting("palette.invert"));
-        switchPaletteInvert->setOnChangedCallback([this]() { SilkyRgbService::applyValue("palette.invert", switchPaletteInvert->getState() ? "1" : "0"); });
-    
-        // Swap colors switch
-        switchPaletteInvertSecondary = createSwitch(_("INVERT COLORS (SECONDARY ZONE)"), "led.palette.invert.secondary", _("Inverts palette colors for secondary RGB LED zone."), false, false, hasRequiredSetting("palette.invert.secondary"));
-        switchPaletteInvertSecondary->setOnChangedCallback([this]() { SilkyRgbService::applyValue("palette.invert.secondary", switchPaletteInvertSecondary->getState() ? "1" : "0"); });
+        switchPaletteInvertSecondary = createSwitch(_("INVERT COLORS (SECONDARY ZONE)"), "led.color.invert.secondary", _("Inverts color for secondary RGB LED zone."), false, false, hasRequiredSetting("color.invert.secondary"));
+        switchPaletteInvertSecondary->setOnChangedCallback([this]() { SilkyRgbService::applyValue("color.invert.secondary", switchPaletteInvertSecondary->getState() ? "1" : "0"); });
     
         // Palette modification options
         optionListPaletteMod = createPaletteModOptionList();
-        optionListPaletteMod->setSelectedChangedCallback([this](std::string value) { SilkyRgbService::applyValue("palette.mod", value); }); 
+        optionListPaletteMod->setSelectedChangedCallback([this](std::string value) { SilkyRgbService::applyValue("color.mod", value); }); 
     
         // LED Brightness Slider
         sliderLedBrightness = createSlider(_("BRIGHTNESS"), 0.f, 100.f, 10.f, "%", "", hasRequiredSetting("brightness"));
@@ -114,8 +143,14 @@ SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(w
         if (optionListMode != nullptr) {
             SystemConf::getInstance()->set("led.mode", optionListMode->getSelected());
         }
-        if (optionListPalettePrimary != nullptr) {
-            SystemConf::getInstance()->set("led.palette", optionListPalettePrimary->getSelected());
+        if (optionListPalette != nullptr) {
+            SystemConf::getInstance()->set("led.palette", optionListPalette->getSelected());
+        }
+        if (optionListColorPrimary != nullptr) {
+            SystemConf::getInstance()->set("led.color.primary", optionListColorPrimary->getSelected());
+        }
+        if (optionListColorSecondary != nullptr) {
+            SystemConf::getInstance()->set("led.color.secondary", optionListColorSecondary->getSelected());
         }
         if (sliderLedBrightness != nullptr) {
             SystemConf::getInstance()->set("led.brightness", std::to_string((int) sliderLedBrightness->getValue()));
@@ -135,14 +170,11 @@ SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(w
         if (switchRetroAchievements != nullptr) {
             SystemConf::getInstance()->set("led.retroachievements", (switchRetroAchievements->getState() ? "1" : "0"));
         }
-        if (switchPaletteInvert != nullptr) {
-            SystemConf::getInstance()->set("led.palette.invert", (switchPaletteInvert->getState() ? "1" : "0"));
-        }
         if (switchPaletteInvertSecondary != nullptr) {
-            SystemConf::getInstance()->set("led.palette.invert.secondary", (switchPaletteInvertSecondary->getState() ? "1" : "0"));
+            SystemConf::getInstance()->set("led.color.invert.secondary", (switchPaletteInvertSecondary->getState() ? "1" : "0"));
         }
         if (optionListPaletteMod != nullptr) {
-            SystemConf::getInstance()->set("led.palette.mod", optionListPaletteMod->getSelected());
+            SystemConf::getInstance()->set("led.color.mod", optionListPaletteMod->getSelected());
         }
 		SystemConf::getInstance()->saveSystemConf();
 		Scripting::fireEvent(MENU_EVENT_NAME);
@@ -195,6 +227,9 @@ std::shared_ptr<OptionListComponent<std::string>> SilkyGuiRgbSettings::createMod
         }
 
         for (const auto& mode : availableModes) {
+            if (mode.name == "Glitch") {
+                continue;
+            }
             optionsLedMode->add(_(mode.name.c_str()), mode.id, mode.id == selectedLedMode);
         }
     }
@@ -210,21 +245,45 @@ std::shared_ptr<OptionListComponent<std::string>> SilkyGuiRgbSettings::createPal
 
     std::string configKey = "led." + setting;
     std::string selectedLedPalette = SystemConf::getInstance()->get(configKey);
-    std::vector<PaletteInfo> availablePalettes = SilkyRgbService::getAvailablePalettes();
-    if (selectedLedPalette.empty() && !availablePalettes.empty())
+    mPalettes = SilkyRgbService::getAvailablePalettes();
+    if (selectedLedPalette.empty() && !mPalettes.empty())
         selectedLedPalette = DEFAULT_LED_PALETTE;
+    optionsLedPalette->add(_(CUSTOM_LED_PALETTE), CUSTOM_LED_PALETTE, selectedLedPalette == CUSTOM_LED_PALETTE);
+    for (const auto& palette : mPalettes) {
+        optionsLedPalette->add(palette.name, palette.id, selectedLedPalette == palette.id);
+    }
+    addWithDescription(_(title.c_str()), _(description.c_str()), optionsLedPalette);
+    return optionsLedPalette;
+}
 
-    for (const auto& palette : availablePalettes) {
-        // XXX: Shorten the palette name by removing the color specification in parentheses
-        // e.g., "Cotton Candy (Pink, Sky Blue)" becomes "Cotton Candy", just because the
-        // overly long names cause misalignment in the GUI.
-        std::string shortenedName = palette.name.substr(0, palette.name.find(" ("));
-        optionsLedPalette->add(shortenedName, palette.id, selectedLedPalette == palette.id);
+std::shared_ptr<OptionListComponent<std::string>> SilkyGuiRgbSettings::createColorOptionList(const std::string& setting, const std::string& title, const std::string& description)
+{
+    auto optionsColor = std::make_shared<OptionListComponent<std::string>>(mWindow, _(title.c_str()), false);
+
+    std::string configKey = "led." + setting;
+    std::string selectedColor = SystemConf::getInstance()->get(configKey);
+    if (selectedColor.empty() && optionListPalette != nullptr) {
+        // If no color is set but a palette is selected, try to default to the primary color of the selected palette
+        std::string selectedPaletteId = optionListPalette->getSelected();
+        std::shared_ptr<PaletteInfo> paletteInfo = getPaletteInfoById(selectedPaletteId);
+        if (paletteInfo != nullptr) {
+            if (setting == "color.primary") {
+                selectedColor = paletteInfo->colorPrimary;
+            } else if (setting == "color.secondary") {
+                selectedColor = paletteInfo->colorSecondary;
+            }
+        }
+    }
+
+    std::vector<ColorInfo> availableColors = SilkyRgbService::getAvailableColors();
+
+    for (const auto& color : availableColors) {
+        optionsColor->add(color.name, color.id, selectedColor == color.id);
     }
 
     if (hasRequiredSetting(setting) == true)
-        addWithDescription(_(title.c_str()), _(description.c_str()), optionsLedPalette);
-    return optionsLedPalette;
+        addWithDescription(_(title.c_str()), _(description.c_str()), optionsColor);
+    return optionsColor;
 }
 
 std::shared_ptr<OptionListComponent<std::string>> SilkyGuiRgbSettings::createBatteryIndicationOptionList(const std::string& setting, const std::string& title, const std::string& description)
@@ -249,7 +308,7 @@ std::shared_ptr<OptionListComponent<std::string>> SilkyGuiRgbSettings::createPal
 {
     auto optionsPaletteMod = std::make_shared<OptionListComponent<std::string>>(mWindow, _("PALETTE MODIFICATION"), false);
 
-    std::string selectedPaletteMod = SystemConf::getInstance()->get("led.palette.mod");
+    std::string selectedPaletteMod = SystemConf::getInstance()->get("led.color.mod");
     if (selectedPaletteMod.empty())
         selectedPaletteMod = "none";
 
@@ -258,7 +317,7 @@ std::shared_ptr<OptionListComponent<std::string>> SilkyGuiRgbSettings::createPal
     optionsPaletteMod->add(_("Sparkle"), "sparkle", selectedPaletteMod == "sparkle");
     optionsPaletteMod->add(_("Haze"), "haze", selectedPaletteMod == "haze");
 
-    if (hasRequiredSetting("palette.mod") == true)
+    if (hasRequiredSetting("color.mod") == true)
         addWithDescription(_("PALETTE MOD"), _("Select a modification effect for the color palette."), optionsPaletteMod);
     return optionsPaletteMod;
 }
