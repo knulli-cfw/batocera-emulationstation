@@ -60,11 +60,11 @@ SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(w
         optionListPalette->setSelectedChangedCallback([this](std::string value) {
             std::shared_ptr<PaletteInfo> paletteInfo = getPaletteInfoById(value);
             if (optionListColorPrimary != nullptr && paletteInfo != nullptr) {
-                optionListColorPrimary->setSelected(paletteInfo->colorPrimary);
+                optionListColorPrimary->selectItemByName(paletteInfo->colorPrimary);
                 SilkyRgbService::applyValue("color.primary", paletteInfo->colorPrimary);
             }
             if (optionListColorSecondary != nullptr && paletteInfo != nullptr) {
-                optionListColorSecondary->setSelected(paletteInfo->colorSecondary);
+                optionListColorSecondary->selectItemByName(paletteInfo->colorSecondary);
                 SilkyRgbService::applyValue("color.secondary", paletteInfo->colorSecondary);
             }
         });
@@ -72,7 +72,7 @@ SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(w
         optionListColorPrimary = createColorOptionList("color.primary", "PRIMARY COLOR", "Select the primary color.");
         optionListColorPrimary->setSelectedChangedCallback([this](std::string value) {
             if (optionListPalette != nullptr) {
-                optionListPalette->setSelected(CUSTOM_LED_PALETTE);
+                optionListPalette->selectItemByName(CUSTOM_LED_PALETTE);
             }
             SilkyRgbService::applyValue("color.primary", value);
         });
@@ -80,7 +80,7 @@ SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(w
         optionListColorSecondary = createColorOptionList("color.secondary", "SECONDARY COLOR", "Select the secondary color (for dual-color modes).");
         optionListColorSecondary->setSelectedChangedCallback([this](std::string value) {
             if (optionListPalette != nullptr) {
-                optionListPalette->setSelected(CUSTOM_LED_PALETTE);
+                optionListPalette->selectItemByName(CUSTOM_LED_PALETTE);
             }
             SilkyRgbService::applyValue("color.secondary", value);
         });
@@ -143,6 +143,12 @@ SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(w
         }
         if (optionListPalette != nullptr) {
             SystemConf::getInstance()->set("led.palette", optionListPalette->getSelected());
+        }
+        if (optionListColorPrimary != nullptr) {
+            SystemConf::getInstance()->set("led.color.primary", optionListColorPrimary->getSelected());
+        }
+        if (optionListColorSecondary != nullptr) {
+            SystemConf::getInstance()->set("led.color.secondary", optionListColorSecondary->getSelected());
         }
         if (sliderLedBrightness != nullptr) {
             SystemConf::getInstance()->set("led.brightness", std::to_string((int) sliderLedBrightness->getValue()));
