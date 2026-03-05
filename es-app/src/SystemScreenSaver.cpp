@@ -658,10 +658,10 @@ void GameScreenSaverBase::setGame(FileData* game)
 				"retroarch"
 			);
 
-			if (info.has_value()) {
-				bezelPath = info->png.string();
-				applyBezelInfo(info->info.string());
-			}
+			if (info.valid) {
+            	bezelPath = info.png;
+            	applyBezelInfo(info.info);
+        	}
 		}
 #endif
 

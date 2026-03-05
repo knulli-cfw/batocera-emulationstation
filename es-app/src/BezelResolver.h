@@ -2,19 +2,14 @@
 
 #include <string>
 #include <vector>
-#include <filesystem>
-#include <optional>
-#include <algorithm>
-#include <cctype>
-
-namespace fs = std::filesystem;
 
 struct BezelInfos {
-    fs::path png;
-    fs::path info;
-    fs::path layout;
-    fs::path mamezip;
+    std::string png;
+    std::string info;
+    std::string layout;
+    std::string mamezip;
     bool specific_to_game;
+    bool valid; // Replacement for std::optional
 };
 
 struct Resolution {
@@ -24,26 +19,24 @@ struct Resolution {
 
 class BezelResolver {
 public:
-    // Main entry point
-    static std::optional<BezelInfos> getBezelInfos(const std::string& romPath, 
-                                                   const std::string& bezelName, 
-                                                   const std::string& systemName, 
-                                                   const std::string& emulator);
+    static BezelInfos getBezelInfos(const std::string& romPath, 
+                                    const std::string& bezelName, 
+                                    const std::string& systemName, 
+                                    const std::string& emulator);
 
 private:
-    // Knulli Hard-wired Paths
-    static inline const fs::path KNULLI_SHARE_DIR   = "/usr/share/knulli";
-    static inline const fs::path USERDATA           = "/userdata";
-    static inline const fs::path DATAINIT_DIR       = KNULLI_SHARE_DIR / "datainit";
-    static inline const fs::path DEFAULTS_DIR       = KNULLI_SHARE_DIR / "configgen";
-    
-    // Decoration specific paths
-    static inline const fs::path USER_DECORATIONS   = USERDATA / "decorations";
-    static inline const fs::path SYSTEM_DECORATIONS = DATAINIT_DIR / "decorations";
+    static const std::string KNULLI_SHARE_DIR;
+    static const std::string USERDATA;
+    static const std::string DATAINIT_DIR;
+    static const std::string DEFAULTS_DIR;
+    static const std::string USER_DECORATIONS;
+    static const std::string SYSTEM_DECORATIONS;
 
-    // Internal Helpers
     static Resolution getCurrentResolution();
     static std::string toAspectRatio(int width, int height);
     static std::string getAltDecoration(const std::string& systemName, const std::string& romPath, const std::string& emulator);
     static std::string toLower(std::string s);
+    static std::string getStem(const std::string& path);
+    static bool fileExists(const std::string& path);
+    static std::string join(const std::string& p1, const std::string& p2);
 };
