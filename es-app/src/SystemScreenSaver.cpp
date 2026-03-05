@@ -25,6 +25,7 @@
 #include "utils/Randomizer.h"
 #include "Paths.h"
 #include "ApiSystem.h"
+#include "BezelResolver.h"
 
 #define FADE_TIME					(500)
 #define DATE_TIME_UPDATE_INTERVAL	(100)
@@ -639,17 +640,35 @@ void GameScreenSaverBase::setGame(FileData* game)
 	mViewport = Renderer::Rect(0, 0, Renderer::getScreenWidth(), Renderer::getScreenHeight());
 
 	std::string decos = Settings::getInstance()->getString("ScreenSaverDecorations");
+	std::string bezelPath = "";
 
 #ifdef _RPI_
 	if (!Settings::getInstance()->getBool("ScreenSaverOmxPlayer"))
 #endif
 	if (decos != "none")
 	{
-		auto sets = GuiMenu::getDecorationsSets(game->getSystem());
-		int setId = Randomizer::random(sets.size()); // (int)(((float)rand() / float(RAND_MAX)) * (float)sets.size());
 
-		if (decos == "systems")
+#ifdef KNULLI
+		if (decos == "default-knulli") {
+			// Call the resolver (using "retroarch" as the most likely candidate for overlays)
+			auto info = BezelResolver::getBezelInfos(
+				game->getPath(), 
+				"default-knulli", 
+				game->getSystem()->getName(), 
+				"retroarch"
+			);
+
+			if (info.has_value()) {
+				bezelPath = info->png.string();
+				applyBezelInfo(info->info.string());
+			}
+		}
+#endif
+
+		if (bezelPath.empty() && decos == "systems")
 		{
+			auto sets = GuiMenu::getDecorationsSets(game->getSystem());
+			int setId = Randomizer::random(sets.size()); // (int)(((float)rand() / float(RAND_MAX)) * (float)sets.size());
 			std::string bezel = SystemConf::getInstance()->get("global.bezel");
 
 			bool found = false;
@@ -692,60 +711,23 @@ void GameScreenSaverBase::setGame(FileData* game)
 					}
 				}
 			}
+
+			if (setId >= 0 && setId < sets.size()) {
+            	bezelPath = sets[setId].imageUrl;
+            	applyBezelInfo(Utils::String::replace(bezelPath, ".png", ".info"));
+        	}
+
 		}
 
-		if (setId >= 0 && setId < sets.size() && Utils::FileSystem::exists(sets[setId].imageUrl))
+		if (!bezelPath.empty() && !Renderer::isVerticalScreen())
 		{
-			std::string infoFile = Utils::String::replace(sets[setId].imageUrl, ".png", ".info");
-			if (Utils::FileSystem::exists(infoFile))
-			{
-				FILE* fp = fopen(infoFile.c_str(), "r"); // non-Windows use "r"
-				if (fp)
-				{
-					char readBuffer[65536];
-					rapidjson::FileReadStream is(fp, readBuffer, sizeof(readBuffer));
-					rapidjson::Document doc;
-					doc.ParseStream(is);
-
-					if (!doc.HasParseError())
-					{
-						if (doc.HasMember("top") && doc.HasMember("left") && doc.HasMember("bottom") && doc.HasMember("right") && doc.HasMember("width") && doc.HasMember("height"))
-						{
-							auto width = doc["width"].GetInt();
-							auto height = doc["height"].GetInt();
-							if (width > 0 && height > 0)
-							{
-								Vector2i sz = ImageIO::adjustPictureSize(Vector2i(width, height), Vector2i(Renderer::getScreenWidth(), Renderer::getScreenHeight()));
-
-								float px = (float) sz.x() / (float)width;
-								float py = (float) sz.y() / (float)height;
-
-								float dx = (Renderer::getScreenWidth() - sz.x()) / 2.0;
-								float dy = (Renderer::getScreenHeight() - sz.y()) / 2.0;
-
-								auto top = doc["top"].GetInt();
-								auto left = doc["left"].GetInt();
-								auto bottom = doc["bottom"].GetInt();
-								auto right = doc["right"].GetInt();
-
-								mViewport = Renderer::Rect(dx + left * px, dy + top * py, (width - right - left) * px, (height - bottom - top) * py);
-							}
-						}
-					}
-
-					fclose(fp);
-				}
-			}
-
-			if (!Renderer::isVerticalScreen())
-			{
-				mDecoration = new ImageComponent(mWindow, true);
-				mDecoration->setImage(sets[setId].imageUrl);
-				mDecoration->setOrigin(0.5f, 0.5f);
-				mDecoration->setPosition(Renderer::getScreenWidth() / 2.0f, (float)Renderer::getScreenHeight() / 2.0f);
-				mDecoration->setMaxSize((float)Renderer::getScreenWidth() * Renderer::getScreenProportion(), (float)Renderer::getScreenHeight());
-			}
+			mDecoration = new ImageComponent(mWindow, true);
+			mDecoration->setImage(bezelPath);
+			mDecoration->setOrigin(0.5f, 0.5f);
+			mDecoration->setPosition(Renderer::getScreenWidth() / 2.0f, Renderer::getScreenHeight() / 2.0f);
+			mDecoration->setMaxSize((float)Renderer::getScreenWidth() * Renderer::getScreenProportion(), (float)Renderer::getScreenHeight());
 		}
+
 	}
 
 	if (!Settings::getInstance()->getBool("SlideshowScreenSaverGameName"))
@@ -788,6 +770,49 @@ void GameScreenSaverBase::setGame(FileData* game)
 	mLabelSystem->setGlowSize(2);
 	mLabelSystem->setFont(ph, sz * 0.66);
 	mLabelSystem->setText(game->getSystem()->getFullName());
+}
+
+void GameScreenSaverBase::applyBezelInfo(const std::string& infoFile)
+{
+    if (!Utils::FileSystem::exists(infoFile))
+        return;
+
+    FILE* fp = fopen(infoFile.c_str(), "r");
+    if (!fp) return;
+
+    char readBuffer[65536];
+    rapidjson::FileReadStream is(fp, readBuffer, sizeof(readBuffer));
+    rapidjson::Document doc;
+    doc.ParseStream(is);
+
+    if (!doc.HasParseError() && doc.HasMember("top") && doc.HasMember("width") && doc.HasMember("height"))
+    {
+        auto width = doc["width"].GetInt();
+        auto height = doc["height"].GetInt();
+        
+        if (width > 0 && height > 0)
+        {
+            // Adjust the bezel to fit the physical screen
+            Vector2i sz = ImageIO::adjustPictureSize(Vector2i(width, height), 
+                          Vector2i(Renderer::getScreenWidth(), Renderer::getScreenHeight()));
+
+            float px = (float)sz.x() / (float)width;
+            float py = (float)sz.y() / (float)height;
+            float dx = (Renderer::getScreenWidth() - sz.x()) / 2.0f;
+            float dy = (Renderer::getScreenHeight() - sz.y()) / 2.0f;
+
+            auto top = doc["top"].GetInt();
+            auto left = doc["left"].GetInt();
+            auto bottom = doc["bottom"].GetInt();
+            auto right = doc["right"].GetInt();
+
+            // Set the viewport where the video will actually play
+            mViewport = Renderer::Rect(dx + left * px, dy + top * py, 
+                                      (width - right - left) * px, 
+                                      (height - bottom - top) * py);
+        }
+    }
+    fclose(fp);
 }
 
 void GameScreenSaverBase::render(const Transform4x4f& transform)
