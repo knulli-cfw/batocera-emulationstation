@@ -164,7 +164,7 @@ void GuiGeneralScreensaverOptions::addVideoScreensaverOptions(int selectItem)
 		if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::DECORATIONS))
 		{
 			auto decoration_screensaver = std::make_shared<OptionListComponent<std::string>>(mWindow, _("DECORATION SET USED"), false);
-			decoration_screensaver->addRange({ "none", "systems", "random" }, Settings::getInstance()->getString("ScreenSaverDecorations"));
+			decoration_screensaver->addRange(std::vector<std::string>{ "none", "default-knulli" }, Settings::getInstance()->getString("ScreenSaverDecorations"));
 			addWithLabel(_("DECORATION SET USED"), decoration_screensaver);
 			addSaveFunc([decoration_screensaver] { Settings::getInstance()->setString("ScreenSaverDecorations", decoration_screensaver->getSelected()); });
 		}

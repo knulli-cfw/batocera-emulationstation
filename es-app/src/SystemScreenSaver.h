@@ -37,6 +37,8 @@ protected:
 
 	int 				mDateTimeUpdateAccumulator;
 	time_t				mDateTimeLastUpdate;
+private:
+    void applyBezelInfo(const std::string& infoFile);
 };
 
 class ImageScreenSaver : public GameScreenSaverBase

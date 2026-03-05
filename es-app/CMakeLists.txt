@@ -11,6 +11,7 @@ set(ES_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/src/Genres.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/FileFilterIndex.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SystemScreenSaver.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/BezelResolver.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/CollectionSystemManager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/NetworkThread.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/ContentInstaller.h
@@ -138,6 +139,7 @@ set(ES_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/Genres.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/FileFilterIndex.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SystemScreenSaver.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/BezelResolver.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/CollectionSystemManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/NetworkThread.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/ContentInstaller.cpp
