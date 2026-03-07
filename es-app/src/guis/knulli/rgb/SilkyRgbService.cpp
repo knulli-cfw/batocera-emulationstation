@@ -13,7 +13,7 @@
 #include "Log.h"
 
 
-const std::string DAEMON_NAME = "/etc/init.d/S25silky-rgb";
+const std::string DAEMON_NAME = "/etc/init.d/S95silky-rgb";
 
 const std::string API_BASE_PATH = "http://localhost:1235/";
 const std::string API_GET_SETTINGS = "get-settings";
@@ -80,8 +80,8 @@ std::vector<ModeInfo> SilkyRgbService::getAvailableModes()
 		doc.Parse(req.getContent().c_str());
 		if (doc.HasParseError())
 			return modes;
-		
-		
+
+
 		if (doc.IsObject() == false)
 			return modes;
 
@@ -98,7 +98,7 @@ std::vector<ModeInfo> SilkyRgbService::getAvailableModes()
 				}
 			}
 		}
-		
+
 	}
 	return modes;
 }
@@ -113,8 +113,8 @@ std::vector<ColorInfo> SilkyRgbService::getAvailableColors()
 		doc.Parse(req.getContent().c_str());
 		if (doc.HasParseError())
 			return colors;
-		
-		
+
+
 		if (doc.IsObject() == false)
 			return colors;
 
@@ -131,7 +131,7 @@ std::vector<ColorInfo> SilkyRgbService::getAvailableColors()
 				}
 			}
 		}
-		
+
 	}
 	return colors;
 }
@@ -146,8 +146,8 @@ std::vector<PaletteInfo> SilkyRgbService::getAvailablePalettes()
 		doc.Parse(req.getContent().c_str());
 		if (doc.HasParseError())
 			return palettes;
-		
-		
+
+
 		if (doc.IsObject() == false)
 			return palettes;
 
@@ -170,7 +170,7 @@ std::vector<PaletteInfo> SilkyRgbService::getAvailablePalettes()
 				}
 			}
 		}
-		
+
 	}
 	return palettes;
 }
