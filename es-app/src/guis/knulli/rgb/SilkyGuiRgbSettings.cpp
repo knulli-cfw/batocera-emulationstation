@@ -150,7 +150,7 @@ SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(w
             SystemConf::getInstance()->set("led.mode", optionListMode->getSelected());
         }
         if (optionListPalette != nullptr) {
-            SystemConf::getInstance()->set("led.palette", optionListPalette->getSelected());
+            SystemConf::getInstance()->set("led.color.palette", optionListPalette->getSelected());
         }
         if (optionListColorPrimary != nullptr) {
             SystemConf::getInstance()->set("led.color.primary", optionListColorPrimary->getSelected());
