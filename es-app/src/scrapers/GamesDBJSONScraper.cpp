@@ -197,7 +197,7 @@ void TheGamesDBScraper::generateRequests(const ScraperSearchParams& params,
 	bool usingGameID = false;
 	const std::string apiKey = std::string("apikey=") + resources.getApiKey();
 
-	if (apiKey.length() <= 8)
+	if (apiKey.length() <= 8) {
 		return;
 	}
 
@@ -450,7 +450,7 @@ namespace
 		if (boxart.HasMember("data") && boxart["data"].IsObject())
 		{
 			if (boxart["data"].HasMember(id.c_str()))
-			{
+			{ga
 				std::string image = getBoxartImage(boxart["data"][id.c_str()]);
 				if (!image.empty())
 					medias["boxart"] = baseImageUrlThumb + image;
@@ -458,7 +458,7 @@ namespace
 		}
 
 		const std::string apiKey = std::string("apikey=") + resources.getApiKey();
-		if (apiKey.length() <= 8)
+		if (apiKey.length() <= 8) {
 			return;
 		}
 
