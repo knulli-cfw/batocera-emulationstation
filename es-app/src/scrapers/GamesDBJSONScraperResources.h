@@ -4,8 +4,6 @@
 
 #include "EmulationStation.h"
 
-#ifdef GAMESDB_APIKEY
-
 #include <fstream>
 #include <memory>
 #include <string>
@@ -42,4 +40,3 @@ struct TheGamesDBJSONRequestResources
 std::string getScrapersResouceDir();
 #endif
 
-#endif // ES_APP_SCRAPERS_GAMES_DB_JSON_SCRAPER_H

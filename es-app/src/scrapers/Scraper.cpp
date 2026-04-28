@@ -25,9 +25,7 @@ std::vector<std::pair<std::string, Scraper*>> Scraper::scrapers
 	{ "ScreenScraper", new ScreenScraperScraper() },
 #endif
 
-#ifdef GAMESDB_APIKEY
 	{ "TheGamesDB", new TheGamesDBScraper() },
-#endif
 
 #ifdef HFS_DEV_LOGIN
 	{ "HfsDB", new HfsDBScraper() },

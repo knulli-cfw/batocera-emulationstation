@@ -178,4 +178,10 @@ GuiScraperSettings::GuiScraperSettings(Window* window) : GuiSettings(window, _("
 		addInputTextRow(_("USERNAME"), "ScreenScraperUser", false, true);
 		addInputTextRow(_("PASSWORD"), "ScreenScraperPass", true, true);
 	}
+	if (scraper == "TheGamesDB")
+	{
+		addGroup(_("ACCOUNT"));
+		addInputTextRow(_("API KEY"), "TheGamesDBApiKey", false, true);
+	}
+
 }
