@@ -4,8 +4,6 @@
 
 #include "EmulationStation.h"
 
-#ifdef GAMESDB_APIKEY
-
 #include <fstream>
 #include <memory>
 #include <string>

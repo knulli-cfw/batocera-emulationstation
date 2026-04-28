@@ -8,8 +8,8 @@
 #include <rapidjson/error/en.h>
 #include "Log.h"
 #include "Paths.h"
+#include "Settings.h"
 
-#ifdef GAMESDB_APIKEY
 using namespace rapidjson;
 
 namespace
@@ -46,7 +46,7 @@ std::string getScrapersResouceDir()
 	return Utils::FileSystem::getGenericPath(Paths::getUserEmulationStationPath() + std::string("/") + SCRAPER_RESOURCES_DIR);
 }
 
-std::string TheGamesDBJSONRequestResources::getApiKey() const { return GAMESDB_APIKEY; }
+std::string TheGamesDBJSONRequestResources::getApiKey() const { return Settings::getInstance()->getString("TheGamesDBApiKey"); }
 
 
 void TheGamesDBJSONRequestResources::prepare()
@@ -198,4 +198,3 @@ int TheGamesDBJSONRequestResources::loadResource(
 	}
 	return resource.empty();
 }
-#endif

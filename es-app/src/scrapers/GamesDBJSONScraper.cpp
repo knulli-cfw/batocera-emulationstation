@@ -4,8 +4,6 @@
 #include "scrapers/GamesDBJSONScraper.h"
 #include "scrapers/GamesDBJSONScraperResources.h"
 
-#ifdef GAMESDB_APIKEY
-
 #include "FileData.h"
 #include "Log.h"
 #include "PlatformId.h"
@@ -198,6 +196,11 @@ void TheGamesDBScraper::generateRequests(const ScraperSearchParams& params,
 	std::string path = "https://api.thegamesdb.net/v1";
 	bool usingGameID = false;
 	const std::string apiKey = std::string("apikey=") + resources.getApiKey();
+
+	if (apiKey.length() <= 8)
+		return;
+	}
+
 	std::string cleanName = params.nameOverride;
 
 	if (!cleanName.empty() && cleanName.substr(0, 3) == "id:")
@@ -455,6 +458,10 @@ namespace
 		}
 
 		const std::string apiKey = std::string("apikey=") + resources.getApiKey();
+		if (apiKey.length() <= 8)
+			return;
+		}
+
 		HttpReq req("https://api.thegamesdb.net/v1/Games/Images?" + apiKey + "&games_id=" + id);
 		if (req.wait())
 		{
@@ -609,4 +616,3 @@ bool TheGamesDBJSONRequest::process(HttpReq* request, std::vector<ScraperSearchR
 	return true;
 }
 
-#endif
