@@ -450,7 +450,7 @@ namespace
 		if (boxart.HasMember("data") && boxart["data"].IsObject())
 		{
 			if (boxart["data"].HasMember(id.c_str()))
-			{ga
+			{
 				std::string image = getBoxartImage(boxart["data"][id.c_str()]);
 				if (!image.empty())
 					medias["boxart"] = baseImageUrlThumb + image;
