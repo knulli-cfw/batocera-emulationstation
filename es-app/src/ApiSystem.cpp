@@ -474,7 +474,10 @@ bool ApiSystem::launchFileManager(Window *window)
 
 bool ApiSystem::enableWifi(std::string ssid, std::string key)
 {
-	return executeScript("knulli-wifi enable \"" + ssid + "\" \"" + key + "\"");
+	ssid = Utils::String::replace(ssid, "'", "'\\''");
+	key = Utils::String::replace(key, "'", "'\\''");
+
+	return executeScript("knulli-wifi enable '" + ssid + "' '" + key + "'");
 }
 
 bool ApiSystem::disableWifi()
