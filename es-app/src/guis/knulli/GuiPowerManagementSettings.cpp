@@ -108,7 +108,7 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 		// of the power LED, even if it was changed outside of
 		// EmulationStation (e.g. via hotkey combo)
 		bool powerLedEnabled = true;
-		std::string powerLedResult = SysCalls::execute("knulli-settings-get system.power.led");
+		std::string powerLedResult = SysCalls::executeAndCatchOutput("knulli-settings-get system.power.led");
 		if (!powerLedResult.empty()) {
 			powerLedEnabled = powerLedResult == "1";
 		}
