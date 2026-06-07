@@ -15,6 +15,7 @@
 #include <algorithm>
 #include "utils/Platform.h"
 #include "CapabilityCheck.h"
+#include "syscalls/SysCalls.h"
 
 GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSettings(window, _("POWER MANAGEMENT").c_str())
 {
@@ -101,9 +102,15 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 	// Power LED toggle switch
 	auto powerLedSwitch = std::make_shared<SwitchComponent>(mWindow);
 	if (CapabilityCheck::hasCapability(CapabilityCheck::PWRLED_CAPABILITY)) {
+
+		// We purposely brute-force this directly from knulli.conf
+		// because we want to be sure to reflect the actual state
+		// of the power LED, even if it was changed outside of
+		// EmulationStation (e.g. via hotkey combo)
 		bool powerLedEnabled = true;
-		if (!SystemConf::getInstance()->get("system.power.led").empty()) {
-			powerLedEnabled = SystemConf::getInstance()->getBool("system.power.led");
+		std::string powerLedResult = SysCalls::executeAndCatchOutput("knulli-settings-get system.power.led");
+		if (!powerLedResult.empty()) {
+			powerLedEnabled = powerLedResult == "1";
 		}
 		powerLedSwitch->setState(powerLedEnabled);
 		addWithDescription(_("POWER LED"),_("Enable/disable the power LED."), powerLedSwitch);
