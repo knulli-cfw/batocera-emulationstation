@@ -112,6 +112,8 @@ GuiPowerManagementSettings::GuiPowerManagementSettings(Window* window) : GuiSett
 		if (!powerLedResult.empty()) {
 			powerLedEnabled = powerLedResult == "1";
 		}
+		// Update the ES-internal state to match the actual state of the power LED
+		SystemConf::getInstance()->setBool("system.power.led", powerLedEnabled);
 		powerLedSwitch->setState(powerLedEnabled);
 		addWithDescription(_("POWER LED"),_("Enable/disable the power LED."), powerLedSwitch);
 	}
