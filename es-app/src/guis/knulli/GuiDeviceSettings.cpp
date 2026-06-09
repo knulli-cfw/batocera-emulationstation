@@ -198,6 +198,7 @@ std::shared_ptr<OptionListComponent<std::string>> GuiDeviceSettings::createToggl
 	optionsToggleSwitchMode->add(_("MUTE/UNMUTE"), "mute", selectedToggleSwitchMode == "mute");
 	optionsToggleSwitchMode->add(_("RGB ON/OFF"), "rgboff", selectedToggleSwitchMode == "rgboff");
 	optionsToggleSwitchMode->add(_("AIRPLANE MODE ON/OFF"), "airplane", selectedToggleSwitchMode == "airplane");
+	optionsToggleSwitchMode->add(_("CUSTOM MODE ON/OFF"), "custom", selectedToggleSwitchMode == "custom");
 
     addWithDescription(_("TOGGLE SWITCH MODE"), _("Decide what to use the switch of your device for."), optionsToggleSwitchMode);
     return optionsToggleSwitchMode;
