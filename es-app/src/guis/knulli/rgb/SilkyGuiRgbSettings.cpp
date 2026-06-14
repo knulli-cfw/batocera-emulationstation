@@ -101,10 +101,10 @@ SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(w
         switchPaletteInvertSecondary->setOnChangedCallback([this]() { SilkyRgbService::applyValue("color.invert.secondary", switchPaletteInvertSecondary->getState() ? "1" : "0"); });
     
         // Palette modification options
-        if (hasRequiredSetting("color.mod")) {
-            optionListPaletteMod = createPaletteModOptionList();
-            optionListPaletteMod->setSelectedChangedCallback([this](std::string value) { SilkyRgbService::applyValue("color.mod", value); }); 
-        }
+        //if (hasRequiredSetting("color.mod")) {
+        //    optionListPaletteMod = createPaletteModOptionList();
+        //    optionListPaletteMod->setSelectedChangedCallback([this](std::string value) { SilkyRgbService::applyValue("color.mod", value); });
+        //}
         // LED Brightness Slider
         sliderLedBrightness = createSlider(_("BRIGHTNESS"), 0.f, 100.f, 10.f, "%", "", hasRequiredSetting("brightness"));
         setConfigValueForSlider(sliderLedBrightness, DEFAULT_BRIGHTNESS, "led.brightness");
@@ -179,9 +179,9 @@ SilkyGuiRgbSettings::SilkyGuiRgbSettings(Window* window) : ExtendedGuiSettings(w
         if (switchPaletteInvertSecondary != nullptr) {
             SystemConf::getInstance()->set("led.color.invert.secondary", (switchPaletteInvertSecondary->getState() ? "1" : "0"));
         }
-        if (optionListPaletteMod != nullptr) {
-            SystemConf::getInstance()->set("led.color.mod", optionListPaletteMod->getSelected());
-        }
+        //if (optionListPaletteMod != nullptr) {
+        //    SystemConf::getInstance()->set("led.color.mod", optionListPaletteMod->getSelected());
+        //}
 		SystemConf::getInstance()->saveSystemConf();
 		Scripting::fireEvent(MENU_EVENT_NAME);
 
