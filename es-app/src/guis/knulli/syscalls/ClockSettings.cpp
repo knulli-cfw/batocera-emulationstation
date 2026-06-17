@@ -6,7 +6,7 @@
 #include <ctime>
 
 ClockSettings::Clock ClockSettings::get() {
-Clock currentClock;
+    Clock currentClock;
     
     // Get current time
     auto now = std::chrono::system_clock::now();
@@ -19,33 +19,10 @@ Clock currentClock;
     currentClock.hour   = localTime->tm_hour;
     currentClock.minute = localTime->tm_min;
     
-    // Get current timezone
-    std::string fullPath = SysCalls::executeAndCatchOutput("readlink /etc/localtime");
-    std::string prefix = "/usr/share/zoneinfo/";
-    size_t pos = fullPath.find(prefix);
-    
-    if (pos != std::string::npos) {
-        // Clean up the timezone string by removing the prefix
-        std::string tz = fullPath.substr(pos + prefix.length());
-        
-        // Remove any trailing newline or carriage return characters
-        if (!tz.empty() && tz.back() == '\n') tz.pop_back();
-        if (!tz.empty() && tz.back() == '\r') tz.pop_back();
-        
-        currentClock.timezone = tz;
-    } else {
-        // Fallback to UTC if we can't determine the timezone
-        currentClock.timezone = "UTC";
-    }
     return currentClock;
 }
 
 void ClockSettings::set(const Clock& targetClock) {
-    // Update timezone
-    SysCalls::execute("rm -f /etc/localtime");
-    std::string tzCmd = "ln -s /usr/share/zoneinfo/" + targetClock.timezone + " /etc/localtime";
-    SysCalls::execute(tzCmd);
-
     // Update date/time
     std::ostringstream dateStream;
     dateStream << std::setfill('0')
@@ -60,6 +37,34 @@ void ClockSettings::set(const Clock& targetClock) {
     if (SysCalls::execute(dateCmd)) {
         SysCalls::execute("hwclock --set --date=\"now\"");
     }
+}
+
+std::string ClockSettings::getTimezone() {
+    // Get current timezone via readlink
+    std::string fullPath = SysCalls::executeAndCatchOutput("readlink /etc/localtime");
+    std::string prefix = "/usr/share/zoneinfo/";
+    size_t pos = fullPath.find(prefix);
+    
+    if (pos != std::string::npos) {
+        std::string tz = fullPath.substr(pos + prefix.length());
+        
+        // Remove any trailing newline or carriage return characters
+        if (!tz.empty() && tz.back() == '\n') tz.pop_back();
+        if (!tz.empty() && tz.back() == '\r') tz.pop_back();
+        
+        return tz;
+    }
+    
+    return "UTC";
+}
+
+std::string ClockSettings::setTimezone(const std::string& timezone) {
+    // Update timezone symlink
+    SysCalls::execute("rm -f /etc/localtime");
+    std::string tzCmd = "ln -s /usr/share/zoneinfo/" + timezone + " /etc/localtime";
+    SysCalls::execute(tzCmd);
+    
+    return timezone;
 }
 
 bool ClockSettings::synchronize() {

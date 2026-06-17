@@ -13,6 +13,8 @@ public:
 private:
 
     ClockSettings::Clock mCurrentClock;
+    std::string mCurrentTimezone;
+
     bool mSynchronized = false;
 
     std::shared_ptr<OptionListComponent<int>> optionListYear;

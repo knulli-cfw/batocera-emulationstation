@@ -14,7 +14,11 @@ GuiClockSettings::GuiClockSettings(Window* window) : ExtendedGuiSettings(window,
 {
 
     mCurrentClock = ClockSettings::get();
+    mCurrentTimezone = ClockSettings::getTimezone();
 
+    optionListTimezone = createOptionListTimezone();
+    addWithDescription(_("TIME ZONE"), _("Select your local time zone."), optionListTimezone);
+    switchClockMode12 = addSwitch(_("SHOW CLOCK IN 12-HOUR FORMAT"), "ClockMode12", true);
     addWithDescription(_("Synchronize now"), _("Attempt to synchronize date and time via internet."), nullptr, [this]
     {
         mWindow->pushGui(new GuiMsgBox(mWindow, _("SYNCHRONIZE DATE AND TIME NOW?"), _("YES"), [this]
@@ -26,7 +30,6 @@ GuiClockSettings::GuiClockSettings(Window* window) : ExtendedGuiSettings(window,
             },
             _("NO"), nullptr));
     });
-    switchClockMode12 = addSwitch(_("SHOW CLOCK IN 12-HOUR FORMAT"), "ClockMode12", true);
 
     addGroup(_("DATE"));
     optionListYear = createOptionListYear();
@@ -42,50 +45,71 @@ GuiClockSettings::GuiClockSettings(Window* window) : ExtendedGuiSettings(window,
     optionListMinute = createOptionListMinute();
     addWithDescription(_("MINUTE"), _("Set the current minute."), optionListMinute);
 
-    addGroup(_("TIMEZONE"));
-    optionListTimezone = createOptionListTimezone();
-    addWithDescription(_("TIME ZONE"), _("Select your local time zone."), optionListTimezone);
+addSaveFunc([this] {
+        bool systemConfChanged = false;
 
-    addSaveFunc([this] {
-
+        // Handle possible timezone change first
         std::string selectedTZ = optionListTimezone->getSelected();
-        if (SystemConf::getInstance()->set("system.timezone", selectedTZ)) {
-            ApiSystem::getInstance()->setTimezone(selectedTZ);
+        if (selectedTZ.empty()) {
+            selectedTZ = "UTC";
         }
 
-        if (mSynchronized) {
-            // If we already synchronized successfully, we can skip saving the new date/time as it will be overwritten by NTP sync anyway
-            return;
-        }
-        ClockSettings::Clock newClock;
-        newClock.year = optionListYear->getSelected();
-        newClock.month = optionListMonth->getSelected();
-        newClock.day = optionListDay->getSelected();
-        newClock.hour = optionListHour->getSelected();
-        newClock.minute = optionListMinute->getSelected();
-        newClock.timezone = selectedTZ;
-
-        // Sanitize the day of month based on the selected month and year (e.g. prevent setting 31st of February)
-        int maxDays = 31;
-        if (newClock.month == 4 || newClock.month == 6 || newClock.month == 9 || newClock.month == 11) {
-            maxDays = 30;
-        } else if (newClock.month == 2) {
-            // Check for leap year
-            if ((newClock.year % 4 == 0 && newClock.year % 100 != 0) || (newClock.year % 400 == 0)) {
-                maxDays = 29;
-            } else {
-                maxDays = 28;
+        // Only update timezone if it was actually changed by the user
+        if (selectedTZ != mCurrentTimezone) {
+            if (SystemConf::getInstance()->set("system.timezone", selectedTZ)) {
+                ApiSystem::getInstance()->setTimezone(selectedTZ);
+                systemConfChanged = true;
             }
+            ClockSettings::setTimezone(selectedTZ);
         }
 
-        // Adjust to valid max of month if needed
-        if (newClock.day > maxDays) {
-            newClock.day = maxDays;
+        // Check if any time value was actually modified by the user
+        int selectedYear   = optionListYear->getSelected();
+        int selectedMonth  = optionListMonth->getSelected();
+        int selectedDay    = optionListDay->getSelected();
+        int selectedHour   = optionListHour->getSelected();
+        int selectedMinute = optionListMinute->getSelected();
+
+        bool timeChanged = (selectedYear   != mCurrentClock.year  ||
+                            selectedMonth  != mCurrentClock.month ||
+                            selectedDay    != mCurrentClock.day   ||
+                            selectedHour   != mCurrentClock.hour  ||
+                            selectedMinute != mCurrentClock.minute);
+
+        // Only set the clock if NOT synchronized via NTP and at least one value was changed
+        if (!mSynchronized && timeChanged) {
+            ClockSettings::Clock newClock;
+            newClock.year = selectedYear;
+            newClock.month = selectedMonth;
+            newClock.day = selectedDay;
+            newClock.hour = selectedHour;
+            newClock.minute = selectedMinute;
+
+            // Sanitize the day of month based on the selected month and year
+            int maxDays = 31;
+            if (newClock.month == 4 || newClock.month == 6 || newClock.month == 9 || newClock.month == 11) {
+                maxDays = 30;
+            } else if (newClock.month == 2) {
+                // Check for leap year
+                if ((newClock.year % 4 == 0 && newClock.year % 100 != 0) || (newClock.year % 400 == 0)) {
+                    maxDays = 29;
+                } else {
+                    maxDays = 28;
+                }
+            }
+
+            // Adjust to valid max of month if needed
+            if (newClock.day > maxDays) {
+                newClock.day = maxDays;
+            }
+
+            ClockSettings::set(newClock);
         }
 
-        ClockSettings::set(newClock);
-        SystemConf::getInstance()->saveSystemConf();
-
+        // Save system configuration if timezone fields were modified
+        if (systemConfChanged) {
+            SystemConf::getInstance()->saveSystemConf();
+        }
     });
 }
 
@@ -166,7 +190,7 @@ std::shared_ptr<OptionListComponent<std::string>> GuiClockSettings::createOption
         
         if (availableTimezones.size() > 0)
         {
-            std::string currentTZ = mCurrentClock.timezone;
+            std::string currentTZ = mCurrentTimezone;
             if (currentTZ.empty() || !availableTimezones.any([currentTZ](const std::string& tz) { return tz == currentTZ; })) {
                 currentTZ = "UTC";
             }

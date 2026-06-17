@@ -9,10 +9,11 @@ public:
         int day;
         int hour;
         int minute;
-        std::string timezone; // z.B. "Europe/Berlin" oder "UTC"
     };
 
     static Clock get();
     static void set(const Clock& targetClock);
+    static std::string getTimezone();
+    static std::string setTimezone(const std::string& timezone);
     static bool synchronize();
 };
