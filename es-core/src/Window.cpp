@@ -396,6 +396,10 @@ void Window::layoutNotificationPopups()
 
 void Window::processSongTitleNotifications()
 {
+	// Don't initialize AudioManager if it's not already running (e.g., cached Game Switcher mode)
+	if (!AudioManager::isInitialized())
+		return;
+
 	if (AudioManager::getInstance()->songNameChanged())
 	{
 		if (Settings::getInstance()->getBool("audio.display_titles"))
@@ -1023,7 +1027,7 @@ void Window::setHelpPrompts(const std::vector<HelpPrompt>& prompts, const HelpSt
 			"up/down/left/right",
 			"up/down",
 			"left/right",
-			BUTTON_OK, "x", "y", "l", "r", BUTTON_BACK,
+			BUTTON_OK, BUTTON_BACK, "x", "y", "l", "r"
 			"start", "select",
 			NULL
 		};

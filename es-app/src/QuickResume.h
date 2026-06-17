@@ -8,4 +8,5 @@ namespace QuickResume
     bool postLaunchConditionalClean();
     bool quickResumeEnabled();
     bool shutDownInProgress();
+    void launchStartupGame();
 }

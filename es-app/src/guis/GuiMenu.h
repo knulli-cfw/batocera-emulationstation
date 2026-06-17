@@ -51,9 +51,9 @@ private:
         void openSoundSettings();
         void openUISettings();
         void openUpdatesSettings();
-        
+
         void openSystemSettings();
-        void openGamesSettings();       
+        void openGamesSettings(bool selectGameSwitcherEnable = false);       
         void openNetworkSettings(bool selectWifiEnable = false);        
         void openQuitMenu();
         void openSystemInformations();

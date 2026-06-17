@@ -60,6 +60,7 @@
 #include "GuiLoading.h"
 #include "guis/GuiBios.h"
 #include "guis/GuiKeyMappingEditor.h"
+#include "guis/GuiGameSwitcher.h"
 #include "Gamelist.h"
 #include "TextToSpeech.h"
 #include "Paths.h"
@@ -2616,9 +2617,11 @@ void GuiMenu::addFeatures(const VectorEx<CustomFeature>& features, Window* windo
 	}
 }
 
-void GuiMenu::openGamesSettings()
+void GuiMenu::openGamesSettings(bool selectGameSwitcherEnable)
 {
 	Window* window = mWindow;
+
+	bool baseGameSwitcherEnabled = Settings::getInstance()->getBool("GameSwitcherEnabled");
 
 	auto s = new GuiSettings(mWindow, _("GAME SETTINGS").c_str());
 
@@ -2715,13 +2718,37 @@ void GuiMenu::openGamesSettings()
 	s->addWithDescription(_("SHOW SAVESTATE MANAGER"), _("Display savestate manager before launching a game."), showSaveStates);
 	s->addSaveFunc([showSaveStates] { SystemConf::getInstance()->set("global.savestates", showSaveStates->getSelected()); });
 
-	// KNULLI - QUICK RESUME MODE >>>
-	// QUICK RESUME MODE
+	// Quick Resume mode
 	auto quickresume_enabled = std::make_shared<SwitchComponent>(mWindow);
 	quickresume_enabled->setState(SystemConf::getInstance()->get("global.quickresume") == "1");
 	s->addWithDescription(_("QUICK RESUME MODE"), _("If shutdown during gameplay, boots directly into game on next startup. Works with Auto Save/Load on supported emulators."), quickresume_enabled);
 	s->addSaveFunc([quickresume_enabled] { SystemConf::getInstance()->set("global.quickresume", quickresume_enabled->getState() ? "1" : ""); });
-	// KNULLI - QUICK RESUME MODE <<<
+
+	// Game Switcher enable toggle
+	auto gameSwitcherEnable = std::make_shared<SwitchComponent>(mWindow);
+	gameSwitcherEnable->setState(baseGameSwitcherEnabled);
+	s->addWithDescription(_("ENABLE GAME SWITCHER"), _("Quickly switch between recently played games using a hotkey (fn + select). Works best with Auto Save/Load and Quick Resume enabled."), gameSwitcherEnable, selectGameSwitcherEnable);
+	s->addSaveFunc([gameSwitcherEnable] {
+		Settings::getInstance()->setBool("GameSwitcherEnabled", gameSwitcherEnable->getState());
+	});
+
+	// Game Switcher Settings submenu - only visible when enabled
+	if (baseGameSwitcherEnabled)
+	{
+		s->addEntry(_("GAME SWITCHER SETTINGS"), true, [window]() { GuiGameSwitcher::openSettings(window); });
+	}
+
+	// Dynamic menu recreation when toggle changes
+	gameSwitcherEnable->setOnChangedCallback([this, s, baseGameSwitcherEnabled, gameSwitcherEnable]()
+	{
+		bool enabled = gameSwitcherEnable->getState();
+		if (baseGameSwitcherEnabled != enabled)
+		{
+			Settings::getInstance()->setBool("GameSwitcherEnabled", enabled);
+			delete s;
+			openGamesSettings(true);
+		}
+	});
 
 	s->addGroup(_("DEFAULT GLOBAL SETTINGS"));
 
@@ -3926,6 +3953,7 @@ void GuiMenu::openUISettings()
 
 	s->addGroup(_("DISPLAY OPTIONS"));
 	s->addEntry(_("SCREENSAVER SETTINGS"), true, std::bind(&GuiMenu::openScreensaverOptions, this));
+
 	s->addOptionList(_("LIST TRANSITION"), { { _("auto"), "auto" },{ _("fade"), "fade" },{ _("slide"), "slide" },{ _("fade & slide"), "fade & slide" },{ _("instant"), "instant" } }, "TransitionStyle", true);
 	s->addOptionList(_("GAME LAUNCH TRANSITION"), { { _("auto"), "auto" },{ _("fade"), "fade" },{ _("fast fade"), "fast fade" },{ _("slide"), "slide" },{ _("fast slide"), "fast slide" },{ _("instant"), "instant" } }, "GameTransitionStyle", true);
 
@@ -3983,6 +4011,8 @@ void GuiMenu::openUISettings()
 
 	mWindow->pushGui(s);
 }
+
+
 
 void GuiMenu::openSoundSettings()
 {
@@ -4200,6 +4230,16 @@ void GuiMenu::openQuitMenu_static(Window *window, bool quickAccessMenu, bool ani
 				delete s;
 
 			}, "iconScraper", true);
+
+		if (Settings::getInstance()->getBool("GameSwitcherEnabled"))
+		{
+			s->addEntry(_("GAME SWITCHER"), false, [s, window]
+				{
+					Window* w = window;
+					delete s;
+					w->pushGui(new GuiGameSwitcher(w));
+				}, "iconGamepad", true);
+		}
 
 		if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::ScriptId::PDFEXTRACTION) && Utils::FileSystem::exists(Paths::getUserManualPath()))
 		{

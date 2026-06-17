@@ -15,6 +15,7 @@
 #include "CollectionSystemManager.h"
 #include "guis/GuiMenu.h"
 #include "guis/GuiMsgBox.h"
+#include "guis/GuiGameSwitcher.h"
 #include "utils/FileSystemUtil.h"
 #include "HttpApi.h"
 #include "Settings.h"
@@ -25,7 +26,7 @@
 #include "guis/GuiUpdate.h"
 #include "ContentInstaller.h"
 
-/* 
+/*
 
 Misc APIS
 -----------------
@@ -34,6 +35,7 @@ GET  /restart
 GET  /quit
 GET  /emukill
 GET  /reloadgames
+GET  /gameswitcher                                              -> open the Game Switcher UI
 POST /messagebox												-> body must contain the message text as text/plain
 POST /notify													-> body must contain the message text as text/plain
 POST /launch													-> body must contain the exact file path as text/plain
@@ -518,7 +520,7 @@ void HttpServerThread::run()
 
 	
 	mHttpServer->Get("/reloadgames", [this](const httplib::Request& req, httplib::Response& res)
-	{	
+	{
 		if (!isAllowed(req, res))
 			return;
 
@@ -527,6 +529,40 @@ void HttpServerThread::run()
 		{
 			GuiMenu::updateGameLists(w, false);
 		});
+	});
+
+	mHttpServer->Get("/gameswitcher", [this](const httplib::Request& req, httplib::Response& res)
+	{
+		if (!isAllowed(req, res))
+			return;
+
+		if (!Settings::getInstance()->getBool("GameSwitcherEnabled"))
+		{
+			res.set_content("403 Game Switcher is disabled", "text/html");
+			res.status = 403;
+			return;
+		}
+
+		// If Game Switcher is already active, don't create another
+		if (GuiGameSwitcher::isActive())
+		{
+			res.set_content("OK - Game Switcher already active", "text/html");
+			return;
+		}
+
+		// If a game is currently running, set pending flag to show after game exits
+		if (FileData::GetRunningGame() != nullptr)
+		{
+			GuiGameSwitcher::setPendingGameSwitcher(true);
+			res.set_content("OK - Game Switcher will show after game exits", "text/html");
+			return;
+		}
+
+		// No game running - show immediately
+		GuiGameSwitcher::setPendingGameSwitcher(true);
+		Window* w = mWindow;
+		mWindow->postToUiThread([w]() { GuiGameSwitcher::showPendingGameSwitcher(w); });
+		res.set_content("OK", "text/html");
 	});
 
 	mHttpServer->Post("/messagebox", [this](const httplib::Request& req, httplib::Response& res)

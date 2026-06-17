@@ -75,7 +75,8 @@ set(ES_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiKeyboardLayout.h	
 	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiGameAchievements.h		
 	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiSaveState.h
-	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiFileBrowser.h	
+	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiGameSwitcher.h
+	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiFileBrowser.h
 	
     # Knulli-related GUIs
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/syscalls/ClockSettings.h
@@ -200,6 +201,7 @@ set(ES_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiKeyboardLayout.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiGameAchievements.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiSaveState.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiGameSwitcher.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiFileBrowser.cpp
 	
     # Knulli-related GUIs

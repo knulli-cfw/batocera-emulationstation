@@ -42,6 +42,7 @@
 #include "watchers/WatchersManager.h"
 #include "HttpReq.h"
 #include "QuickResume.h"
+#include "guis/GuiGameSwitcher.h"
 
 #ifdef WIN32
 #include <Windows.h>
@@ -428,24 +429,6 @@ void playVideo()
 	window.deinit(true);
 }
 
-void launchStartupGame()
-{
-	auto gamePath = SystemConf::getInstance()->get("global.bootgame.path");
-	if (gamePath.empty() || !Utils::FileSystem::exists(gamePath))
-		return;
-	
-	auto command = SystemConf::getInstance()->get("global.bootgame.cmd");
-	if (!command.empty())
-	{
-		InputManager::getInstance()->init();
-		command = Utils::String::replace(command, "%CONTROLLERSCONFIG%", InputManager::getInstance()->configureEmulators());
-		Utils::Platform::ProcessStartInfo(command).run();
-		// KNULLI - QUICK RESUME MODE >>>>>
-		QuickResume::postLaunchConditionalClean();
-		// KNULLI - QUICK RESUME MODE <<<<<
-	}	
-}
-
 #include "utils/MathExpr.h"
 
 int main(int argc, char* argv[])
@@ -523,12 +506,39 @@ int main(int argc, char* argv[])
 	atexit(&onExit);
 
 	// Set locale
-	setLocale(argv[0]);	
+	setLocale(argv[0]);
 
 #if !WIN32
 	if(enable_startup_game) {
-	    	// Run boot game, before Window Create for linux
-		launchStartupGame();
+		bool hadBootGame = !SystemConf::getInstance()->get("global.bootgame.path").empty();
+
+		// Run boot game, before Window Create for linux
+		QuickResume::launchStartupGame();
+
+		// Keep showing cached Game Switcher as long as hotkey flag is set
+		// This allows chaining multiple games without fully loading ES
+		const std::string gameSwitcherFlag = "/var/run/gameswitcher.flag";
+		while (Utils::FileSystem::exists(gameSwitcherFlag))
+		{
+			Utils::FileSystem::removeFile(gameSwitcherFlag);
+
+			if (Settings::getInstance()->getBool("GameSwitcherEnabled"))
+			{
+				GuiGameSwitcher::runCachedMode();
+			}
+			else
+			{
+				break;
+			}
+		}
+
+		// Boot to Game Switcher if enabled and no Quick Resume game was active
+		if (!hadBootGame &&
+			Settings::getInstance()->getBool("GameSwitcherEnabled") &&
+			Settings::getInstance()->getBool("GameSwitcherBootEnabled"))
+		{
+			GuiGameSwitcher::runCachedMode();
+		}
 	}
 #endif
 
@@ -611,6 +621,9 @@ int main(int argc, char* argv[])
 	// this makes for no delays when accessing content, but a longer startup time
 	ViewController::get()->preload();
 
+	// Apply any pending game stats from Quick Resume / cached Game Switcher
+	GuiGameSwitcher::applyPendingStats();
+
 	// Initialize input
 	InputConfig::AssignActionButtons();
 	InputManager::getInstance()->init();
@@ -637,7 +650,6 @@ int main(int argc, char* argv[])
 		AudioManager::getInstance()->changePlaylist(ViewController::get()->getState().getSystem()->getTheme());
 	else
 		AudioManager::getInstance()->playRandomMusic();
-
 
 #ifdef WIN32	
 	DWORD displayFrequency = 60;

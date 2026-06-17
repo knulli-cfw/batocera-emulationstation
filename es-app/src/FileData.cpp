@@ -31,6 +31,7 @@
 #include "TextToSpeech.h"
 #include "LocaleES.h"
 #include "guis/GuiMsgBox.h"
+#include "guis/GuiGameSwitcher.h"
 #include "Paths.h"
 #include "resources/TextureData.h"
 #include "QuickResume.h"
@@ -703,9 +704,11 @@ bool FileData::launchGame(Window* window, LaunchGameOptions options)
 	if (command.empty())
 		return false;
 
-	// KNULLI - QUICK RESUME MODE >>>>>
 	QuickResume::setQuickResume(getlaunchCommand(false), getFullPath());
-	// KNULLI - QUICK RESUME MODE <<<<<
+
+	// Save Game Switcher cache for Quick Resume mode
+	// Pass the game being launched so it's included even if never played before
+	GuiGameSwitcher::saveCache(this);
 
 	AudioManager::getInstance()->deinit();
 	VolumeControl::getInstance()->deinit();
@@ -748,9 +751,7 @@ bool FileData::launchGame(Window* window, LaunchGameOptions options)
 
 	Scripting::fireEvent("game-end");
 	
-	// KNULLI - QUICK RESUME MODE >>>>>
 	QuickResume::postLaunchConditionalClean();
-	// KNULLI - QUICK RESUME MODE <<<<<
 
 	if (!hideWindow && Settings::getInstance()->getBool("HideWindowFullReinit"))
 	{
@@ -788,6 +789,9 @@ bool FileData::launchGame(Window* window, LaunchGameOptions options)
 	}
 
 	window->reactivateGui();
+
+	// Check for pending Game Switcher request (from HTTP API while game was running)
+	GuiGameSwitcher::showPendingGameSwitcher(window);
 
 	if (system != nullptr && system->getTheme() != nullptr)
 		AudioManager::getInstance()->changePlaylist(system->getTheme(), true);

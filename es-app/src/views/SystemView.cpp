@@ -1,6 +1,7 @@
 #include "views/SystemView.h"
 
 #include "animations/LambdaAnimation.h"
+#include "guis/GuiGameSwitcher.h"
 #include "guis/GuiMsgBox.h"
 #include "views/UIModeController.h"
 #include "views/ViewController.h"
@@ -521,6 +522,11 @@ bool SystemView::input(InputConfig* config, Input input)
 
 		if (config->isMappedTo("select", input))
 		{
+			// Don't open menu if Game Switcher is about to be shown
+			// (the game switcher hotkey uses select, so this prevents a race condition)
+			if (GuiGameSwitcher::hasPendingGameSwitcher())
+				return true;
+
 			GuiMenu::openQuitMenu_static(mWindow, true);
 			return true;
 		}

@@ -26,6 +26,7 @@
 #include "guis/GuiImageViewer.h"
 #include "ApiSystem.h"
 #include "guis/GuiMsgBox.h"
+#include "guis/GuiGameSwitcher.h"
 #include "utils/ThreadPool.h"
 #include <SDL_timer.h>
 #include "TextToSpeech.h"
@@ -1368,6 +1369,9 @@ void ViewController::reloadAllGames(Window* window, bool deleteCurrentGui, bool 
 
 	window->closeSplashScreen();
 	window->pushGui(ViewController::get());
+
+	// Check for pending Game Switcher request (from HTTP API while game was running)
+	GuiGameSwitcher::showPendingGameSwitcher(window);
 }
 
 void ViewController::setActiveView(std::shared_ptr<GuiComponent> view)
