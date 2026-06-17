@@ -2,6 +2,8 @@
 #include "SysCalls.h"
 #include <iomanip>
 #include <sstream>
+#include <chrono>
+#include <ctime>
 
 ClockSettings::Clock ClockSettings::get() {
 Clock currentClock;
@@ -32,14 +34,14 @@ Clock currentClock;
         
         currentClock.timezone = tz;
     } else {
-		// Fallback to UTC if we can't determine the timezone
+        // Fallback to UTC if we can't determine the timezone
         currentClock.timezone = "UTC";
     }
     return currentClock;
 }
 
 void ClockSettings::set(const Clock& targetClock) {
-	// Update timezone
+    // Update timezone
     SysCalls::execute("rm -f /etc/localtime");
     std::string tzCmd = "ln -s /usr/share/zoneinfo/" + targetClock.timezone + " /etc/localtime";
     SysCalls::execute(tzCmd);
@@ -58,6 +60,7 @@ void ClockSettings::set(const Clock& targetClock) {
     if (SysCalls::execute(dateCmd)) {
         SysCalls::execute("hwclock --set --date=\"now\"");
     }
+}
 
 bool ClockSettings::synchronize() {
     // Simply restart the NTP service to synchronize time with configured NTP servers
@@ -67,5 +70,4 @@ bool ClockSettings::synchronize() {
         SysCalls::execute("hwclock --set --date=\"now\"");
     }
     return success;
-
 }
