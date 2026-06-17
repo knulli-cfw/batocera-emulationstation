@@ -62,6 +62,7 @@ private:
         void openDmdSettings();
         void openDeveloperSettings();
         void openDeviceSettings();
+        void openClockSettings();
         void openNetplaySettings(); 
         void openRetroachievementsSettings();
         void openMissingBiosSettings();
