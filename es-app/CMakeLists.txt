@@ -78,6 +78,7 @@ set(ES_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiFileBrowser.h	
 	
     # Knulli-related GUIs
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/syscalls/ClockSettings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/syscalls/DisplaySettings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/syscalls/SysCalls.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/syscalls/ThreadedRunner.h
@@ -85,6 +86,7 @@ set(ES_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/CapabilityCheck.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/ExtendedGuiSettings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/FactorySettings.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiClockSettings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiDeviceSettings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiDisplaySettings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiPowerManagementSettings.h
@@ -201,6 +203,7 @@ set(ES_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/guis/GuiFileBrowser.cpp
 	
     # Knulli-related GUIs
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/syscalls/ClockSettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/syscalls/DisplaySettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/syscalls/SysCalls.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/syscalls/ThreadedRunner.cpp
@@ -208,6 +211,7 @@ set(ES_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/CapabilityCheck.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/ExtendedGuiSettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/FactorySettings.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiClockSettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiDeviceSettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiDisplaySettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/guis/knulli/GuiPowerManagementSettings.cpp
