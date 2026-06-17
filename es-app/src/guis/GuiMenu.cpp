@@ -22,6 +22,7 @@
 #include "guis/GuiScraperSettings.h"
 #include "guis/GuiControllersSettings.h"
 #include "guis/knulli/GuiDeviceSettings.h"
+#include "guis/knulli/GuiClockSettings.h"
 #include "guis/knulli/ThreadedDiskCheck.h"
 #include "guis/knulli/CapabilityCheck.h"
 #include "views/UIModeController.h"
@@ -725,6 +726,11 @@ void GuiMenu::openDeviceSettings()
 	mWindow->pushGui(new GuiDeviceSettings(mWindow));
 }
 
+void GuiMenu::openClockSettings()
+{
+    mWindow->pushGui(new GuiClockSettings(mWindow));
+}
+
 void GuiMenu::openDeveloperSettings()
 {
 	Window *window = mWindow;
@@ -1402,6 +1408,10 @@ void GuiMenu::openSystemSettings()
 		}
 	});
 
+#ifdef KNULLI
+    // Für Knulli wandert alles gesammelt in dein neues Untermenü
+    s->addEntry(_("DATE & TIME SETTINGS"), true, [this] { openClockSettings(); });
+#else
 	// Timezone
 	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::ScriptId::TIMEZONES))
 	{
@@ -1428,6 +1438,7 @@ void GuiMenu::openSystemSettings()
 
 	// Clock time format (14:42 or 2:42 pm)
 	s->addSwitch(_("SHOW CLOCK IN 12-HOUR FORMAT"), "ClockMode12", true);
+#endif
 
 	// power saver
 	auto power_saver = std::make_shared< OptionListComponent<std::string> >(mWindow, _("POWER SAVING MODE"), false);
