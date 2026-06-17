@@ -1409,8 +1409,7 @@ void GuiMenu::openSystemSettings()
 	});
 
 #ifdef KNULLI
-    // Für Knulli wandert alles gesammelt in dein neues Untermenü
-    s->addEntry(_("DATE & TIME SETTINGS"), true, [this] { openClockSettings(); });
+    s->addEntry(_("DATE AND TIME SETTINGS"), true, [this] { openClockSettings(); });
 #else
 	// Timezone
 	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::ScriptId::TIMEZONES))
