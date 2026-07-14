@@ -7,5 +7,5 @@ class Window;
 class GuiRetroAchievementsSettings : public GuiSettings
 {
 public:
-	GuiRetroAchievementsSettings(Window* window);
+	GuiRetroAchievementsSettings(Window* window, bool focusProxyRow = false);
 };

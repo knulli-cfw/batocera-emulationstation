@@ -111,6 +111,7 @@ public:
 	virtual const bool getFavorite() const;
 	virtual const bool getKidGame() const;
 	virtual const bool hasCheevos();
+	const bool hasCheevosCached();
 
 	bool hasAnyMedia();
 	std::vector<std::string> getFileMedias();
