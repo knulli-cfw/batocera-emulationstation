@@ -23,6 +23,10 @@
 #include "GuiGameAchievements.h"
 #include "guis/GuiGameOptions.h"
 #include "views/gamelist/ISimpleGameListView.h"
+#include "GuiLoading.h"
+#include "RAOfflineProxy.h"
+#include "SystemConf.h"
+#include <fstream>
 
 std::vector<std::string> GuiGamelistOptions::gridSizes {
 	"automatic", 
@@ -275,6 +279,52 @@ GuiGamelistOptions::GuiGamelistOptions(Window* window, IGameListView* gamelist, 
 				}
 					
 				mMenu.addEntry(_("ADVANCED SYSTEM OPTIONS"), true, [this, sysOptions] { GuiMenu::popSystemConfigurationGui(mWindow, sysOptions); });
+			}
+		}
+
+		if (RAOfflineProxy::isActive() && SystemConf::getInstance()->getBool("global.retroachievements") && !fromPlaceholder && !isInRelevancyMode)
+		{
+			std::vector<std::string> romsToCache;
+			for (auto entry : getGamelist()->getFileDataEntries())
+				if (entry->getType() == GAME && entry->hasCheevos() && !entry->hasCheevosCached())
+					romsToCache.push_back(entry->getSourceFileData()->getPath());
+
+			if (!romsToCache.empty())
+			{
+				Window* window = mWindow;
+				SystemData* listSystem = mSystem;
+
+				mMenu.addGroup(_("RETROACHIEVEMENTS"));
+				mMenu.addEntry(_U("\uF500 ") + _("CACHE ACHIEVEMENTS FOR OFFLINE PLAY") + " (" + std::to_string(romsToCache.size()) + ")", false, [window, listSystem, romsToCache, this]
+				{
+					std::string listPath = "/tmp/raofflineproxy-cache-list.txt";
+
+					std::ofstream listFile(listPath, std::ios::trunc);
+					for (auto& romPath : romsToCache)
+						listFile << romPath << "\n";
+					listFile.close();
+
+					std::string command = RAOfflineProxy::launcherPath() + " cache-roms --paths-file " + listPath;
+					window->pushGui(new GuiLoading<int>(window, _("CACHING ACHIEVEMENT DATA"),
+						[command](IGuiLoadingHandler* gui)
+						{
+							return RAOfflineProxy::runCommand(command, [gui](const std::string& line)
+							{
+								if (Utils::String::startsWith(line, "OK ") || Utils::String::startsWith(line, "FAIL "))
+									gui->setText(line);
+							});
+						},
+						[window, listSystem](int exitCode)
+						{
+							RAOfflineProxy::invalidateCachedIds();
+							ViewController::get()->reloadGameListView(listSystem);
+							window->displayNotificationMessage(exitCode == 0 ?
+								_U("\uF091 ") + _("OFFLINE ACHIEVEMENT CACHING FINISHED") :
+								_U("\uF071 ") + _("OFFLINE ACHIEVEMENT CACHING FAILED"));
+						}));
+
+					delete this;
+				});
 			}
 		}
 	}

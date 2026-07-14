@@ -26,6 +26,8 @@
 #include "SaveStateRepository.h"
 #include "guis/GuiSaveState.h"
 #include "SystemConf.h"
+#include "GuiLoading.h"
+#include "RAOfflineProxy.h"
 
 GuiGameOptions::GuiGameOptions(Window* window, FileData* game) : GuiComponent(window),
 	mMenu(window, game->getName()), mReloadAll(false)
@@ -131,6 +133,56 @@ GuiGameOptions::GuiGameOptions(Window* window, FileData* game) : GuiComponent(wi
 				mMenu.addEntry(_("VIEW THIS GAME'S ACHIEVEMENTS"), false, [window, game, this]
 				{
 					GuiGameAchievements::show(window, Utils::String::toInteger(game->getMetadata(MetaDataId::CheevosId)));
+					close();
+				});
+			}
+		}
+
+		if (hasCheevos && game->getType() == GAME && RAOfflineProxy::isActive())
+		{
+			int cheevosId = Utils::String::toInteger(game->getMetadata(MetaDataId::CheevosId));
+			SystemData* system = mSystem;
+
+			if (game->hasCheevosCached())
+			{
+				mMenu.addEntry(_U("\uF500 ") + _("REMOVE OFFLINE ACHIEVEMENT DATA"), false, [window, cheevosId, system, this]
+				{
+					std::string command = RAOfflineProxy::launcherPath() + " remove-cached-game --game-id " + std::to_string(cheevosId);
+					window->pushGui(new GuiLoading<int>(window, _("PLEASE WAIT"),
+						[command](auto gui)
+						{
+							return RAOfflineProxy::runCommand(command, nullptr) == 0 ? 1 : 0;
+						},
+						[window, system](int exitCode)
+						{
+							RAOfflineProxy::invalidateCachedIds();
+							ViewController::get()->reloadGameListView(system);
+							window->displayNotificationMessage(exitCode == 1 ?
+								_U("\uF091 ") + _("OFFLINE ACHIEVEMENT DATA REMOVED") :
+								_U("\uF071 ") + _("FAILED TO REMOVE OFFLINE ACHIEVEMENT DATA"));
+						}));
+					close();
+				});
+			}
+			else
+			{
+				std::string romPath = game->getSourceFileData()->getPath();
+				mMenu.addEntry(_U("\uF500 ") + _("CACHE ACHIEVEMENTS FOR OFFLINE PLAY"), false, [window, romPath, system, this]
+				{
+					std::string command = RAOfflineProxy::launcherPath() + " cache-rom --path " + RAOfflineProxy::quoteShellArgument(romPath);
+					window->pushGui(new GuiLoading<int>(window, _("CACHING ACHIEVEMENT DATA"),
+						[command](auto gui)
+						{
+							return RAOfflineProxy::runCommand(command, nullptr) == 0 ? 1 : 0;
+						},
+						[window, system](int exitCode)
+						{
+							RAOfflineProxy::invalidateCachedIds();
+							ViewController::get()->reloadGameListView(system);
+							window->displayNotificationMessage(exitCode == 1 ?
+								_U("\uF091 ") + _("ACHIEVEMENTS ARE NOW AVAILABLE OFFLINE") :
+								_U("\uF071 ") + _("CACHING FAILED - CHECK NETWORK AND LOGIN"));
+						}));
 					close();
 				});
 			}

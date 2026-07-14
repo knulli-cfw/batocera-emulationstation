@@ -8,8 +8,10 @@
 #include "guis/GuiMsgBox.h"
 #include "components/SwitchComponent.h"
 #include "components/OptionListComponent.h"
+#include "components/TextComponent.h"
+#include "RAOfflineProxy.h"
 
-GuiRetroAchievementsSettings::GuiRetroAchievementsSettings(Window* window) : GuiSettings(window, _("RETROACHIEVEMENT SETTINGS").c_str())
+GuiRetroAchievementsSettings::GuiRetroAchievementsSettings(Window* window, bool focusProxyRow) : GuiSettings(window, _("RETROACHIEVEMENT SETTINGS").c_str())
 {
 	addGroup(_("SETTINGS"));
 
@@ -30,7 +32,46 @@ GuiRetroAchievementsSettings::GuiRetroAchievementsSettings(Window* window) : Gui
 
 	addGroup(_("OPTIONS"));
 
-	addSwitch(_("HARDCORE MODE"), _("Disable loading states, rewind and cheats for more points."), "global.retroachievements.hardcore", false, nullptr);
+	bool raopActive = RAOfflineProxy::isServiceActive();
+	bool proxyEnabled = SystemConf::getInstance()->getBool("global.retroachievements.proxy", true);
+	bool proxyRouting = raopActive && proxyEnabled;
+
+	if (raopActive)
+	{
+		auto raop_proxy = std::make_shared<SwitchComponent>(mWindow);
+		raop_proxy->setState(proxyEnabled);
+		addWithDescription(_("USE OFFLINE PROXY"), _("Route RetroAchievements through RAOfflineProxy for offline play and casual unlocks. Turn off to connect directly."), raop_proxy, focusProxyRow);
+		addSaveFunc([raop_proxy]
+		{
+			SystemConf::getInstance()->setBool("global.retroachievements.proxy", raop_proxy->getState());
+		});
+
+		// rebuild the screen on toggle so the hardcore row updates instantly;
+		// deferred to the next UI tick because close() deletes the switch that
+		// is still handling this input event
+		raop_proxy->setOnChangedCallback([this, window, comp = raop_proxy.get()]
+		{
+			SystemConf::getInstance()->setBool("global.retroachievements.proxy", comp->getState());
+			window->postToUiThread([this, window]
+			{
+				window->pushGui(new GuiRetroAchievementsSettings(window, true));
+				close();
+			});
+		});
+	}
+
+	if (proxyRouting)
+	{
+		// The offline proxy is casual-only: hardcore is force-disabled while it routes.
+		auto theme = ThemeData::getMenuTheme();
+		auto hardcore_locked = std::make_shared<TextComponent>(mWindow, _U("\uF023  ") + _("DISABLED"), theme->Text.font, theme->Text.color);
+		hardcore_locked->setOpacity(110);
+		addWithDescription(_("HARDCORE MODE"), _("Not available while the offline proxy is active (casual mode only)."), hardcore_locked);
+		addSaveFunc([] { SystemConf::getInstance()->set("global.retroachievements.hardcore", "0"); });
+	}
+	else
+		addSwitch(_("HARDCORE MODE"), _("Disable loading states, rewind and cheats for more points."), "global.retroachievements.hardcore", false, nullptr);
+
 	addSwitch(_("LEADERBOARDS"), _("Compete in high-score and best time leaderboards (requires hardcore)."), "global.retroachievements.leaderboards", false, nullptr);
 	addSwitch(_("VERBOSE MODE"), _("Show achievement progression on game launch and other notifications."), "global.retroachievements.verbose", false, nullptr);
 	addSwitch(_("RICH PRESENCE"), "global.retroachievements.richpresence", false);

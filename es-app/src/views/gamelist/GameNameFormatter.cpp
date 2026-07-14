@@ -14,6 +14,7 @@
 #define FAVORITEICON _U("\uF006 ")
 
 #define CHEEVOSICON _U("\uF091")
+#define CHEEVOSCACHEDICON _U("\uF091 \uF500")
 #define SAVESTATE	_U("\uF0C7")
 #define MANUAL		_U("\uF02D")
 
@@ -211,7 +212,7 @@ std::string GameNameFormatter::getDisplayName(FileData* fd, bool showFolderIcon)
 		after.push_back(SPINNER);
 
 	if (mShowCheevosIcon && fd->hasCheevos())
-		after.push_back(CHEEVOSICON);
+		after.push_back(fd->hasCheevosCached() ? CHEEVOSCACHEDICON : CHEEVOSICON);
 
 	bool saves = mShowSaveStates && fd->getSourceFileData()->getSystem()->getSaveStateRepository()->hasSaveStates(fd);
 	if (saves)

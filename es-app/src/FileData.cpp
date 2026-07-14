@@ -34,6 +34,7 @@
 #include "Paths.h"
 #include "resources/TextureData.h"
 #include "QuickResume.h"
+#include "RAOfflineProxy.h"
 
 using namespace Utils::Platform;
 
@@ -252,6 +253,14 @@ const bool FileData::hasCheevos()
 		return getSourceFileData()->getSystem()->isCheevosSupported();
 
 	return false;
+}
+
+const bool FileData::hasCheevosCached()
+{
+	if (!hasCheevos())
+		return false;
+
+	return RAOfflineProxy::isGameCached(Utils::String::toInteger(getMetadata(MetaDataId::CheevosId)));
 }
 
 bool FileData::hasAnyMedia()
