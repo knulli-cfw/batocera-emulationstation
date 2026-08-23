@@ -50,6 +50,7 @@ CPackSourceConfig.cmake
 # batocera
 # po backup
 *.po~
+*.po.tmp
 /.vs/
 *.sqlite
 .DS_Store
