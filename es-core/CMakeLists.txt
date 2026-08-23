@@ -138,6 +138,10 @@ set(CORE_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/src/watchers/WatchersManager.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/watchers/BatteryLevelWatcher.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/watchers/NetworkStateWatcher.h
+
+	# Knulli Syncthing Integration
+	${CMAKE_CURRENT_SOURCE_DIR}/src/watchers/SyncthingWatcher.h
+	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/SyncthingUtil.h
 )
 
 set(CORE_SOURCES	
@@ -268,6 +272,10 @@ set(CORE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/watchers/WatchersManager.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/watchers/BatteryLevelWatcher.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/watchers/NetworkStateWatcher.cpp
+
+	# Knulli Syncthing Integration
+	${CMAKE_CURRENT_SOURCE_DIR}/src/watchers/SyncthingWatcher.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/SyncthingUtil.cpp
 )
 
 # Keep Directory structure in Visual Studio

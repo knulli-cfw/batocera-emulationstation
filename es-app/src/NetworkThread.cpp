@@ -10,6 +10,7 @@
 #include "watchers/BatteryLevelWatcher.h"
 #include "watchers/NetworkStateWatcher.h"
 #include "RetroAchievements.h"
+#include "watchers/SyncthingWatcher.h"
 
 NetworkThread::NetworkThread(Window* window) : mWindow(window)
 {
@@ -18,7 +19,8 @@ NetworkThread::NetworkThread(Window* window) : mWindow(window)
 	mgr->RegisterComponent(&mCheckCheevosTokenComponent);
 	mgr->RegisterComponent(new BatteryLevelWatcher());
 	mgr->RegisterComponent(new NetworkStateWatcher());
-
+	mgr->RegisterComponent(new SyncthingWatcher(mWindow));
+	
 	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::UPGRADE))
 		mgr->RegisterComponent(&mCheckUpdatesComponent);
 

@@ -34,6 +34,7 @@
 #include "Paths.h"
 #include "resources/TextureData.h"
 #include "views/gamelist/GameNameFormatter.h"
+#include "QuickResume.h"
 
 using namespace Utils::Platform;
 
@@ -703,6 +704,10 @@ bool FileData::launchGame(Window* window, LaunchGameOptions options)
 	if (command.empty())
 		return false;
 
+	// KNULLI - QUICK RESUME MODE >>>>>
+	QuickResume::setQuickResume(getlaunchCommand(false), getFullPath());
+	// KNULLI - QUICK RESUME MODE <<<<<
+
 	AudioManager::getInstance()->deinit();
 	VolumeControl::getInstance()->deinit();
 
@@ -745,6 +750,10 @@ bool FileData::launchGame(Window* window, LaunchGameOptions options)
 		Utils::FileSystem::removeFile(p2kConv);
 
 	Scripting::fireEvent("game-end");
+	
+	// KNULLI - QUICK RESUME MODE >>>>>
+	QuickResume::postLaunchConditionalClean();
+	// KNULLI - QUICK RESUME MODE <<<<<
 
 	if (!hideWindow && Settings::getInstance()->getBool("HideWindowFullReinit"))
 	{

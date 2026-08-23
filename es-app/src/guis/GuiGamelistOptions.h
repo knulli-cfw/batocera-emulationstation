@@ -4,6 +4,7 @@
 
 #include "components/MenuComponent.h"
 #include "components/OptionListComponent.h"
+#include "components/SwitchComponent.h"
 #include "FileData.h"
 #include "GuiComponent.h"
 
@@ -46,6 +47,7 @@ private:
 
 	typedef OptionListComponent<unsigned int> SortList;
 	std::shared_ptr<SortList> mListSort;
+	std::shared_ptr<SwitchComponent> mSwitchUnlimitedRecursiveDepth;
 
 	std::shared_ptr<GuiComponent> mTextFilter;
 

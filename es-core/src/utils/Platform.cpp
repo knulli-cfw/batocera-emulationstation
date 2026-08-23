@@ -26,6 +26,8 @@
 #include <fstream>
 #include <string>
 #include "renderers/Renderer.h"
+#include <cctype>
+#include <algorithm>
 
 // #define DEVTEST
 
@@ -197,7 +199,11 @@ namespace Utils
 #ifdef WIN32 // windows
 			return system("shutdown -s -t 0");
 #else // osx / linux
-		return system("shutdown -P -h now");
+			if (Utils::FileSystem::exists("/usr/bin/knulli-shutdown")) {
+					return system("/usr/bin/knulli-shutdown -s");
+				} else {
+					return system("shutdown -Ph now");
+				}
 #endif
 		}
 
@@ -206,7 +212,11 @@ namespace Utils
 #ifdef WIN32 // windows
 			return system("shutdown -r -t 0");
 #else // osx / linux
-			return system("shutdown -r now");
+			if (Utils::FileSystem::exists("/usr/bin/knulli-shutdown")) {
+				return system("/usr/bin/knulli-shutdown -r");
+			} else {
+				return system("shutdown -r now");
+			}
 #endif
 		}
 
@@ -384,6 +394,51 @@ namespace Utils
 			ret.hasBattery = false;
 			ret.isCharging = false;
 			ret.level = 0;
+			bool percentSetFromFile = false;
+
+#ifdef KNULLI
+{
+	// Prefer batteryplus (/tmp/battery.percent) over sysfs
+	static int s_lastPercent = -1;
+
+	const std::string pctPath = "/tmp/battery.percent";
+	if (Utils::FileSystem::exists(pctPath)) {
+		std::string s = Utils::FileSystem::readAllText(pctPath);
+
+		// Strip all trailing whitespaces
+		while (!s.empty() && std::isspace(static_cast<unsigned char>(s.back()))) {
+			s.pop_back();
+		}
+
+		bool isPercentValid = false;
+		int val = 0;
+
+		if (!s.empty() &&
+			std::all_of(s.begin(), s.end(), [](unsigned char c) {
+				return std::isdigit(c);
+			}))
+		{
+			int parsed = Utils::String::toInteger(s);
+			if (parsed >= 0 && parsed <= 100) {
+				val = parsed;
+				isPercentValid = true;
+			}
+		}
+
+		if (isPercentValid) {
+			s_lastPercent = val;
+		}
+
+		// If we have at least one good sample always use it and skip sysfs percent
+		if (s_lastPercent >= 0) {
+			ret.hasBattery = true;
+			ret.level = s_lastPercent;
+			percentSetFromFile = true;
+		}
+	}
+	// If the file does not exist sysfs will be used
+}
+#endif
 
 #ifdef DEVTEST
 			ret.hasBattery = true;
@@ -438,6 +493,10 @@ namespace Utils
 
 					// Qualcomm devices use "qcom-battery"
 					if ((Utils::String::toLower(file).find("/qcom-battery") != std::string::npos) && (batteryRootPath.empty()))
+						batteryRootPath = file;
+
+					// Allwinner H700 devices use "axp2202-battery"
+					if ((Utils::String::toLower(file).find("/axp2202-battery") != std::string::npos) && (batteryRootPath.empty()))
 						batteryRootPath = file;
 
 					if ((Utils::String::toLower(file).find("fuel") != std::string::npos) && (fuelgaugeRootPath.empty()))
@@ -501,31 +560,37 @@ namespace Utils
 				{
 					if ((!batteryCurrChargePath.empty()) && (!batteryMaxChargePath.empty()))
 					{
-						float now = std::stof(Utils::FileSystem::readAllText(batteryCurrChargePath).c_str());
-						float full = std::stof(Utils::FileSystem::readAllText(batteryMaxChargePath).c_str());
-						ret.level = int(round((now / full) * 100));
+						if (!percentSetFromFile)
+						{
+							float now = std::stof(Utils::FileSystem::readAllText(batteryCurrChargePath).c_str());
+							float full = std::stof(Utils::FileSystem::readAllText(batteryMaxChargePath).c_str());
+							ret.level = int(round((now / full) * 100));
+						}
 					}
 				}
 				else
 				{
-					std::ifstream file(batteryCapacityPath);
-					if (file.is_open())
+					if (!percentSetFromFile)
 					{
-						std::string buffer;
-						std::getline(file, buffer);
-						file.close();
-						if (!buffer.empty())
+						std::ifstream file(batteryCapacityPath);
+						if (file.is_open())
 						{
-							ret.level = Utils::String::toInteger(buffer);
+							std::string buffer;
+							std::getline(file, buffer);
+							file.close();
+							if (!buffer.empty())
+							{
+								ret.level = Utils::String::toInteger(buffer);
+							}
+							else
+							{
+								LOG(LogError) << "Error reading: " << batteryCapacityPath;
+							}
 						}
 						else
 						{
-							LOG(LogError) << "Error reading: " << batteryCapacityPath;
+							LOG(LogError) << "Error opening: " << batteryCapacityPath;
 						}
-					}
-					else
-					{
-						LOG(LogError) << "Error opening: " << batteryCapacityPath;
 					}
 				}
 			}

@@ -6,6 +6,7 @@
 #include "guis/GuiMsgBox.h"
 #include "Gamelist.h"
 #include "Log.h"
+#include "Scripting.h"
 
 #define GUIICON _U("\uF03E ")
 
@@ -22,6 +23,8 @@ ThreadedScraper::ThreadedScraper(Window* window, const std::queue<ScraperSearchP
 
 void ThreadedScraper::Process()
 {
+	Scripting::fireEvent("scraper-start");
+
 	mWndNotification = mWindow->createAsyncNotificationComponent();
 	mWndNotification->updateTitle(GUIICON + _("SCRAPING"));
 
@@ -53,6 +56,8 @@ void ThreadedScraper::ProcessNextGame(ScraperThread* thread)
 
 ThreadedScraper::~ThreadedScraper()
 {
+	Scripting::fireEvent("scraper-stop");
+
 	mWndNotification->close();
 	mWndNotification = nullptr;
 
@@ -142,7 +147,7 @@ int ScraperThread::updateState()
 
 void ThreadedScraper::processError(int status, const std::string statusString)
 {
-	if (status == HttpReq::REQ_430_TOOMANYSCRAPS || status == HttpReq::REQ_430_TOOMANYFAILURES || 
+	if (status == HttpReq::REQ_430_TOOMANYSCRAPS || status == HttpReq::REQ_430_TOOMANYFAILURES ||
 		status == HttpReq::REQ_426_BLACKLISTED || status == HttpReq::REQ_FILESTREAM_ERROR || status == HttpReq::REQ_426_SERVERMAINTENANCE ||
 		status == HttpReq::REQ_403_BADLOGIN || status == HttpReq::REQ_401_FORBIDDEN)
 	{
@@ -166,7 +171,7 @@ void ThreadedScraper::run()
 				std::this_thread::sleep_for(std::chrono::milliseconds(500));
 			}
 		}
-		
+
 		for (auto iter = mScraperThreads.cbegin(); iter != mScraperThreads.cend(); ++iter)
 		{
 			if (mExitCode != ASYNC_IN_PROGRESS)
@@ -196,7 +201,7 @@ void ThreadedScraper::run()
 				if (!mSearchQueue.empty())
 					ProcessNextGame(mScraperThread);
 				else
-				{					
+				{
 					mScraperThreads.erase(iter);
 					if (mScraperThreads.size() == 0)
 					{
@@ -208,7 +213,7 @@ void ThreadedScraper::run()
 			}
 		}
 	}
-	
+
 	if (mExitCode == ASYNC_DONE)
 		mWindow->displayNotificationMessage(GUIICON + _("SCRAPING FINISHED") + std::string(". ") + _("UPDATE GAMELISTS TO APPLY CHANGES."));
 
@@ -222,7 +227,7 @@ void ThreadedScraper::updateUI()
 	if (remaining < 0)
 		remaining = 0;
 
-	std::string idx = std::to_string(remaining) + "/" + std::to_string(mTotal);	
+	std::string idx = std::to_string(remaining) + "/" + std::to_string(mTotal);
 	int percentDone = remaining * 100 / (mTotal + 1);
 
 	mWndNotification->updateTitle(GUIICON + _("SCRAPING") + " " + idx);
@@ -236,7 +241,7 @@ void ThreadedScraper::acceptResult(ScraperThread& thread)
 
 	ScraperSearchResult& result = thread.getResult();
 	if (result.mdl.getName().empty())
-	{		
+	{
 		auto scraperName = Scraper::getScraperName(Scraper::getScraper());
 		thread.getSearchParams().game->getMetadata().setScrapeDate(scraperName);
 		return;

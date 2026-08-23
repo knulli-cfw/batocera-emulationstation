@@ -4,12 +4,16 @@
 #include <condition_variable>
 #include <mutex>
 #include <list>
+#include <chrono>
 
 class WatchersManager;
 
 class IWatcher
 {
 	friend class WatchersManager;
+
+public:
+	virtual void handleEvent(const std::string& event, const std::string& value) {};
 
 protected:
 	virtual bool enabled() = 0;
@@ -43,6 +47,8 @@ public:
 		return nullptr;
 	}
 
+	static void FireEvent(const std::string& event, const std::string& value);
+
 	static void RegisterComponent(IWatcher* instance);
 	static void UnregisterComponent(IWatcher* instance);
 
@@ -63,10 +69,10 @@ private:
 
 	struct WatcherInfo
 	{
-		WatcherInfo() { component = nullptr; nextCheckTime = 0; }
+		WatcherInfo() { component = nullptr; nextCheckTime = std::chrono::steady_clock::now(); }
 
 		IWatcher*	component;
-		int			nextCheckTime;
+		std::chrono::time_point<std::chrono::steady_clock>	nextCheckTime;
 	};
 
 	void NotifyComponentChanged(IWatcher* component);

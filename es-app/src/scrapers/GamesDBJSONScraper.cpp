@@ -4,8 +4,6 @@
 #include "scrapers/GamesDBJSONScraper.h"
 #include "scrapers/GamesDBJSONScraperResources.h"
 
-#ifdef GAMESDB_APIKEY
-
 #include "FileData.h"
 #include "Log.h"
 #include "PlatformId.h"
@@ -199,6 +197,11 @@ void TheGamesDBScraper::generateRequests(const ScraperSearchParams& params,
 	std::string path = "https://api.thegamesdb.net/v1";
 	bool usingGameID = false;
 	const std::string apiKey = std::string("apikey=") + resources.getApiKey();
+
+	if (apiKey.length() <= 8) {
+		return;
+	}
+
 	std::string cleanName = params.nameOverride;
 
 	if (!cleanName.empty() && cleanName.substr(0, 3) == "id:")
@@ -552,6 +555,12 @@ namespace
 
 void TheGamesDBJSONRequest::preProcess(const std::string& response)
 {
+
+	const std::string apiKey = std::string("apikey=") + resources.getApiKey();
+	if (apiKey.length() <= 8) {
+		return;
+	}
+
 	Document doc;
 	doc.Parse(response.c_str());
 	
@@ -567,7 +576,6 @@ void TheGamesDBJSONRequest::preProcess(const std::string& response)
 			continue;
 		
 		std::string id = std::to_string(game["id"].GetInt());
-		const std::string apiKey = std::string("apikey=") + resources.getApiKey();
 		mDependencyQueue.push(std::pair<std::string, std::string>(id, "https://api.thegamesdb.net/v1/Games/Images?" + apiKey + "&games_id=" + id));		
 	}
 }
@@ -630,4 +638,3 @@ bool TheGamesDBJSONRequest::process(const std::string& response, std::vector<Scr
 	return true;
 }
 
-#endif

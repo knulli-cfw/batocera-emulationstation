@@ -121,6 +121,7 @@ InputConfig::InputConfig(int deviceId, int deviceIndex, const std::string& devic
 {
 	mBatteryLevel = -1;
 	mIsWheel = false;
+	mIsInternal = false;
 	mDeviceParentSysPath = "";
 #ifdef HAVE_UDEV
 	mIsWheel = isWheel(devicePath);
@@ -279,6 +280,10 @@ void InputConfig::loadFromXML(pugi::xml_node& node)
 {
 	clear();
 
+	// Determine whether the input device is an internal input device (e.g. built-in handheld controls)
+	pugi::xml_attribute attributeInternal = node.attribute("internal");
+	mIsInternal = attributeInternal.as_bool();
+
 	for(pugi::xml_node input = node.child("input"); input; input = input.next_sibling("input"))
 	{
 		std::string name = input.attribute("name").as_string();
@@ -322,6 +327,9 @@ void InputConfig::writeToXML(pugi::xml_node& parent)
 	}
 
 	cfg.append_attribute("deviceGUID") = mDeviceGUID.c_str();
+	if (mIsInternal) {
+		cfg.append_attribute("internal") = "1";
+	}
 
 	typedef std::map<std::string, Input>::const_iterator it_type;
 	for(it_type iterator = mNameMap.cbegin(); iterator != mNameMap.cend(); iterator++)

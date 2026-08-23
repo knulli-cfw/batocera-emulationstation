@@ -1,0 +1,205 @@
+#include "guis/knulli/GuiDeviceSettings.h"
+#include "guis/knulli/ExtendedGuiSettings.h"
+#include "guis/knulli/FactorySettings.h"
+#include "guis/knulli/GuiDisplaySettings.h"
+#include "guis/knulli/GuiPowerManagementSettings.h"
+#include "guis/knulli/rgb/SilkyGuiRgbSettings.h"
+#include "guis/knulli/rgb/SilkyRgbService.h"
+#include "guis/knulli/Pico8Installer.h"
+#include "guis/knulli/PortMasterInstaller.h"
+#include "guis/knulli/ThreadedSyncthing.h"
+#include "guis/knulli/syscalls/DisplaySettings.h"
+#include "components/OptionListComponent.h"
+#include "components/SliderComponent.h"
+#include "components/SwitchComponent.h"
+#include "guis/GuiMsgBox.h"
+#include "views/UIModeController.h"
+#include "views/ViewController.h"
+#include "SystemConf.h"
+#include "ApiSystem.h"
+#include "InputManager.h"
+#include "AudioManager.h"
+#include <SDL_events.h>
+#include <algorithm>
+#include "utils/Platform.h"
+#include "BoardCheck.h"
+#include "CapabilityCheck.h"
+#include "UsbService.h"
+#include "utils/SyncthingUtil.h"
+
+const std::vector<std::string> BOARDS_WITH_TOGGLE_SWITCH = {"trimui-brick", "trimui-smart-pro"};
+
+constexpr const char* DEFAULT_USB_MODE = "off";
+constexpr const char* DEFAULT_SWITCH_MODE = "mute";
+
+GuiDeviceSettings::GuiDeviceSettings(Window* window) : ExtendedGuiSettings(window, _("DEVICE SETTINGS").c_str())
+{
+	addGroup(_("POWER SAVING AND BATTERY LIFE"));
+	addEntry(_("POWER MANAGEMENT"), true, [this] { openPowerManagementSettings(); });
+	if(CapabilityCheck::hasCapability(CapabilityCheck::RGB_CAPABILITY) || BoardCheck::isBoard(BOARDS_WITH_TOGGLE_SWITCH) || DisplaySettings::hasDisplaySettings()) {
+		addGroup(_("DEVICE CUSTOMIZATION"));
+		// Only add Display Settings if display settings are supported on this device.
+		if(DisplaySettings::hasDisplaySettings()) {
+			addEntry(_("DISPLAY SETTINGS"), true, [this] { openDisplaySettings(); });
+		}
+		if(CapabilityCheck::hasCapability(CapabilityCheck::RGB_CAPABILITY)) {
+			addEntry(_("RGB LED SETTINGS"), true, [this] { openRgbLedSettings(); });
+		}
+		if(BoardCheck::isBoard(BOARDS_WITH_TOGGLE_SWITCH)) {
+			optionsToggleSwitchMode = createToggleSwitchModeOptionList();
+	
+			addSaveFunc([this] {
+				// Set the toggle Switch mode in batocera.conf
+				SystemConf::getInstance()->set("system.toggleswitch.mode", optionsToggleSwitchMode->getSelected());
+				SystemConf::getInstance()->saveSystemConf();
+			});
+	
+		}
+	}
+
+	if(SyncthingUtil::isEnabled()) {
+		addGroup(_("SYNCTHING"));
+
+		addWithDescription(_("Synchronize now"), _("Attempt to synchronize your devices with Syncthing."), nullptr, [this]
+		{
+			if (ThreadedSyncthing::isRunning())
+				mWindow->pushGui(new GuiMsgBox(mWindow, _("SYNCHRONIZATION IS ALREADY RUNNING.")));
+			else
+			{
+				mWindow->pushGui(new GuiMsgBox(mWindow, _("SYNCHRONIZE NOW?"), _("YES"), [this]
+					{
+						ThreadedSyncthing::start(mWindow);
+					},
+					_("NO"), nullptr));
+			}
+		});
+
+		addWithDescription(_("Reload configuration"), _("If you changed your Syncthing configuration recently, you can reload it here."), nullptr, [this]
+		{
+			if (SyncthingUtil::getInstance().reloadConfig()) {
+				mWindow->pushGui(new GuiMsgBox(mWindow, _("SYNCTHING CONFIGURATION RELOADED SUCCESSFULLY.")));
+			 } else {
+				mWindow->pushGui(new GuiMsgBox(mWindow, _("FAILED TO RELOAD SYNCTHING CONFIGURATION.")));
+			}
+		});
+
+		switchSyncthingScanOnGameExit = createSwitch(_("AUTO-SCAN ON GAME EXIT"), "syncthing.autoscan", _("Scan for changed files after exiting a game."), true, false, true);
+		switchSyncthingNotifications = createSwitch(_("NOTIFICATIONS"), "syncthing.notifications", _("Show notifications when Syncthing is syncing."), true, false, true);
+		addSaveFunc([this] {
+			// Set the telemetry settings in batocera.conf
+			SystemConf::getInstance()->set("syncthing.autoscan", switchSyncthingScanOnGameExit->getState() ? "1" : "0");
+			SystemConf::getInstance()->set("syncthing.notifications", switchSyncthingNotifications->getState() ? "1" : "0");
+			SystemConf::getInstance()->saveSystemConf();
+		});
+
+	}
+	// Only add additional software options if at least one installer is available.
+	if (Pico8Installer::hasInstaller() || PortMasterInstaller::hasInstaller()) {
+		addGroup(_("ADDITIONAL SOFTWARE"));
+		if (Pico8Installer::hasInstaller()) {
+			addEntry(_("INSTALL NATIVE PICO-8"), true, [this] { Pico8Installer::install(mWindow); });
+		}
+		if (PortMasterInstaller::hasInstaller()) {
+			if(PortMasterInstaller::isInstalled()) {
+				addEntry(_("REINSTALL PORTMASTER"), true, [this] { PortMasterInstaller::install(mWindow); });
+			} else {
+				addEntry(_("INSTALL PORTMASTER"), true, [this] { PortMasterInstaller::install(mWindow); });
+			}
+		}
+	}
+	// Only add USB MODE options if USB service is available on this device.
+	if (UsbService::hasService() && (CapabilityCheck::hasCapability(CapabilityCheck::ADB_CAPABILITY) || CapabilityCheck::hasCapability(CapabilityCheck::MTP_CAPABILITY))) {
+		addGroup(_("USB MODE"));
+		optionsUsbMode = createUsbModeOptionList();
+
+		addSaveFunc([this] {		
+			// Set the USB mode in batocera.conf
+			SystemConf::getInstance()->set("system.usbmode", optionsUsbMode->getSelected());
+			SystemConf::getInstance()->saveSystemConf();
+
+			if (optionsUsbMode->getSelected() == "off") {
+				// Deactivate the USB Service
+				UsbService::stop();
+			} else {
+				// Reactivate the USB Service
+				UsbService::restart();	
+			}
+		});
+	}
+
+	addGroup(_("TELEMETRY"));
+	switchTelemetryStatistics = createSwitch(_("ENABLE STATISTICS"), "system.telemetry", _("Help the Knulli project keep track of which devices and Knulli versions are currently in use. Enable telemetry and report your device model and your current Knulli version to our statistics server after boot. No other data will be transmitted!"), true, false, true);
+	addSaveFunc([this] {
+		// Set the telemetry settings in batocera.conf
+		SystemConf::getInstance()->set("system.telemetry", switchTelemetryStatistics->getState() ? "1" : "0");
+		SystemConf::getInstance()->saveSystemConf();
+	});
+
+	if (FactorySettings::hasFactoryReset()) {
+		addGroup(_("FACTORY SETTINGS"));
+		addWithDescription(_("FACTORY RESET"), _("This will reset all your Knulli settings to factory defaults. Other user data (e.g., games, BIOS files, saves, etc.) will be left untouched."), nullptr, [this]
+		{
+			mWindow->pushGui(new GuiMsgBox(mWindow, _("ARE YOU SURE YOU WANT TO RESET TO FACTORY SETTINGS? ALL YOUR SETTINGS WILL BE UNDONE!\n\nDO NOT PANIC: THE SCREEN WILL TURN OFF AND THE DEVICE WILL REBOOT AUTOMATICALLY AFTER A COUPLE OF SECONDS."), _("YES"), [this]
+				{
+					FactorySettings::applyFactoryReset();
+				},
+				_("NO"), nullptr));
+		}, "", false, true);
+	}
+
+}
+
+void GuiDeviceSettings::openPowerManagementSettings()
+{
+	mWindow->pushGui(new GuiPowerManagementSettings(mWindow));
+}
+
+void GuiDeviceSettings::openDisplaySettings()
+{
+	mWindow->pushGui(new GuiDisplaySettings(mWindow));
+}
+
+void GuiDeviceSettings::openRgbLedSettings()
+{
+	mWindow->pushGui(new SilkyGuiRgbSettings(mWindow));
+}
+
+// Creates a new USB mode option list
+std::shared_ptr<OptionListComponent<std::string>> GuiDeviceSettings::createUsbModeOptionList()
+{
+    auto optionsUsbMode = std::make_shared<OptionListComponent<std::string>>(mWindow, _("USB MODE"), false);
+
+    std::string selectedUsbMode = SystemConf::getInstance()->get("system.usbmode");
+    if (selectedUsbMode.empty())
+        selectedUsbMode = DEFAULT_USB_MODE;
+
+	optionsUsbMode->add(_("OFF"), "off", selectedUsbMode == "off");
+	if (CapabilityCheck::hasCapability(CapabilityCheck::ADB_CAPABILITY)) {
+		optionsUsbMode->add(_("ADB"), "adb", selectedUsbMode == "adb");
+	}
+	if (CapabilityCheck::hasCapability(CapabilityCheck::MTP_CAPABILITY)) {
+		optionsUsbMode->add(_("MTP"), "mtp", selectedUsbMode == "mtp");
+	}
+
+    addWithDescription(_("USB MODE"), _("Set the USB mode to access your device."), optionsUsbMode);
+    return optionsUsbMode;
+}
+
+// Creates a new toggle switch mode option list.
+std::shared_ptr<OptionListComponent<std::string>> GuiDeviceSettings::createToggleSwitchModeOptionList()
+{
+    auto optionsToggleSwitchMode = std::make_shared<OptionListComponent<std::string>>(mWindow, _("TOGGLE SWITCH MODE"), false);
+
+    std::string selectedToggleSwitchMode = SystemConf::getInstance()->get("system.toggleswitch.mode");
+    if (selectedToggleSwitchMode.empty()) {
+		selectedToggleSwitchMode = DEFAULT_SWITCH_MODE;
+	}
+
+	optionsToggleSwitchMode->add(_("MUTE/UNMUTE"), "mute", selectedToggleSwitchMode == "mute");
+	optionsToggleSwitchMode->add(_("RGB ON/OFF"), "rgboff", selectedToggleSwitchMode == "rgboff");
+	optionsToggleSwitchMode->add(_("AIRPLANE MODE ON/OFF"), "airplane", selectedToggleSwitchMode == "airplane");
+	optionsToggleSwitchMode->add(_("CUSTOM MODE ON/OFF"), "custom", selectedToggleSwitchMode == "custom");
+
+    addWithDescription(_("TOGGLE SWITCH MODE"), _("Decide what to use the switch of your device for."), optionsToggleSwitchMode);
+    return optionsToggleSwitchMode;
+}

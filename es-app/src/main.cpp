@@ -44,6 +44,7 @@
 #include <thread>
 #include "ZaparooSupport.h"
 #include "utils/ThreadPool.h"
+#include "QuickResume.h"
 
 #ifdef WIN32
 #include <Windows.h>
@@ -294,6 +295,10 @@ bool loadSystemConfigFile(Window* window, const char** errorString)
 		return false;
 	}
 
+#ifdef KNULLI
+	ApiSystem::getInstance()->callBatoceraPreGameListsHook();
+#endif
+
 	if(SystemData::sSystemVector.size() == 0)
 	{
 		LOG(LogError) << "No systems found! Does at least one system have a game present? (check that extensions match!)\n(Also, make sure you've updated your es_systems.cfg for XML!)";
@@ -437,7 +442,10 @@ void launchStartupGame()
 	{
 		InputManager::getInstance()->init();
 		command = Utils::String::replace(command, "%CONTROLLERSCONFIG%", InputManager::getInstance()->configureEmulators());
-		Utils::Platform::ProcessStartInfo(command).run();		
+		Utils::Platform::ProcessStartInfo(command).run();
+		// KNULLI - QUICK RESUME MODE >>>>>
+		QuickResume::postLaunchConditionalClean();
+		// KNULLI - QUICK RESUME MODE <<<<<
 	}	
 }
 
@@ -527,8 +535,8 @@ int main(int argc, char* argv[])
 
 #if !WIN32
 	if(enable_startup_game) {
-	  // Run boot game, before Window Create for linux
-	  launchStartupGame();
+	    	// Run boot game, before Window Create for linux
+		launchStartupGame();
 	}
 #endif
 

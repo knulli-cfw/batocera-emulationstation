@@ -693,11 +693,12 @@ namespace Renderer
 
 			glTexImage2D(GL_TEXTURE_2D, 0, type, _width, _height, 0, type, GL_UNSIGNED_BYTE, la_data);
 			delete[] la_data;
-		}		
-		else if (type == GL_ALPHA && _data == nullptr)
+		}
+		else if (_data == nullptr)
 		{
-			uint8_t* la_data = new uint8_t[_width * _height];
-			memset(la_data, 0, _width * _height);
+			// Seems required with some video cards or the texture bytes aren't blank
+			uint8_t* la_data = new uint8_t[_width * _height * 4];
+			memset(la_data, 0, _width * _height * 4);
 			glTexImage2D(GL_TEXTURE_2D, 0, type, _width, _height, 0, type, GL_UNSIGNED_BYTE, la_data);
 			delete[] la_data;
 		}

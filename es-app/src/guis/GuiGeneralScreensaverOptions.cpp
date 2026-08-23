@@ -11,11 +11,8 @@
 #include "guis/GuiTextEditPopupKeyboard.h"
 #include "guis/GuiFileBrowser.h"
 
-#define fake_gettext_dim			_("dim")
-#define fake_gettext_black			_("black")
 #define fake_gettext_randomvideo	_("random video")
 #define fake_gettext_slideshow		_("slideshow")
-#define fake_gettext_suspend		_("suspend")
 
 #define fake_gettext_always			_("always")
 #define fake_gettext_start_end		_("start & end")
@@ -44,10 +41,7 @@ GuiGeneralScreensaverOptions::GuiGeneralScreensaverOptions(Window* window, int s
 	// Screensaver behavior
 	auto ctlBehavior = std::make_shared< OptionListComponent<std::string> >(mWindow, _("SCREENSAVER TYPE"), false);
 
-	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::SUSPEND))
-		ctlBehavior->addRange({ "dim", "black", "random video", "slideshow", "suspend" }, ssBehavior);
-	else
-		ctlBehavior->addRange({ "dim", "black", "random video", "slideshow" }, ssBehavior);
+	ctlBehavior->addRange(std::vector<std::string>{ "slideshow", "random video" }, ssBehavior);
 
 	addWithLabel(_("SCREENSAVER TYPE"), ctlBehavior, selectItem == 1);
 	ctlBehavior->setSelectedChangedCallback([this](const std::string& name)
@@ -170,7 +164,7 @@ void GuiGeneralScreensaverOptions::addVideoScreensaverOptions(int selectItem)
 		if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::DECORATIONS))
 		{
 			auto decoration_screensaver = std::make_shared<OptionListComponent<std::string>>(mWindow, _("DECORATION SET USED"), false);
-			decoration_screensaver->addRange({ "none", "systems", "random" }, Settings::getInstance()->getString("ScreenSaverDecorations"));
+			decoration_screensaver->addRange(std::vector<std::string>{ "none", "default-knulli" }, Settings::getInstance()->getString("ScreenSaverDecorations"));
 			addWithLabel(_("DECORATION SET USED"), decoration_screensaver);
 			addSaveFunc([decoration_screensaver] { Settings::getInstance()->setString("ScreenSaverDecorations", decoration_screensaver->getSelected()); });
 		}

@@ -165,6 +165,23 @@ GuiControllersSettings::GuiControllersSettings(Window* wnd, int autoSel) : GuiSe
 #endif
 	}
 
+#ifdef KNULLI
+
+	addGroup(_("CONTROLLER ASSIGNMENT"));
+
+	// ALWAYS ASSIGN INTERNAL HANDHELD CONTROLS TO PLAYER 1 EVEN IF A CONTROLLER IS CONNECTED
+	bool alwaysHandheldEnabled = SystemConf::getInstance()->getBool("system.input.p1_handheld");
+	auto alwaysHandheld = std::make_shared<SwitchComponent>(mWindow);
+	alwaysHandheld->setState(alwaysHandheldEnabled);
+	addWithDescription(_("HANDHELD AS PLAYER 1"), _("Always use the built-in handheld controls for player 1, even if additional controllers are connected."), alwaysHandheld);
+
+	addSaveFunc([alwaysHandheld]
+	{
+		SystemConf::getInstance()->setBool("system.input.p1_handheld", alwaysHandheld->getState());
+	});
+
+#endif
+
 	addGroup(_("DISPLAY OPTIONS"));
 
 	// CONTROLLER NOTIFICATION
@@ -187,6 +204,7 @@ GuiControllersSettings::GuiControllersSettings(Window* wnd, int autoSel) : GuiSe
 	if (Settings::getInstance()->getBool("ShowControllerActivity"))
 		addSwitch(_("SHOW CONTROLLER BATTERY LEVEL"), "ShowControllerBattery", true);
 
+#ifndef KNULLI
 	addSwitch(_("SHOW GUN NOTIFICATIONS"), "ShowGunsNotifications", true);	
 	addSwitch(_("DRAW GUN CROSSHAIR"), "DrawGunCrosshair", true);
 
@@ -343,7 +361,7 @@ GuiControllersSettings::GuiControllersSettings(Window* wnd, int autoSel) : GuiSe
 		// Populate controllers list
 		addWithLabel(label, inputOptionList);
 	}
-#endif
+#endif // WIN32
 
 	addSaveFunc([this, options, window]
 	{
@@ -380,6 +398,9 @@ GuiControllersSettings::GuiControllersSettings(Window* wnd, int autoSel) : GuiSe
 		// this is dependant of this configuration, thus update it
 		InputManager::getInstance()->computeLastKnownPlayersDeviceIndexes();
 	});
+
+#endif // KNULLI
+
 }
 
 void GuiControllersSettings::openControllersHotkeys()
@@ -805,15 +826,15 @@ void GuiControllersSettings::openControllersSpecificSettings_steamdeckgun()
 	mWindow->pushGui(s);
 }
 
-void GuiControllersSettings::clearLoadedInput() 
+void GuiControllersSettings::clearLoadedInput()
 {
-	for (int i = 0; i < mLoadedInput.size(); i++) 
+	for (int i = 0; i < mLoadedInput.size(); i++)
 		delete mLoadedInput[i];
 
 	mLoadedInput.clear();
 }
 
-GuiControllersSettings::~GuiControllersSettings() 
+GuiControllersSettings::~GuiControllersSettings()
 {
 	clearLoadedInput();
 }

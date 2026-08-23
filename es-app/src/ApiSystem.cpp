@@ -12,6 +12,7 @@
 #include "utils/FileSystemUtil.h"
 #include "utils/StringUtil.h"
 #include "utils/ThreadPool.h"
+#include "watchers/WatchersManager.h"
 #include "RetroAchievements.h"
 #include "utils/ZipFile.h"
 #include "Paths.h"
@@ -51,29 +52,29 @@
 #endif
 
 /*
-#define script_config "batocera-config"; // canupdate, overscan enable, overscan disable, storage 'X', storage current, storage list, forgetBT, getRootPassword, lsoutputs
-#define script_overclock "batocera-overclock"; // list, set X
-#define script_upgrade "batocera-upgrade";
-#define script_sync "batocera-sync"; // sync
-#define script_install "batocera-install"; // listDisks, listArchs, install X Y
-#define script_scraper "batocera-scraper";
-#define script_kodi "batocera-kodi";
-#define script_wifi "batocera-wifi"; // scanlist, list, enable X Y, disable
-#define script_bluetooth "batocera-bluetooth"; // trust, list, remove 
-#define script_resolution "batocera-resolution"; // listModes
-#define script_sync "batocera-sync";   // list
-#define script_info "batocera-info"; // --full
-#define script_systems "batocera-systems"; // --filter
-#define script_suport "batocera-support";
-#define script_gameforce "batocera-gameforce"; // buttonColorLed X, powerLed X
-#define script_audio "batocera-audio"; // list, list-profiles, get-profile, set-profile 'X', get, set 'X'
-#define script_bezelproject "batocera-es-thebezelproject"; // list, install X, remove X
-#define script_format "batocera-format"; // listDisks, listFstypes
-#define script_store "batocera-store"; // list, update, refresh, clean-all, install "X", remove "X"
-#define script_preupdategamelists "batocera-preupdate-gamelists-hook";
-#define script_timezones "batocera-timezone"; // get, detect, set "X"
-#define script_padsinfos "batocera-padsinfo";
-#define script_swissknife "batocera-es-swissknife"; // --emukill"
+#define script_config "knulli-config"; // canupdate, overscan enable, overscan disable, storage 'X', storage current, storage list, forgetBT, getRootPassword, lsoutputs
+#define script_overclock "knulli-overclock"; // list, set X
+#define script_upgrade "knulli-upgrade";
+#define script_sync "knulli-sync"; // sync
+#define script_install "knulli-install"; // listDisks, listArchs, install X Y
+#define script_scraper "knulli-scraper";
+#define script_kodi "knulli-kodi";
+#define script_wifi "knulli-wifi"; // scanlist, list, enable X Y, disable
+#define script_bluetooth "knulli-bluetooth"; // trust, list, remove
+#define script_resolution "knulli-resolution"; // listModes
+#define script_sync "knulli-sync";   // list
+#define script_info "knulli-info"; // --full
+#define script_systems "knulli-systems"; // --filter
+#define script_suport "knulli-support";
+#define script_gameforce "knulli-gameforce"; // buttonColorLed X, powerLed X
+#define script_audio "knulli-audio"; // list, list-profiles, get-profile, set-profile 'X', get, set 'X'
+#define script_bezelproject "knulli-es-thebezelproject"; // list, install X, remove X
+#define script_format "knulli-format"; // listDisks, listFstypes
+#define script_store "knulli-store"; // list, update, refresh, clean-all, install "X", remove "X"
+#define script_preupdategamelists "knulli-preupdate-gamelists-hook";
+#define script_timezones "knulli-timezone"; // get, detect, set "X"
+#define script_padsinfos "knulli-padsinfo";
+#define script_swissknife "knulli-es-swissknife"; // --emukill"
 */
 
 ApiSystem::ApiSystem() { }
@@ -81,7 +82,7 @@ ApiSystem::ApiSystem() { }
 ApiSystem* ApiSystem::instance = nullptr;
 ApiSystem::LED_TYPE ApiSystem::mSystemLedType = ApiSystem::LED_TYPE_NONE;
 
-ApiSystem *ApiSystem::getInstance() 
+ApiSystem *ApiSystem::getInstance()
 {
 	if (ApiSystem::instance == nullptr)
 	{
@@ -90,14 +91,14 @@ ApiSystem *ApiSystem::getInstance()
 #else
 		ApiSystem::instance = new ApiSystem();
 #endif
-		
+
 		IExternalActivity::Instance = ApiSystem::instance;
 	}
 
 	return ApiSystem::instance;
 }
 
-unsigned long ApiSystem::getFreeSpaceGB(std::string mountpoint) 
+unsigned long ApiSystem::getFreeSpaceGB(std::string mountpoint)
 {
 	LOG(LogDebug) << "ApiSystem::getFreeSpaceGB";
 
@@ -132,25 +133,25 @@ std::string ApiSystem::getFreeSpaceInfo(const std::string mountpoint)
 	struct statvfs fiData;
 	if ((statvfs(mountpoint.c_str(), &fiData)) < 0)
 		return "";
-		
+
 	unsigned long long total = (unsigned long long) fiData.f_blocks * (unsigned long long) (fiData.f_bsize);
 	unsigned long long free = (unsigned long long) fiData.f_bfree * (unsigned long long) (fiData.f_bsize);
 	unsigned long long used = total - free;
 	unsigned long percent = 0;
-	
-	if (total != 0) 
+
+	if (total != 0)
 	{  //for small SD card ;) with share < 1GB
 		percent = used * 100 / total;
 		oss << Utils::FileSystem::megaBytesToString(used / (1024L * 1024L)) << "/" << Utils::FileSystem::megaBytesToString(total / (1024L * 1024L)) << " (" << percent << "%)";
 	}
 	else
-		oss << "N/A";	
+		oss << "N/A";
 #endif
 
 	return oss.str();
 }
 
-bool ApiSystem::isFreeSpaceLimit() 
+bool ApiSystem::isFreeSpaceLimit()
 {
 	return getFreeSpaceGB(Paths::getRootPath()) < 2;
 }
@@ -159,10 +160,10 @@ std::string ApiSystem::getVersion(bool extra)
 {
 	LOG(LogDebug) << "ApiSystem::getVersion";
 
-	if (isScriptingSupported(VERSIONINFO)) 
+	if (isScriptingSupported(VERSIONINFO))
 	{
-		std::string command = "batocera-version";
-		if (extra) 
+		std::string command = "knulli-version";
+		if (extra)
 			command += " --extra";
 
 		auto res = executeEnumerationScript(command);
@@ -184,7 +185,7 @@ std::string ApiSystem::getVersion(bool extra)
 		return localVersion;
 	}
 
-	return PROGRAM_VERSION_STRING;	
+	return PROGRAM_VERSION_STRING;
 }
 
 std::string ApiSystem::getApplicationName()
@@ -210,24 +211,26 @@ std::string ApiSystem::getApplicationName()
 		return aboutInfo;
 	}
 
-#if BATOCERA
+#if KNULLI
+	return "KNULLI";
+#elif BATOCERA
 	return "BATOCERA";
 #else
 	return "EMULATIONSTATION";
 #endif
 }
 
-bool ApiSystem::setOverscan(bool enable) 
+bool ApiSystem::setOverscan(bool enable)
 {
-	return executeScript("batocera-config overscan " + std::string(enable ? "enable" : "disable"));
+	return executeScript("knulli-config overscan " + std::string(enable ? "enable" : "disable"));
 }
 
-bool ApiSystem::setOverclock(std::string mode) 
+bool ApiSystem::setOverclock(std::string mode)
 {
 	if (mode.empty())
 		return false;
 
-	return executeScript("batocera-overclock set " + mode);
+	return executeScript("knulli-overclock set " + mode);
 }
 
 #ifdef BATOCERA
@@ -252,8 +255,8 @@ std::pair<std::string, int> ApiSystem::updateSystem(const std::function<void(con
 {
 	LOG(LogDebug) << "ApiSystem::updateSystem";
 
+#ifndef KNULLI
 	std::string upgradeScriptPath = "batocera-upgrade";
-
 	// Fetch the latest script from GitHub if performing an online upgrade
 	if (!fromlocalmedia)
 	{
@@ -280,35 +283,42 @@ std::pair<std::string, int> ApiSystem::updateSystem(const std::function<void(con
 	if (fromlocalmedia) {
 		updatecommand = upgradeScriptPath + " --media-upgrade --media";
 	}
+#else
+	std::string updatecommand = "knulli-upgrade";
+#endif
 
 	FILE *pipe = popen(updatecommand.c_str(), "r");
 	if (pipe == nullptr)
 	{
+#ifndef KNULLI
 		// Clean up the downloaded script if we failed to execute popen
 		if (upgradeScriptPath == "/tmp/batocera-upgrade") {
 			Utils::FileSystem::removeFile("/tmp/batocera-upgrade");
 		}
+#endif
 		return std::pair<std::string, int>(std::string("Cannot call update command"), -1);
 	}
 	
 	char line[1024] = "";
-	FILE *flog = fopen(Utils::FileSystem::combine(Paths::getLogPath(), "batocera-upgrade.log").c_str(), "w");
-	while (fgets(line, 1024, pipe)) 
+	FILE *flog = fopen(Utils::FileSystem::combine(Paths::getLogPath(), "knulli-upgrade.log").c_str(), "w");
+	while (fgets(line, 1024, pipe))
 	{
 		strtok(line, "\n");
-		if (flog != nullptr) 
+		if (flog != nullptr)
 			fprintf(flog, "%s\n", line);
 
 		if (func != nullptr)
-			func(std::string(line));		
+			func(std::string(line));
 	}
 
 	int exitCode = WEXITSTATUS(pclose(pipe));
 
+#ifndef KNULLI
 	// Clean up the temporary script to free RAM disk space
 	if (upgradeScriptPath == "/tmp/batocera-upgrade") {
 		Utils::FileSystem::removeFile("/tmp/batocera-upgrade");
 	}
+#endif
 
 	if (flog != NULL)
 	{
@@ -319,48 +329,48 @@ std::pair<std::string, int> ApiSystem::updateSystem(const std::function<void(con
 	return std::pair<std::string, int>(std::string(line), exitCode);
 }
 
-std::pair<std::string, int> ApiSystem::backupSystem(BusyComponent* ui, std::string device) 
+std::pair<std::string, int> ApiSystem::backupSystem(BusyComponent* ui, std::string device)
 {
 	LOG(LogDebug) << "ApiSystem::backupSystem";
 
-	std::string updatecommand = "batocera-sync sync " + device;
+	std::string updatecommand = "knulli-sync sync " + device;
 	FILE* pipe = popen(updatecommand.c_str(), "r");
 	if (pipe == NULL)
 		return std::pair<std::string, int>(std::string("Cannot call sync command"), -1);
 
 	char line[1024] = "";
 
-	FILE* flog = fopen(Utils::FileSystem::combine(Paths::getLogPath(), "batocera-sync.log").c_str(), "w");
-	while (fgets(line, 1024, pipe)) 
+	FILE* flog = fopen(Utils::FileSystem::combine(Paths::getLogPath(), "knulli-sync.log").c_str(), "w");
+	while (fgets(line, 1024, pipe))
 	{
 		strtok(line, "\n");
 
-		if (flog != NULL) 
+		if (flog != NULL)
 			fprintf(flog, "%s\n", line);
 
 		ui->setText(std::string(line));
 	}
 
-	if (flog != NULL) 
+	if (flog != NULL)
 		fclose(flog);
 
 	int exitCode = WEXITSTATUS(pclose(pipe));
 	return std::pair<std::string, int>(std::string(line), exitCode);
 }
 
-std::pair<std::string, int> ApiSystem::installSystem(BusyComponent* ui, std::string device, std::string architecture) 
+std::pair<std::string, int> ApiSystem::installSystem(BusyComponent* ui, std::string device, std::string architecture)
 {
 	LOG(LogDebug) << "ApiSystem::installSystem";
 
-	std::string updatecommand = "batocera-install install " + device + " " + architecture;
+	std::string updatecommand = "knulli-install install " + device + " " + architecture;
 	FILE *pipe = popen(updatecommand.c_str(), "r");
 	if (pipe == NULL)
 		return std::pair<std::string, int>(std::string("Cannot call install command"), -1);
 
 	char line[1024] = "";
 
-	FILE *flog = fopen(Utils::FileSystem::combine(Paths::getLogPath(), "batocera-install.log").c_str(), "w");
-	while (fgets(line, 1024, pipe)) 
+	FILE *flog = fopen(Utils::FileSystem::combine(Paths::getLogPath(), "knulli-install.log").c_str(), "w");
+	while (fgets(line, 1024, pipe))
 	{
 		strtok(line, "\n");
 		if (flog != NULL) fprintf(flog, "%s\n", line);
@@ -378,26 +388,26 @@ std::pair<std::string, int> ApiSystem::installSystem(BusyComponent* ui, std::str
 	return std::pair<std::string, int>(std::string(line), exitCode);
 }
 
-std::pair<std::string, int> ApiSystem::scrape(BusyComponent* ui) 
+std::pair<std::string, int> ApiSystem::scrape(BusyComponent* ui)
 {
 	LOG(LogDebug) << "ApiSystem::scrape";
 
-	FILE* pipe = popen("batocera-scraper", "r");
+	FILE* pipe = popen("knulli-scraper", "r");
 	if (pipe == nullptr)
 		return std::pair<std::string, int>(std::string("Cannot call scrape command"), -1);
 
 	char line[1024] = "";
 
-	FILE* flog = fopen(Utils::FileSystem::combine(Paths::getLogPath(), "batocera-scraper.log").c_str(), "w");
-	while (fgets(line, 1024, pipe)) 
+	FILE* flog = fopen(Utils::FileSystem::combine(Paths::getLogPath(), "knulli-scraper.log").c_str(), "w");
+	while (fgets(line, 1024, pipe))
 	{
 		strtok(line, "\n");
 
-		if (flog != NULL) 
+		if (flog != NULL)
 			fprintf(flog, "%s\n", line);
 
 		if (ui != nullptr && Utils::String::startsWith(line, "GAME: "))
-			ui->setText(std::string(line));	
+			ui->setText(std::string(line));
 	}
 
 	if (flog != nullptr)
@@ -407,7 +417,7 @@ std::pair<std::string, int> ApiSystem::scrape(BusyComponent* ui)
 	return std::pair<std::string, int>(std::string(line), exitCode);
 }
 
-bool ApiSystem::ping() 
+bool ApiSystem::ping()
 {
     // Google DNS
     if (!executeScript("ping -c 1 -W 2 -t 255 8.8.8.8"))
@@ -502,23 +512,23 @@ bool ApiSystem::canLocalUpdate() {
 	return false;
 }
 
-bool ApiSystem::canUpdate(std::vector<std::string>& output) 
+bool ApiSystem::canUpdate(std::vector<std::string>& output)
 {
 	LOG(LogDebug) << "ApiSystem::canUpdate";
 
-	FILE *pipe = popen("batocera-upgrade --check-upgrade", "r");
+	FILE *pipe = popen("knulli-update-check", "r");
 	if (pipe == NULL)
 		return false;
 
 	char line[1024];
-	while (fgets(line, 1024, pipe)) 
+	while (fgets(line, 1024, pipe))
 	{
 		strtok(line, "\n");
 		output.push_back(std::string(line));
 	}
 
 	int res = WEXITSTATUS(pclose(pipe));
-	if (res == 0) 
+	if (res == 0)
 	{
 		LOG(LogInfo) << "Can update ";
 		return true;
@@ -528,7 +538,7 @@ bool ApiSystem::canUpdate(std::vector<std::string>& output)
 	return false;
 }
 
-void ApiSystem::launchExternalWindow_before(Window *window) 
+void ApiSystem::launchExternalWindow_before(Window *window)
 {
 	LOG(LogDebug) << "ApiSystem::launchExternalWindow_before";
 
@@ -539,7 +549,7 @@ void ApiSystem::launchExternalWindow_before(Window *window)
 	LOG(LogDebug) << "ApiSystem::launchExternalWindow_before OK";
 }
 
-void ApiSystem::launchExternalWindow_after(Window *window) 
+void ApiSystem::launchExternalWindow_after(Window *window)
 {
 	LOG(LogDebug) << "ApiSystem::launchExternalWindow_after";
 
@@ -567,7 +577,7 @@ bool ApiSystem::launchKodi(Window *window)
 	LOG(LogDebug) << "ApiSystem::launchKodi";
 
 	std::string commandline = InputManager::getInstance()->configureEmulators();
-	std::string command = "batocera-kodi " + commandline;
+	std::string command = "knulli-kodi " + commandline;
 
 	ApiSystem::launchExternalWindow_before(window);
 
@@ -581,12 +591,12 @@ bool ApiSystem::launchKodi(Window *window)
 	ApiSystem::launchExternalWindow_after(window);
 
 	// handle end of kodi
-	switch (exitCode) 
+	switch (exitCode)
 	{
 	case 10: // reboot code
 		Utils::Platform::quitES(Utils::Platform::QuitMode::REBOOT);
 		return true;
-		
+
 	case 11: // shutdown code
 		Utils::Platform::quitES(Utils::Platform::QuitMode::SHUTDOWN);
 		return true;
@@ -595,7 +605,7 @@ bool ApiSystem::launchKodi(Window *window)
 	return exitCode == 0;
 }
 
-bool ApiSystem::launchFileManager(Window *window) 
+bool ApiSystem::launchFileManager(Window *window)
 {
 	LOG(LogDebug) << "ApiSystem::launchFileManager";
 
@@ -618,15 +628,18 @@ bool ApiSystem::enableWifi(std::string ssid, std::string key, std::string countr
 	return executeScript("batocera-wifi enable \"" + ssid + "\" \"" + key + "\" \"" + country + "\"");
 }
 #else
-bool ApiSystem::enableWifi(std::string ssid, std::string key) 
+bool ApiSystem::enableWifi(std::string ssid, std::string key)
 {
-	return executeScript("batocera-wifi enable \"" + ssid + "\" \"" + key + "\"");
+	ssid = Utils::String::replace(ssid, "'", "'\\''");
+	key = Utils::String::replace(key, "'", "'\\''");
+
+	return executeScript("knulli-wifi enable '" + ssid + "' '" + key + "'");
 }
 #endif
 
-bool ApiSystem::disableWifi() 
+bool ApiSystem::disableWifi()
 {
-	return executeScript("batocera-wifi disable");
+	return executeScript("knulli-wifi disable");
 }
 
 std::string ApiSystem::getIpAddress()
@@ -640,114 +653,128 @@ std::string ApiSystem::getIpAddress()
 	return result;
 }
 
+bool ApiSystem::isWifiAPModeSupported()
+{
+	LOG(LogDebug) << "ApiSystem::isWifiAPModeSupported";
+
+	return executeScript("knulli-wifi has_ap_mode");
+}
+
+#ifdef KNULLI
+bool ApiSystem::runDiskCheck(const std::function<void(const std::string)>& func)
+{
+	return executeScript("knulli-disk-check", func).second == 0;
+}
+#endif
+
 bool ApiSystem::enableBluetooth()
 {
-	return executeScript("batocera-bluetooth enable 2>&1 >/dev/null");
+	return executeScript("knulli-bluetooth enable 2>&1 >/dev/null");
 }
 
 bool ApiSystem::disableBluetooth()
 {
-	return executeScript("batocera-bluetooth disable");
+	return executeScript("knulli-bluetooth disable");
 }
 
 void ApiSystem::startBluetoothLiveDevices(const std::function<void(const std::string)>& func)
 {
-	executeScript("batocera-bluetooth live_devices", func);
+	executeScript("knulli-bluetooth live_devices", func);
 }
 
 void ApiSystem::stopBluetoothLiveDevices()
 {
-	executeScript("batocera-bluetooth stop_live_devices");
+	executeScript("knulli-bluetooth stop_live_devices");
 }
 
 bool ApiSystem::pairBluetoothDevice(const std::string& deviceName)
 {
-	return executeScript("batocera-bluetooth trust " + deviceName);
+	return executeScript("knulli-bluetooth trust " + deviceName);
 }
 
 bool ApiSystem::connectBluetoothDevice(const std::string& deviceName)
 {
-	return executeScript("batocera-bluetooth connect " + deviceName);
+	return executeScript("knulli-bluetooth connect " + deviceName);
 }
 
 bool ApiSystem::disconnectBluetoothDevice(const std::string& deviceName)
 {
-	return executeScript("batocera-bluetooth disconnect " + deviceName);
+	return executeScript("knulli-bluetooth disconnect " + deviceName);
 }
 
 bool ApiSystem::removeBluetoothDevice(const std::string& deviceName)
 {
-	return executeScript("batocera-bluetooth remove " + deviceName);
+	return executeScript("knulli-bluetooth remove " + deviceName);
 }
 
 bool ApiSystem::scanNewBluetooth(const std::function<void(const std::string)>& func)
 {
-	return executeScript("batocera-bluetooth trust input", func).second == 0;
+	return executeScript("knulli-bluetooth trust input", func).second == 0;
 }
 
 std::vector<std::string> ApiSystem::getPairedBluetoothDeviceList()
 {
-	return executeEnumerationScript("batocera-bluetooth list");
+	return executeEnumerationScript("knulli-bluetooth list");
 }
 
-std::vector<std::string> ApiSystem::getAvailableStorageDevices() 
+std::vector<std::string> ApiSystem::getAvailableStorageDevices()
 {
-	return executeEnumerationScript("batocera-config storage list");
+	return executeEnumerationScript("knulli-config storage list");
 }
 
 std::vector<std::string> ApiSystem::getVideoModes(const std::string output)
 {
   if(output == "") {
-    return executeEnumerationScript("batocera-resolution listModes");
+    return executeEnumerationScript("knulli-resolution listModes");
   } else {
-    return executeEnumerationScript("batocera-resolution --screen \"" + output + "\" listModes");
+    return executeEnumerationScript("knulli-resolution --screen \"" + output + "\" listModes");
   }
 }
 
-std::vector<std::string> ApiSystem::getCustomRunners() 
+std::vector<std::string> ApiSystem::getCustomRunners()
 {
-	return executeEnumerationScript("batocera-wine-runners");
+	return executeEnumerationScript("knulli-wine-runners");
 }
 
-std::vector<std::string> ApiSystem::getAvailableBackupDevices() 
+std::vector<std::string> ApiSystem::getAvailableBackupDevices()
 {
-	return executeEnumerationScript("batocera-sync list");
+	return executeEnumerationScript("knulli-sync list");
 }
 
-std::vector<std::string> ApiSystem::getAvailableInstallDevices() 
+std::vector<std::string> ApiSystem::getAvailableInstallDevices()
 {
-	return executeEnumerationScript("batocera-install listDisks");
+	return executeEnumerationScript("knulli-install listDisks");
 }
 
-std::vector<std::string> ApiSystem::getAvailableInstallArchitectures() 
+std::vector<std::string> ApiSystem::getAvailableInstallArchitectures()
 {
-	return executeEnumerationScript("batocera-install listArchs");
+	return executeEnumerationScript("knulli-install listArchs");
 }
 
-std::vector<std::string> ApiSystem::getAvailableOverclocking() 
+std::vector<std::string> ApiSystem::getAvailableOverclocking()
 {
-	return executeEnumerationScript("batocera-overclock list");
+	return executeEnumerationScript("knulli-overclock list");
 }
 
-std::vector<std::string> ApiSystem::getSystemInformations() 
+std::vector<std::string> ApiSystem::getSystemInformations()
 {
-	return executeEnumerationScript("batocera-info --full");
+	return executeEnumerationScript("knulli-info --full");
 }
 
-std::vector<BiosSystem> ApiSystem::getBiosInformations(const std::string system) 
+std::vector<BiosSystem> ApiSystem::getBiosInformations(const std::string system)
 {
 	std::vector<BiosSystem> res;
 	BiosSystem current;
 	bool isCurrent = false;
 
-	std::string cmd = "batocera-systems";
+	std::string cmd = "knulli-systems";
 	if (!system.empty())
 		cmd += " --filter " + system;
 
 	auto systems = executeEnumerationScript(cmd);
 	for (auto line : systems)
 	{
-		if (Utils::String::startsWith(line, "> ")) 
+		if (Utils::String::startsWith(line, "> "))
 		{
 			if (isCurrent)
 				res.push_back(current);
@@ -756,18 +783,18 @@ std::vector<BiosSystem> ApiSystem::getBiosInformations(const std::string system)
 			current.name = std::string(std::string(line).substr(2));
 			current.bios.clear();
 		}
-		else 
+		else
 		{
 			BiosFile biosFile;
 			std::vector<std::string> tokens = Utils::String::split(line, ' ');
-			if (tokens.size() >= 3) 
+			if (tokens.size() >= 3)
 			{
 				biosFile.status = tokens.at(0);
 				biosFile.md5 = tokens.at(1);
 
 				// concatenat the ending words
 				std::string vname = "";
-				for (unsigned int i = 2; i < tokens.size(); i++) 
+				for (unsigned int i = 2; i < tokens.size(); i++)
 				{
 					if (i > 2) vname += " ";
 					vname += tokens.at(i);
@@ -785,12 +812,12 @@ std::vector<BiosSystem> ApiSystem::getBiosInformations(const std::string system)
 	return res;
 }
 
-bool ApiSystem::generateSupportFile() 
+bool ApiSystem::generateSupportFile()
 {
-	return executeScript("batocera-support");
+	return executeScript("knulli-support");
 }
 
-std::string ApiSystem::getCurrentStorage() 
+std::string ApiSystem::getCurrentStorage()
 {
 	LOG(LogDebug) << "ApiSystem::getCurrentStorage";
 
@@ -799,12 +826,12 @@ std::string ApiSystem::getCurrentStorage()
 #endif
 
 	std::ostringstream oss;
-	oss << "batocera-config storage current";
+	oss << "knulli-config storage current";
 	FILE *pipe = popen(oss.str().c_str(), "r");
 	char line[1024];
 
 	if (pipe == NULL)
-		return "";	
+		return "";
 
 	if (fgets(line, 1024, pipe)) {
 		strtok(line, "\n");
@@ -814,19 +841,19 @@ std::string ApiSystem::getCurrentStorage()
 	return "INTERNAL";
 }
 
-bool ApiSystem::setStorage(std::string selected) 
+bool ApiSystem::setStorage(std::string selected)
 {
-	return executeScript("batocera-config storage " + selected);
+	return executeScript("knulli-config storage " + selected);
 }
 
 bool ApiSystem::setButtonColorGameForce(std::string selected)
 {
-	return executeScript("batocera-gameforce buttonColorLed " + selected);
+	return executeScript("knulli-gameforce buttonColorLed " + selected);
 }
 
 bool ApiSystem::setPowerLedGameForce(std::string selected)
 {
-	return executeScript("batocera-gameforce powerLed " + selected);
+	return executeScript("knulli-gameforce powerLed " + selected);
 }
 
 bool ApiSystem::setButtonColorR36Ultra(const std::string& selected)
@@ -858,15 +885,15 @@ bool ApiSystem::setPowerLedR36(const std::string& selected)
 
 bool ApiSystem::forgetBluetoothControllers() 
 {
-	return executeScript("batocera-config forgetBT");
+	return executeScript("knulli-config forgetBT");
 }
 
-std::string ApiSystem::getRootPassword() 
+std::string ApiSystem::getRootPassword()
 {
 	LOG(LogDebug) << "ApiSystem::getRootPassword";
 
 	std::ostringstream oss;
-	oss << "batocera-config getRootPassword";
+	oss << "knulli-config getRootPassword";
 	FILE *pipe = popen(oss.str().c_str(), "r");
 	char line[1024];
 
@@ -882,12 +909,12 @@ std::string ApiSystem::getRootPassword()
 	return oss.str().c_str();
 }
 
-std::vector<std::string> ApiSystem::getAvailableVideoOutputDevices() 
+std::vector<std::string> ApiSystem::getAvailableVideoOutputDevices()
 {
-	return executeEnumerationScript("batocera-config lsoutputs");
+	return executeEnumerationScript("knulli-config lsoutputs");
 }
 
-std::vector<std::string> ApiSystem::getAvailableAudioOutputDevices() 
+std::vector<std::string> ApiSystem::getAvailableAudioOutputDevices()
 {
 #if WIN32
 	std::vector<std::string> res;
@@ -895,10 +922,10 @@ std::vector<std::string> ApiSystem::getAvailableAudioOutputDevices()
 	return res;
 #endif
 
-	return executeEnumerationScript("batocera-audio list");
+	return executeEnumerationScript("knulli-audio list");
 }
 
-std::string ApiSystem::getCurrentAudioOutputDevice() 
+std::string ApiSystem::getCurrentAudioOutputDevice()
 {
 #if WIN32
 	return "auto";
@@ -907,14 +934,14 @@ std::string ApiSystem::getCurrentAudioOutputDevice()
 	LOG(LogDebug) << "ApiSystem::getCurrentAudioOutputDevice";
 
 	std::ostringstream oss;
-	oss << "batocera-audio get";
+	oss << "knulli-audio get";
 	FILE *pipe = popen(oss.str().c_str(), "r");
 	char line[1024];
 
 	if (pipe == NULL)
-		return "";	
+		return "";
 
-	if (fgets(line, 1024, pipe)) 
+	if (fgets(line, 1024, pipe))
 	{
 		strtok(line, "\n");
 		pclose(pipe);
@@ -924,13 +951,13 @@ std::string ApiSystem::getCurrentAudioOutputDevice()
 	return "";
 }
 
-bool ApiSystem::setAudioOutputDevice(std::string selected) 
+bool ApiSystem::setAudioOutputDevice(std::string selected)
 {
 	LOG(LogDebug) << "ApiSystem::setAudioOutputDevice";
 
 	std::ostringstream oss;
 
-	oss << "batocera-audio set" << " '" << selected << "'";
+	oss << "knulli-audio set" << " '" << selected << "'";
 	int exitcode = system(oss.str().c_str());
 
 	Sound::get(":/checksound.ogg")->play();
@@ -946,10 +973,10 @@ std::vector<std::string> ApiSystem::getAvailableAudioOutputProfiles()
 	return res;
 #endif
 
-	return executeEnumerationScript("batocera-audio list-profiles");
+	return executeEnumerationScript("knulli-audio list-profiles");
 }
 
-std::string ApiSystem::getCurrentAudioOutputProfile() 
+std::string ApiSystem::getCurrentAudioOutputProfile()
 {
 #if WIN32
 	return "auto";
@@ -958,14 +985,14 @@ std::string ApiSystem::getCurrentAudioOutputProfile()
 	LOG(LogDebug) << "ApiSystem::getCurrentAudioOutputProfile";
 
 	std::ostringstream oss;
-	oss << "batocera-audio get-profile";
+	oss << "knulli-audio get-profile";
 	FILE *pipe = popen(oss.str().c_str(), "r");
 	char line[1024];
 
 	if (pipe == NULL)
-		return "";	
+		return "";
 
-	if (fgets(line, 1024, pipe)) 
+	if (fgets(line, 1024, pipe))
 	{
 		strtok(line, "\n");
 		pclose(pipe);
@@ -975,15 +1002,15 @@ std::string ApiSystem::getCurrentAudioOutputProfile()
 	return "";
 }
 
-bool ApiSystem::setAudioOutputProfile(std::string selected) 
+bool ApiSystem::setAudioOutputProfile(std::string selected)
 {
 	LOG(LogDebug) << "ApiSystem::setAudioOutputProfile";
 
 	std::ostringstream oss;
 
-	oss << "batocera-audio set-profile" << " '" << selected << "'";
+	oss << "knulli-audio set-profile" << " '" << selected << "'";
 	int exitcode = system(oss.str().c_str());
-	
+
 	Sound::get(":/checksound.ogg")->play();
 
 	return exitcode == 0;
@@ -995,7 +1022,7 @@ std::string ApiSystem::getUpdateUrl()
 	if (!systemsetting.empty())
 		return systemsetting;
 
-	return "https://updates.batocera.org";
+	return "https://updates.knulli.org";
 }
 
 std::string ApiSystem::getThemesUrl()
@@ -1163,7 +1190,7 @@ std::vector<BatoceraTheme> ApiSystem::getBatoceraThemesList()
 		}
 	}
 
-	return res;	
+	return res;
 }
 
 std::pair<std::string, int> ApiSystem::installBatoceraTheme(std::string thname, const std::function<void(const std::string)>& func)
@@ -1185,7 +1212,7 @@ std::pair<std::string, int> ApiSystem::installBatoceraTheme(std::string thname, 
 
 		Utils::FileSystem::createDirectory(extractionDirectory);
 		Utils::FileSystem::removeFile(zipFile);
-		
+
 		std::string branch = getGitRepositoryDefaultBranch(theme.url);
 
 		if (downloadGitRepository(theme.url, branch, zipFile, thname, func, theme.size * 1024LL * 1024))
@@ -1194,7 +1221,7 @@ std::pair<std::string, int> ApiSystem::installBatoceraTheme(std::string thname, 
 				func(_("Extracting") + " " + thname);
 
 			unzipFile(zipFile, extractionDirectory);
-			
+
 			std::string folderName = extractionDirectory + "/" + themeFileName + "-" + branch;
 			if (!Utils::FileSystem::exists(folderName))
 				folderName = extractionDirectory + "/" + themeFileName;
@@ -1258,7 +1285,7 @@ std::vector<BatoceraBezel> ApiSystem::getBatoceraBezelsList()
 
 	std::vector<BatoceraBezel> res;
 
-	auto lines = executeEnumerationScript("batocera-es-thebezelproject list");
+	auto lines = executeEnumerationScript("knulli-es-thebezelproject list");
 	for (auto line : lines)
 	{
 		auto parts = Utils::String::splitAny(line, " \t");
@@ -1283,12 +1310,12 @@ std::vector<BatoceraBezel> ApiSystem::getBatoceraBezelsList()
 
 std::pair<std::string, int> ApiSystem::installBatoceraBezel(std::string bezelsystem, const std::function<void(const std::string)>& func)
 {
-	return executeScript("batocera-es-thebezelproject install " + bezelsystem, func);
+	return executeScript("knulli-es-thebezelproject install " + bezelsystem, func);
 }
 
 std::pair<std::string, int> ApiSystem::uninstallBatoceraBezel(std::string bezelsystem, const std::function<void(const std::string)>& func)
 {
-	return executeScript("batocera-es-thebezelproject remove " + bezelsystem, func);
+	return executeScript("knulli-es-thebezelproject remove " + bezelsystem, func);
 }
 
 std::string ApiSystem::getMD5(const std::string fileName, bool fromZipContents)
@@ -1348,7 +1375,7 @@ std::string ApiSystem::getMD5(const std::string fileName, bool fromZipContents)
 
 			std::vector<std::string> res;
 			std::copy_if(fileList.cbegin(), fileList.cend(), std::back_inserter(res), [](const std::string file) { return Utils::FileSystem::getExtension(file) != ".txt";  });
-		
+
 			if (res.size() == 1)
 				contentFile = *res.cbegin();
 		}
@@ -1426,7 +1453,7 @@ bool ApiSystem::unzipFile(const std::string fileName, const std::string destFold
 
 	if (!Utils::FileSystem::exists(destFolder))
 		Utils::FileSystem::createDirectory(destFolder);
-		
+
 	if (Utils::String::toLower(Utils::FileSystem::getExtension(fileName)) == ".zip")
 	{
 		LOG(LogDebug) << "unzipFile is using ZipFile";
@@ -1455,7 +1482,7 @@ bool ApiSystem::unzipFile(const std::string fileName, const std::string destFold
 		LOG(LogDebug) << "unzipFile << KO Bad format ?" << fileName;
 		return false;
 	}
-	
+
 	LOG(LogDebug) << "unzipFile is using 7z";
 
 	std::string cmd = getSevenZipCommand() + " x \"" + Utils::FileSystem::getPreferredPath(fileName) + "\" -y -o\"" + Utils::FileSystem::getPreferredPath(destFolder) + "\"";
@@ -1465,7 +1492,7 @@ bool ApiSystem::unzipFile(const std::string fileName, const std::string destFold
 }
 
 bool ApiSystem::getBrightness(std::vector<BrightnessDevice>& values)
-{	
+{
 	#if WIN32
 	return false;
 	#endif
@@ -1501,7 +1528,7 @@ bool ApiSystem::getBrightness(std::vector<BrightnessDevice>& values)
 
 void ApiSystem::setBrightness(BrightnessDevice bd)
 {
-#if WIN32	
+#if WIN32
 	return;
 #endif 
 	if (bd.value < 1)
@@ -1512,7 +1539,7 @@ void ApiSystem::setBrightness(BrightnessDevice bd)
 
 	int max = Utils::String::toInteger(Utils::FileSystem::readAllText(bd.pathmax));
 	if (max == 0)
-	  return;
+		return;
 
 	float percent = (bd.value / 100.0f * (float)max) + 0.5f;
 		
@@ -1693,7 +1720,7 @@ void ApiSystem::getLEDColours(int& red, int& green, int& blue)
 
 void ApiSystem::setLEDColours(int red, int green, int blue)
 {
-#if WIN32    
+#if WIN32
     return;
 #endif
 
@@ -2023,7 +2050,22 @@ bool ApiSystem::isLEDMonochrome()
 
 std::vector<std::string> ApiSystem::getWifiNetworks(bool scan)
 {
-	return executeEnumerationScript(scan ? "batocera-wifi scanlist" : "batocera-wifi list");
+	return executeEnumerationScript(scan ? "knulli-wifi scanlist" : "knulli-wifi list");
+}
+
+void ApiSystem::scanWifiNetworks()
+{
+	executeScript("knulli-wifi scanlist &");
+}
+
+std::string ApiSystem::getWifiRoute()
+{
+	std::vector<std::string> result = executeEnumerationScript("knulli-wifi get_route");
+
+	if (result.empty() || result[0].empty())
+		return "NOT CONNECTED";
+
+	return result[0];
 }
 
 std::vector<std::string> ApiSystem::executeEnumerationScript(const std::string command)
@@ -2073,12 +2115,12 @@ std::pair<std::string, int> ApiSystem::executeScript(const std::string command, 
 }
 
 bool ApiSystem::executeScript(const std::string command)
-{	
+{
 	LOG(LogInfo) << "Running " << command;
 
 	if (system(command.c_str()) == 0)
 		return true;
-	
+
 	LOG(LogError) << "Error executing " << command;
 	return false;
 }
@@ -2092,30 +2134,30 @@ bool ApiSystem::isScriptingSupported(ScriptId script)
 	case ApiSystem::THEMESDOWNLOADER:
 		return true;
 	case ApiSystem::RETROACHIVEMENTS:
-#ifdef CHEEVOS_DEV_LOGIN
-		return true;
-#endif
+		if (SystemConf::getInstance()->get("global.retroachievements.webapikey") != "") {
+			return true;
+		}
 		break;
 	case ApiSystem::KODI:
 		executables.push_back("kodi");
 		break;
 	case ApiSystem::WIFI:
-		executables.push_back("batocera-wifi");
+		executables.push_back("knulli-wifi");
 		break;
 	case ApiSystem::BLUETOOTH:
-		executables.push_back("batocera-bluetooth");
+		executables.push_back("knulli-bluetooth");
 		break;
 	case ApiSystem::RESOLUTION:
-		executables.push_back("batocera-resolution");
+		executables.push_back("knulli-resolution");
 		break;
 	case ApiSystem::BIOSINFORMATION:
-		executables.push_back("batocera-systems");
+		executables.push_back("knulli-systems");
 		break;
 	case ApiSystem::DISKFORMAT:
-		executables.push_back("batocera-format");
+		executables.push_back("knulli-format");
 		break;
 	case ApiSystem::OVERCLOCK:
-		executables.push_back("batocera-overclock");
+		executables.push_back("knulli-overclock");
 		break;
 	case ApiSystem::NETPLAY:
 		executables.push_back("7zr");
@@ -2125,37 +2167,37 @@ bool ApiSystem::isScriptingSupported(ScriptId script)
 		executables.push_back("pdfinfo");
 		break;
 	case ApiSystem::BATOCERASTORE:
-		executables.push_back("batocera-store");
+		executables.push_back("knulli-store");
 		break;
 	case ApiSystem::THEBEZELPROJECT:
-		executables.push_back("batocera-es-thebezelproject");
-		break;		
+		executables.push_back("knulli-es-thebezelproject");
+		break;
 	case ApiSystem::PADSINFO:
-		executables.push_back("batocera-padsinfo");
+		executables.push_back("knulli-padsinfo");
 		break;
 	case ApiSystem::EVMAPY:
 		executables.push_back("evmapy");
 		break;
 	case ApiSystem::BATOCERAPREGAMELISTSHOOK:
-		executables.push_back("batocera-preupdate-gamelists-hook");
+		executables.push_back("knulli-preupdate-gamelists-hook");
 		break;
 	case ApiSystem::TIMEZONES:
-		executables.push_back("batocera-timezone");
+		executables.push_back("knulli-timezone");
 		break;
 	case ApiSystem::AUDIODEVICE:
-		executables.push_back("batocera-audio");
-		break;		
+		executables.push_back("knulli-audio");
+		break;
 	case ApiSystem::BACKUP:
-		executables.push_back("batocera-sync");
+		executables.push_back("knulli-sync");
 		break;
 	case ApiSystem::INSTALL:
-		executables.push_back("batocera-install");
-		break;	
+		executables.push_back("knulli-install");
+		break;
 	case ApiSystem::SUPPORTFILE:
-		executables.push_back("batocera-support");
+		executables.push_back("knulli-support");
 		break;
 	case ApiSystem::UPGRADE:
-		executables.push_back("batocera-upgrade");
+		executables.push_back("knulli-upgrade");
 		break;
 	case ApiSystem::UPGRADEVIATORRENT:
 		executables.push_back("batocera-upgrade-torrent");
@@ -2163,17 +2205,17 @@ bool ApiSystem::isScriptingSupported(ScriptId script)
 	case ApiSystem::SUSPEND:
 		return (Utils::FileSystem::exists("/usr/sbin/pm-suspend") && Utils::FileSystem::exists("/usr/bin/pm-is-supported") && executeScript("/usr/bin/pm-is-supported --suspend"));
 	case ApiSystem::VERSIONINFO:
-		executables.push_back("batocera-version");
+		executables.push_back("knulli-version");
 		break;
 	case ApiSystem::READPLANEMODE:
 	case ApiSystem::WRITEPLANEMODE:
-		executables.push_back("batocera-planemode");
+		executables.push_back("knulli-planemode");
 		break;
 	case ApiSystem::SERVICES:
-		executables.push_back("batocera-services");
+		executables.push_back("knulli-services");
 		break;
 	case ApiSystem::BACKGLASS:
-		executables.push_back("batocera-backglass");
+		executables.push_back("knulli-backglass");
 		break;
 	case ApiSystem::NFC:
 		executables.push_back("batocera-nfc");
@@ -2219,7 +2261,7 @@ void ApiSystem::setReadyFlag(bool ready)
 	}
 
 	FILE* fd = fopen("/tmp/emulationstation.ready", "w");
-	if (fd != NULL) 
+	if (fd != NULL)
 		fclose(fd);
 }
 
@@ -2236,23 +2278,23 @@ std::vector<std::string> ApiSystem::getFormatDiskList()
 	ret.push_back("e:\\ DRIVE Z:");
 	return ret;
 #endif
-	return executeEnumerationScript("batocera-format listDisks");
+	return executeEnumerationScript("knulli-format listDisks");
 }
 
 std::vector<std::string> ApiSystem::getFormatFileSystems()
 {
 #if WIN32 && _DEBUG
 	std::vector<std::string> ret;
-	ret.push_back("exfat");	
+	ret.push_back("exfat");
 	ret.push_back("brfs");
 	return ret;
 #endif
-	return executeEnumerationScript("batocera-format listFstypes");
+	return executeEnumerationScript("knulli-format listFstypes");
 }
 
 int ApiSystem::formatDisk(const std::string disk, const std::string format, const std::function<void(const std::string)>& func)
 {
-	return executeScript("batocera-format format " + disk + " " + format, func).second;
+	return executeScript("knulli-format format " + disk + " " + format, func).second;
 }
 
 int ApiSystem::getPdfPageCount(const std::string& fileName)
@@ -2329,7 +2371,7 @@ std::vector<std::string> ApiSystem::extractPdfImages(const std::string& fileName
 	{
 		char buffer[12];
 		sprintf(buffer, "%08d", (uint32_t)pageIndex);
-		
+
 		if (pageIndex < 0)
 			prefix = "page-" + squality + "-" + std::string(buffer) + "-pdf"; // page
 		else
@@ -2346,7 +2388,7 @@ std::vector<std::string> ApiSystem::extractPdfImages(const std::string& fileName
 
 	int time = SDL_GetTicks() - lastTime;
 	std::string text = std::to_string(time);
-	
+
 	for (auto file : Utils::FileSystem::getDirContent(pdfFolder, false))
 	{
 		auto ext = Utils::String::toLower(Utils::FileSystem::getExtension(file));
@@ -2370,7 +2412,7 @@ std::vector<PacmanPackage> ApiSystem::getBatoceraStorePackages()
 
 	LOG(LogDebug) << "ApiSystem::getBatoceraStorePackages";
 
-	auto res = executeEnumerationScript("batocera-store list");
+	auto res = executeEnumerationScript("knulli-store list");
 	std::string data = Utils::String::join(res, "\n");
 	if (data.empty())
 	{
@@ -2419,7 +2461,7 @@ std::vector<PacmanPackage> ApiSystem::getBatoceraStorePackages()
 			if (tag == "repository")
 				package.repository = node.text().get();
 			if (tag == "url")
-				package.url = node.text().get();			
+				package.url = node.text().get();
 			if (tag == "arch")
 				package.arch = node.text().get();
 			if (tag == "download_size")
@@ -2431,7 +2473,7 @@ std::vector<PacmanPackage> ApiSystem::getBatoceraStorePackages()
 		}
 
 		if (!package.name.empty())
-			packages.push_back(package);		
+			packages.push_back(package);
 	}
 
 	return packages;
@@ -2439,28 +2481,28 @@ std::vector<PacmanPackage> ApiSystem::getBatoceraStorePackages()
 
 std::pair<std::string, int> ApiSystem::installBatoceraStorePackage(std::string name, const std::function<void(const std::string)>& func)
 {
-	return executeScript("batocera-store install \"" + name + "\"", func);
+	return executeScript("knulli-store install \"" + name + "\"", func);
 }
 
 std::pair<std::string, int> ApiSystem::uninstallBatoceraStorePackage(std::string name, const std::function<void(const std::string)>& func)
 {
-	return executeScript("batocera-store remove \"" + name + "\"", func);
+	return executeScript("knulli-store remove \"" + name + "\"", func);
 }
 
 void ApiSystem::refreshBatoceraStorePackageList()
 {
-	executeScript("batocera-store refresh");
-	executeScript("batocera-store clean-all");
+	executeScript("knulli-store refresh");
+	executeScript("knulli-store clean-all");
 }
 
 void ApiSystem::callBatoceraPreGameListsHook()
 {
-	executeScript("batocera-preupdate-gamelists-hook");
+	executeScript("knulli-preupdate-gamelists-hook");
 }
 
 void ApiSystem::updateBatoceraStorePackageList()
 {
-	executeScript("batocera-store update");
+	executeScript("knulli-store update");
 }
 
 std::vector<std::string> ApiSystem::getShaderList(const std::string& systemName, const std::string& emulator, const std::string& core)
@@ -2571,11 +2613,11 @@ std::vector<std::string> ApiSystem::getTimezones()
 std::string ApiSystem::getCurrentTimezone()
 {
 	LOG(LogInfo) << "ApiSystem::getCurrentTimezone";
-	auto cmd = executeEnumerationScript("batocera-timezone get");
+	auto cmd = executeEnumerationScript("knulli-timezone get");
 	std::string tz = Utils::String::join(cmd, "");
 	remove_if(tz.begin(), tz.end(), isspace);
 	if (tz.empty()) {
-		cmd = executeEnumerationScript("batocera-timezone detect");
+		cmd = executeEnumerationScript("knulli-timezone detect");
 		tz = Utils::String::join(cmd, "");
 	}
 	return tz;
@@ -2585,7 +2627,7 @@ bool ApiSystem::setTimezone(std::string tz)
 {
 	if (tz.empty())
 		return false;
-	return executeScript("batocera-timezone set \"" + tz + "\"");
+	return executeScript("knulli-timezone set \"" + tz + "\"");
 }
 
 std::vector<PadInfo> ApiSystem::getPadsInfo()
@@ -2594,7 +2636,7 @@ std::vector<PadInfo> ApiSystem::getPadsInfo()
 
 	std::vector<PadInfo> ret;
 
-	auto res = executeEnumerationScript("batocera-padsinfo");
+	auto res = executeEnumerationScript("knulli-padsinfo");
 	std::string data = Utils::String::join(res, "\n");
 	if (data.empty())
 	{
@@ -2656,7 +2698,7 @@ std::string ApiSystem::getRunningArchitecture()
 
 std::string ApiSystem::getRunningBoard()
 {
-	auto res = executeEnumerationScript("cat /boot/boot/batocera.board");
+	auto res = executeEnumerationScript("cat /boot/boot/knulli.board");
 	if (res.size() > 0)
 		return res[0];
 
@@ -2675,13 +2717,13 @@ std::string ApiSystem::getHostsName()
 bool ApiSystem::emuKill()
 {
 	LOG(LogDebug) << "ApiSystem::emuKill";
-	return executeScript("batocera-es-swissknife --emukill");
+	return executeScript("knulli-es-swissknife --emukill");
 }
 
 void ApiSystem::suspend()
 {
 	LOG(LogDebug) << "ApiSystem::suspend";
-	executeScript("/usr/bin/batocera-shutdown gui");
+	executeScript("/usr/bin/knulli-suspend");
 }
 
 void ApiSystem::replugControllers_sindenguns()
@@ -2704,7 +2746,7 @@ void ApiSystem::replugControllers_steamdeckguns()
 
 bool ApiSystem::isPlaneMode()
 {
-	auto res = executeEnumerationScript("batocera-planemode status");
+	auto res = executeEnumerationScript("knulli-planemode status");
 	if (res.size() > 0)
 		return res[0] == "on";
 
@@ -2719,7 +2761,7 @@ bool ApiSystem::isReadPlaneModeSupported()
 bool ApiSystem::setPlaneMode(bool enable)
 {
 	LOG(LogDebug) << "ApiSystem::setPlaneMode";
-	return executeScript("batocera-planemode " + std::string(enable ? "enable" : "disable"));
+	return executeScript("knulli-planemode " + std::string(enable ? "enable" : "disable"));
 }
 
 std::vector<Service> ApiSystem::getServices()
@@ -2728,12 +2770,12 @@ std::vector<Service> ApiSystem::getServices()
 
 	LOG(LogDebug) << "ApiSystem::getServices";
 
-	auto slines = executeEnumerationScript("batocera-services list");
+	auto slines = executeEnumerationScript("knulli-services list");
 
-	for (auto sline : slines) 
+	for (auto sline : slines)
 	{
 		auto splits = Utils::String::split(sline, ';', true);
-		if (splits.size() == 2) 
+		if (splits.size() == 2)
 		{
 			Service s;
 			s.name = splits[0];
@@ -3202,9 +3244,9 @@ std::vector<std::string> ApiSystem::backglassThemes() {
 
   LOG(LogDebug) << "ApiSystem::backglassThemes";
 
-  auto slines = executeEnumerationScript("batocera-backglass list-themes");
+  auto slines = executeEnumerationScript("knulli-backglass list-themes");
 
-  for (auto sline : slines) 
+  for (auto sline : slines)
     {
       themes.push_back(sline);
     }
@@ -3213,10 +3255,10 @@ std::vector<std::string> ApiSystem::backglassThemes() {
 
 void ApiSystem::restartBackglass() {
   LOG(LogDebug) << "ApiSystem::restartBackglass";
-  executeScript("/usr/bin/batocera-backglass restart");
+  executeScript("/usr/bin/knulli-backglass restart");
 }
 
-bool ApiSystem::enableService(std::string name, bool enable) 
+bool ApiSystem::enableService(std::string name, bool enable)
 {
 	std::string serviceName = name;
 	if (serviceName.find(" ") != std::string::npos)
@@ -3224,10 +3266,12 @@ bool ApiSystem::enableService(std::string name, bool enable)
 
 	LOG(LogDebug) << "ApiSystem::enableService " << serviceName;
 
-	bool res = executeScript("batocera-services " + std::string(enable ? "enable" : "disable") + " " + serviceName);
+	bool res = executeScript("knulli-services " + std::string(enable ? "enable" : "disable") + " " + serviceName);
 	if (res)
-		res = executeScript("batocera-services " + std::string(enable ? "start" : "stop") + " " + serviceName);
-	
+		res = executeScript("knulli-services " + std::string(enable ? "start" : "stop") + " " + serviceName);
+
+	WatchersManager* mgr = WatchersManager::getInstance();
+	mgr->FireEvent(name, enable ? "enabled" : "disabled");
 	return res;
 }
 

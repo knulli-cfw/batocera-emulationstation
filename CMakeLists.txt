@@ -9,6 +9,7 @@ option(BCM "BCM host" OFF)
 
 option(BATOCERA "Set to ON to enable BATOCERA specific code" OFF)
 option(RETROBAT "Set to ON to enable RETROBAT specific code" OFF)
+option(KNULLI "Set to ON to enable KNULLI specific code" OFF)
 
 option(ENABLE_FILEMANAGER "Set to ON to enable f1 shortcut for filesystem" OFF)
 option(DISABLE_KODI "Set to ON to disable kodi in menu" OFF)
@@ -99,6 +100,11 @@ endif()
 if(RETROBAT)
   MESSAGE("Retrobat build")
   add_definitions(-DRETROBAT)
+endif()
+
+if(KNULLI)
+  MESSAGE("Knulli build")
+  add_definitions(-DKNULLI)
 endif()
 
 # disable kodi menu
@@ -237,10 +243,6 @@ endif()
 
 if(DEFINED SCREENSCRAPER_DEV_LOGIN)
     add_definitions(-DSCREENSCRAPER_DEV_LOGIN="${SCREENSCRAPER_DEV_LOGIN}")
-endif()
-
-if(DEFINED GAMESDB_APIKEY)
-    add_definitions(-DGAMESDB_APIKEY="${GAMESDB_APIKEY}")
 endif()
 
 if(DEFINED CHEEVOS_DEV_LOGIN)
