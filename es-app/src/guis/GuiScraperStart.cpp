@@ -348,7 +348,7 @@ void GuiScraperStart::loadAccountsPage()
 	addInputTextConfigRow(_("CLIENT ID"), "IGDBClientID", false, true);
 	addInputTextConfigRow(_("CLIENT SECRET"), "IGDBSecret", true, true);
 
-	addGroup(_("TheGamesDB"));
+	addGroup(_("THEGAMESDB"));
 	addInputTextConfigRow(_("API KEY"), "TheGamesDBApiKey", false, true);
 }
 
