@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-23 19:55+0200\n"
+"POT-Creation-Date: 2026-08-30 23:13+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1116,6 +1116,7 @@ msgstr ""
 msgid "Enable or disable the RGB LED."
 msgstr ""
 
+#. TRANSLATION: number of developpers / various developpers
 msgid "None"
 msgstr ""
 
@@ -3222,7 +3223,7 @@ msgstr ""
 msgid "CLIENT SECRET"
 msgstr ""
 
-msgid "TheGamesDB"
+msgid "THEGAMESDB"
 msgstr ""
 
 msgid "API KEY"
