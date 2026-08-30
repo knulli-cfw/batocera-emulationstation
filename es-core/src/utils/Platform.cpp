@@ -4,6 +4,7 @@
 
 #if WIN32
 #include <codecvt>
+#include <windows.h>
 #else
 #include <sys/types.h>
 #include <unistd.h>
@@ -12,6 +13,7 @@
 #include <sys/stat.h>
 #include <arpa/inet.h>
 #include <sys/wait.h>
+#include <unistd.h>
 #endif
 
 #include <fcntl.h>
@@ -23,6 +25,7 @@
 #include "Paths.h"
 #include <fstream>
 #include <string>
+#include "renderers/Renderer.h"
 #include <cctype>
 #include <algorithm>
 
@@ -109,6 +112,9 @@ namespace Utils
 				lpExecInfo.lpDirectory = wpath.c_str();
 			}
 
+			if (waitForExit)
+				Renderer::setWindowResizable(false);
+
 			ShellExecuteExW(&lpExecInfo);
 
 			if (lpExecInfo.hProcess != NULL)
@@ -120,6 +126,8 @@ namespace Utils
 					WaitForSingleObject(lpExecInfo.hProcess, INFINITE);
 				else
 				{
+				
+
 					while (WaitForSingleObject(lpExecInfo.hProcess, 50) == 0x00000102L)
 					{
 						bool polled = false;
@@ -130,28 +138,36 @@ namespace Utils
 
 						if (window != nullptr && polled)
 							window->renderSplashScreen();
-					}
+					}				
 				}
 
 				DWORD dwExitCode;
-				if (GetExitCodeProcess(lpExecInfo.hProcess, &dwExitCode))
-				{
-					CloseHandle(lpExecInfo.hProcess);
-					return dwExitCode;
-				}
+				if (!GetExitCodeProcess(lpExecInfo.hProcess, &dwExitCode))
+					dwExitCode = 0;
 
-				CloseHandle(lpExecInfo.hProcess);
-				return 0;
+				CloseHandle(lpExecInfo.hProcess); 
+				
+				if (waitForExit)
+					Renderer::setWindowResizable(true);
+
+				return dwExitCode;
 			}
+
+			if (waitForExit)
+				Renderer::setWindowResizable(true);
 
 			return 1;
 #else
-			std::string cmdOutput = " 2> " + Utils::FileSystem::combine(Paths::getLogPath(), stderrFilename) + " | head -300 > " + Utils::FileSystem::combine(Paths::getLogPath(), stdoutFilename);
+			// getting the output when in a pipe is not easy...
+			// https://stackoverflow.com/questions/1221833/pipe-output-and-capture-exit-status-in-bash
+			std::string cmdOutput = "((((" + cmd_utf8 + " 2> " + Utils::FileSystem::combine(Paths::getLogPath(), stderrFilename) + " ; echo $? >&3) | head -300 > " + Utils::FileSystem::combine(Paths::getLogPath(), stdoutFilename) + ") 3>&1) | (read xs; exit $xs))";
 			if (!Log::enabled())
-				cmdOutput = " 2> /dev/null | head -300 > /dev/null";
+			  cmdOutput = "((((" + cmd_utf8 + " 2> /dev/null ; echo $? >&3) | head -300 > /dev/null) 3>&1) | (read xs; exit $xs))";
 
-			if (waitForExit)
-				return system((cmd_utf8 + cmdOutput).c_str());
+			if (waitForExit) {
+			  int n = system(cmdOutput.c_str());
+			  return WEXITSTATUS(n);
+			}
 
 			// fork the current process
 			pid_t ret = fork();
@@ -160,7 +176,7 @@ namespace Utils
 				ret = fork();
 				if (ret == 0)
 				{
-					execl("/bin/sh", "sh", "-c", (cmd_utf8 + cmdOutput).c_str(), (char *) NULL);
+					execl("/bin/sh", "sh", "-c", cmdOutput.c_str(), (char *) NULL);
 					_exit(1); // execl failed
 				}
 				_exit(0); // exit the child process
@@ -275,7 +291,7 @@ namespace Utils
 			return quitMode == QuitMode::FAST_REBOOT || quitMode == QuitMode::FAST_SHUTDOWN;
 		}
 
-		std::string queryIPAdress()
+		std::string queryIPAddress()
 		{
 #ifdef DEVTEST
 			return "127.0.0.1";
@@ -328,7 +344,7 @@ namespace Utils
 					inet_ntop(AF_INET, tmpAddrPtr, addressBuffer, INET_ADDRSTRLEN);
 
 					std::string ifName = ifa->ifa_name;
-					if (ifName.find("eth") != std::string::npos || ifName.find("wlan") != std::string::npos || ifName.find("mlan") != std::string::npos || ifName.find("en") != std::string::npos || ifName.find("wl") != std::string::npos || ifName.find("p2p") != std::string::npos)
+					if (ifName.find("eth") != std::string::npos || ifName.find("wlan") != std::string::npos || ifName.find("mlan") != std::string::npos || ifName.find("en") != std::string::npos || ifName.find("wl") != std::string::npos || ifName.find("p2p") != std::string::npos || ifName.find("usb") != std::string::npos)
 					{
 						result = std::string(addressBuffer);
 						break;
@@ -355,7 +371,7 @@ namespace Utils
 							continue;
 
 						std::string ifName = ifa->ifa_name;
-						if (ifName.find("eth") != std::string::npos || ifName.find("wlan") != std::string::npos || ifName.find("mlan") != std::string::npos || ifName.find("en") != std::string::npos || ifName.find("wl") != std::string::npos || ifName.find("p2p") != std::string::npos)
+						if (ifName.find("eth") != std::string::npos || ifName.find("wlan") != std::string::npos || ifName.find("mlan") != std::string::npos || ifName.find("en") != std::string::npos || ifName.find("wl") != std::string::npos || ifName.find("p2p") != std::string::npos || ifName.find("usb") != std::string::npos)
 						{
 							result = std::string(addressBuffer);
 							break;
@@ -460,6 +476,7 @@ namespace Utils
 			static std::string batteryCapacityPath;
 			static std::string batteryCurrChargePath;
 			static std::string batteryMaxChargePath;
+			static std::string batteryCurrentPath;
 
 			// Find battery path - only at the first call
 			if (batteryStatusPath.empty())
@@ -497,6 +514,7 @@ namespace Utils
 						batteryCurrChargePath = fuelgaugeRootPath + "/charge_now";
 						batteryMaxChargePath = fuelgaugeRootPath + "/charge_full";
 						batteryCapacityPath = ".";
+						batteryCurrentPath = ".";
 						// If there's a fuel gauge without "charge_now" or "charge_full" property, don't poll it
 						if ((!Utils::FileSystem::exists(batteryCurrChargePath)) || (!Utils::FileSystem::exists(batteryMaxChargePath)))
 						{
@@ -513,6 +531,7 @@ namespace Utils
 				{
 					batteryStatusPath = batteryRootPath + "/status";
 					batteryCapacityPath = batteryRootPath + "/capacity";
+					batteryCurrentPath = batteryRootPath + "/current_avg";
 				}
 			}
 
@@ -528,6 +547,14 @@ namespace Utils
 				std::string chargerStatus;
 				chargerStatus = Utils::String::replace(Utils::FileSystem::readAllText(batteryStatusPath), "\n", "");
 				ret.isCharging = ((chargerStatus != "Not charging") && (chargerStatus != "Discharging"));
+
+				if (batteryCurrentPath.length() > 1 && Utils::FileSystem::exists(batteryCurrentPath))
+				{
+					int currentVal = Utils::String::toInteger(Utils::FileSystem::readAllText(batteryCurrentPath));
+					if (currentVal > 0)
+						ret.isCharging = true;
+				}
+
 				// If reading from fuel gauge, we have to calculate remaining charge
 				if (batteryCapacityPath.length() <= 1)
 				{
@@ -607,13 +634,111 @@ namespace Utils
 			return false;
 		}
 
+		bool isWindows10()
+		{
+			static const bool result = []()
+			{
+				WORD major, minor, build, revision;
+
+				if (_getWindowsVersion(major, minor, build, revision))
+					return major > 10 || (major == 10);
+
+				return false;
+			}();
+
+			return result;
+		}
+
 		bool isWindows11()
 		{
-			WORD major, minor, build, revision;
-			if (_getWindowsVersion(major, minor, build, revision))
-				return major > 10 || (major == 10 && (minor > 0 || build >= 22000));
+			static const bool result = []()
+			{
+				WORD major, minor, build, revision;
 
-			return false;
+				if (_getWindowsVersion(major, minor, build, revision))
+					return major > 10 || (major == 10 && (minor > 0 || build >= 22000));
+
+				return false;
+			}();
+
+			return result;
+		}
+
+		// Declared locally (instead of pulled from ShellScalingApi.h / a newer
+		// winuser.h) so this builds regardless of which Windows SDK version ES is
+		// compiled against; on older SDKs the constant/type simply doesn't exist yet.
+#ifndef DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+		DECLARE_HANDLE(DPI_AWARENESS_CONTEXT);
+#define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ((DPI_AWARENESS_CONTEXT)-4)
+#endif
+
+		typedef BOOL(WINAPI* SetProcessDpiAwarenessContext_t)(DPI_AWARENESS_CONTEXT);
+		typedef HRESULT(WINAPI* SetProcessDpiAwareness_t)(int);
+		typedef BOOL(WINAPI* SetProcessDPIAware_t)();
+
+		// Marks the process Per-Monitor-V2 DPI aware so Windows stops bitmap-
+		// stretching our output on displays scaled above 100% (e.g. 4K @ 150%).
+		// Without this, ES is treated as DPI-unaware, gets handed a virtualized
+		// logical resolution, and users have to manually enable the "Override high
+		// DPI scaling" compatibility option for fullscreen/video sizing to be correct.
+		// Resolved dynamically (rather than via an app manifest or direct linking) so
+		// the same binary degrades gracefully on Windows 8.1/7, where PMv2 and even
+		// PROCESS_PER_MONITOR_DPI_AWARE don't exist.
+		void setDpiAwareness()
+		{
+			HMODULE user32 = LoadLibraryA("user32.dll");
+			if (user32 != NULL)
+			{
+				auto setContext = (SetProcessDpiAwarenessContext_t)GetProcAddress(user32, "SetProcessDpiAwarenessContext");
+				if (setContext != NULL && setContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
+				{
+					FreeLibrary(user32);
+					return;
+				}
+			}
+
+			HMODULE shcore = LoadLibraryA("Shcore.dll");
+			if (shcore != NULL)
+			{
+				auto setAwareness = (SetProcessDpiAwareness_t)GetProcAddress(shcore, "SetProcessDpiAwareness");
+				if (setAwareness != NULL && SUCCEEDED(setAwareness(2 /* PROCESS_PER_MONITOR_DPI_AWARE */)))
+				{
+					FreeLibrary(shcore);
+					if (user32 != NULL)
+						FreeLibrary(user32);
+					return;
+				}
+
+				FreeLibrary(shcore);
+			}
+
+			if (user32 != NULL)
+			{
+				auto setAware = (SetProcessDPIAware_t)GetProcAddress(user32, "SetProcessDPIAware");
+				if (setAware != NULL)
+					setAware();
+
+				FreeLibrary(user32);
+			}
+		}
+#else
+		bool isBuildroot()
+		{
+			static const bool cached = []() 
+			{
+				std::ifstream f("/etc/os-release");
+				if (!f)
+					return false;
+
+				std::string line;
+				while (std::getline(f, line))
+					if (line == "ID=buildroot")
+						return true;
+
+				return false;
+			}();
+
+			return cached;
 		}
 #endif
 
@@ -729,6 +854,25 @@ namespace Utils
 #endif
 
 			return "";
+		}
+
+		unsigned long long getTotalSystemMemory() 
+		{
+#ifdef WIN32
+			MEMORYSTATUSEX status;
+			status.dwLength = sizeof(status);
+			if (GlobalMemoryStatusEx(&status))
+				return status.ullTotalPhys;
+			
+			return 0;
+#else
+			long pages = sysconf(_SC_PHYS_PAGES);
+			long page_size = sysconf(_SC_PAGE_SIZE);
+			if (pages == -1 || page_size == -1)
+				return 0;
+			
+			return (unsigned long long)pages * (unsigned long long)page_size;
+#endif
 		}
 	}
 }

@@ -37,7 +37,13 @@ enum class LightGunType
 	Mouse,
 	SindenLightgun,
 	Gun4Ir,
-	MayFlashWiimote
+	MayFlashWiimote,
+	RetroShooter,
+	Blamcon,
+	Aimtrak,
+	AELightgun,
+	Xgunner,
+	VirtualHID
 };
 
 class RawInputManager
@@ -52,7 +58,7 @@ public:
 			if (name.find(id) != std::string::npos)
 				return LightGunType::SindenLightgun;
 
-		std::string gun4irDeviceIds[] = { "VID_2341&PID_8042", "VID_2341&PID_8043", "VID_2341&PID_8044", "VID_2341&PID_8045" };
+		std::string gun4irDeviceIds[] = { "VID_2341&PID_8042", "VID_2341&PID_8043", "VID_2341&PID_8044", "VID_2341&PID_8045", "VID_2341&PID_8046", "VID_2341&PID_8047" };
 		for (auto id : gun4irDeviceIds)
 			if (name.find(id) != std::string::npos)
 				return LightGunType::Gun4Ir;
@@ -61,6 +67,34 @@ public:
 		for (auto id : mayFlashWiimoteIds)
 			if (name.find(id) != std::string::npos)
 				return LightGunType::MayFlashWiimote;
+
+		std::string rsDeviceIds[] = { "VID_0483&PID_5750", "VID_0483&PID_5751", "VID_0483&PID_5752", "VID_0483&PID_5753" };
+		for (auto id : rsDeviceIds)
+			if (name.find(id) != std::string::npos)
+				return LightGunType::RetroShooter;
+
+		std::string blamconDeviceIds[] = { "VID_3673&PID_0100", "VID_3673&PID_0101", "VID_3673&PID_0102", "VID_3673&PID_0103", "VID_3673&PID_0104" };
+		for (auto id : blamconDeviceIds)
+			if (name.find(id) != std::string::npos)
+				return LightGunType::Blamcon;
+
+		std::string aimtrakDeviceIds[] = { "VID_D209&PID_1601", "VID_D209&PID_1602", "VID_D209&PID_1603" };
+		for (auto id : aimtrakDeviceIds)
+			if (name.find(id) != std::string::npos)
+				return LightGunType::Aimtrak;
+
+		std::string xgunnerDeviceIds[] = { "VID_1209&PID_0001", "VID_1209&PID_0002", "VID_1209&PID_0003", "VID_1209&PID_0004" };
+		for (auto id : xgunnerDeviceIds)
+			if (name.find(id) != std::string::npos)
+				return LightGunType::Xgunner;
+
+		std::string aeDeviceIds[] = { "VID_2341&PID_8037", "VID_2341&PID_8038" };
+		for (auto id : aeDeviceIds)
+			if (name.find(id) != std::string::npos)
+				return LightGunType::AELightgun;
+
+		if (name.find("vmulti") != std::string::npos)
+			return LightGunType::VirtualHID;
 
 		return LightGunType::Mouse;
 	}
@@ -587,7 +621,7 @@ void GunManager::updateGuns(Window* window)
 					newgun->mX = newgun->m_internalX = x;
 					newgun->mY = newgun->m_internalY = y;
 				}
-				else if (window != NULL && !newgun->mName.empty())
+				else if (window != NULL && !newgun->mName.empty() && Settings::getInstance()->getBool("ShowGunsNotifications"))
 					window->displayNotificationMessage(_U("\uF05B ") + Utils::String::format(_("%s connected").c_str(), Utils::String::trim(newgun->mName).c_str()));
 
 				mGuns.push_back(newgun);
@@ -604,7 +638,7 @@ void GunManager::updateGuns(Window* window)
 				iter++;
 			else
 			{
-				if (window != NULL && !gun->m_isMouse)
+				if (window != NULL && !gun->m_isMouse && Settings::getInstance()->getBool("ShowGunsNotifications"))
 					window->displayNotificationMessage(_U("\uF05B ") + Utils::String::format(_("%s disconnected").c_str(), Utils::String::trim(gun->mName).c_str()));
 
 				LOG(LogInfo) << "Gun removed found at " << gun->mPath;
@@ -625,7 +659,7 @@ void GunManager::updateGuns(Window* window)
 
 			mGuns.push_back(newgun);
 
-			if (window != NULL)
+			if (window != NULL && Settings::getInstance()->getBool("ShowGunsNotifications"))
 				window->displayNotificationMessage(_U("\uF05B ") + Utils::String::format(_("%s connected").c_str(), Utils::String::trim(newgun->mName).c_str()));
 		}
 		else if (!hasWiimoteGun && mGuns.size())
@@ -635,7 +669,7 @@ void GunManager::updateGuns(Window* window)
 				Gun* gun = *it;
 				if (gun->mName == WIIMOTE_GUN)
 				{
-					if (window != NULL)
+					if (window != NULL && Settings::getInstance()->getBool("ShowGunsNotifications"))
 						window->displayNotificationMessage(_U("\uF05B ") + Utils::String::format(_("%s disconnected").c_str(), Utils::String::trim(gun->mName).c_str()));
 
 					mGuns.erase(it);
@@ -792,6 +826,10 @@ bool GunManager::updateGunPosition(Gun* gun)
 	{
 		int x, y;
 		auto buttons = SDL_GetMouseState(&x, &y);
+
+		if (x != gun->mX || y != gun->mY)
+			gun->m_lastTick = SDL_GetTicks();
+
 		gun->mX = x;
 		gun->mY = y;
 		gun->mLButtonDown = (buttons & SDL_BUTTON_LMASK) != 0;
@@ -893,7 +931,7 @@ bool GunManager::udev_addGun(struct udev_device *dev, Window* window, bool needG
 	newgun->mNeedBorders = needGunBorder;
 	newgun->m_lastTick = SDL_GetTicks();
 
-	if (!newgun->mName.empty() && window != NULL)
+	if (!newgun->mName.empty() && window != NULL && Settings::getInstance()->getBool("ShowGunsNotifications"))
 		window->displayNotificationMessage(_U("\uF05B ") + Utils::String::format(_("%s connected").c_str(), Utils::String::trim(newgun->mName).c_str()));
 
 	mGuns.push_back(newgun);
@@ -920,7 +958,7 @@ bool GunManager::udev_removeGun(struct udev_device *dev, Window* window)
 		if ((*iter)->devpath == devnode)
 		{
 			LOG(LogInfo) << "Gun removed found at " << devnode;
-			if (window != NULL)
+			if (window != NULL && Settings::getInstance()->getBool("ShowGunsNotifications"))
 				window->displayNotificationMessage(_U("\uF05B ") + Utils::String::format(_("%s disconnected").c_str(), Utils::String::trim((*iter)->mName).c_str()));
 
 			udev_closeGun(*iter);

@@ -46,7 +46,7 @@ GET  /systems
 GET  /systems/{systemName}
 GET  /systems/{systemName}/logo
 GET  /systems/{systemName}/games/{gameId}		
-POST /systems/{systemName}/games/{gameId}						-> body must contain the game metadatas to save as application/json
+POST /systems/{systemName}/games/{gameId}						-> body must contain the game metadata to save as application/json
 GET  /systems/{systemName}/games/{gameId}/media/{mediaType}
 POST /systems/{systemName}/games/{gameId}/media/{mediaType}		-> body must contain the file bytes to save. Content-type must be valid.
 
@@ -560,6 +560,28 @@ void HttpServerThread::run()
 
 		mWindow->displayNotificationMessage(req.body);
 	});
+	
+	mHttpServer->Post("/storage/event", [this](const httplib::Request& req, httplib::Response& res)
+	{
+		if (!isAllowed(req, res))
+			return;
+
+		if (req.body.empty())
+		{
+			res.set_content("400 bad request - body is missing", "text/plain");
+			res.status = 400;
+			return;
+		}
+
+		std::string eventLine = req.body;
+		Window* w = mWindow;
+		
+		mWindow->postToUiThread([w, eventLine]() { 
+            w->processStorageRequest(eventLine); 
+        });
+
+        res.set_content("OK", "text/plain");
+	});
 
 	mHttpServer->Post("/launch", [this](const httplib::Request& req, httplib::Response& res)
 	{
@@ -584,8 +606,11 @@ void HttpServerThread::run()
 			{
 				if (file->getFullPath() == path || file->getPath() == path)
 				{
-					mWindow->postToUiThread([file]() { ViewController::get()->launch(file); });					
-					return;
+					Window* w = mWindow;
+					mWindow->postToUiThread([w, file]() {
+						w->cancelScreenSaver();
+						ViewController::get()->launch(file);
+					});
 				}
 			}
 		}
@@ -620,9 +645,12 @@ void HttpServerThread::run()
 
 			deleteSystem = true;
 		}
+
+		Utils::FileSystem::FileSystemCache::reset();
 			
 		std::unordered_map<std::string, FileData*> fileMap;
-		for (auto file : system->getRootFolder()->getFilesRecursive(GAME))
+		fileMap[system->getRootFolder()->getPath()] = system->getRootFolder();
+		for (auto file : system->getRootFolder()->getFilesRecursive(GAME | FOLDER))
 			fileMap[file->getPath()] = file;
 
 		auto fileList = loadGamelistFile(req.body, system, fileMap, SIZE_MAX, false);
@@ -690,7 +718,8 @@ void HttpServerThread::run()
 		}
 
 		std::unordered_map<std::string, FileData*> fileMap;
-		for (auto file : system->getRootFolder()->getFilesRecursive(GAME))
+		fileMap[system->getRootFolder()->getPath()] = system->getRootFolder();
+		for (auto file : system->getRootFolder()->getFilesRecursive(GAME | FOLDER))
 			fileMap[file->getPath()] = file;
 
 		auto fileList = loadGamelistFile(req.body, system, fileMap, SIZE_MAX, false);

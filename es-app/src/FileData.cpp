@@ -33,6 +33,7 @@
 #include "guis/GuiMsgBox.h"
 #include "Paths.h"
 #include "resources/TextureData.h"
+#include "views/gamelist/GameNameFormatter.h"
 #include "QuickResume.h"
 
 using namespace Utils::Platform;
@@ -52,12 +53,15 @@ static std::map<std::string, std::function<BindableProperty(FileData*)>> propert
 	{ "kidGame",			[](FileData* file) { return file->getKidGame(); } },
 	{ "gunGame",			[](FileData* file) { return file->isLightGunGame(); } },
 	{ "wheelGame",			[](FileData* file) { return file->isWheelGame(); } },
-	{ "trackballGame",			[](FileData* file) { return file->isTrackballGame(); } },
-	{ "spinnerGame",			[](FileData* file) { return file->isSpinnerGame(); } },
+	{ "trackballGame",		[](FileData* file) { return file->isTrackballGame(); } },
+	{ "spinnerGame",		[](FileData* file) { return file->isSpinnerGame(); } },
 	{ "cheevos",			[](FileData* file) { return file->hasCheevos(); } },
 	{ "genre",			    [](FileData* file) { return file->getGenre(); } },
 	{ "hasKeyboardMapping", [](FileData* file) { return file->hasKeyboardMapping(); } },	
 	{ "systemName",			[](FileData* file) { return file->getSourceFileData()->getSystem()->getFullName(); } },
+	{ "fullName",			[](FileData* file) { return GameNameFormatter(file->getSystem()).getDisplayName(file); } },
+	{ "fullNameNoFavorite",	[](FileData* file) { return GameNameFormatter(file->getSystem()).getDisplayName(file, false, false); } },
+	{ "fullNameNoTags",		[](FileData* file) { return GameNameFormatter(file->getSystem()).getDisplayName(file, false, false, false); } },
 };
 
 FileData* FileData::mRunningGame = nullptr;
@@ -484,11 +488,7 @@ std::string FileData::getlaunchCommand(LaunchGameOptions& options, bool includeC
 	// must really;-) be done before window->deinit while it closes joysticks
 	std::string controllersConfig = InputManager::getInstance()->configureEmulators();
 
-#if WIN32
 	if (gameToUpdate->isLightGunGame())
-#else
-	if (InputManager::getInstance()->getGuns().size() && gameToUpdate->isLightGunGame())
-#endif
 		controllersConfig = controllersConfig + "-lightgun ";
 
         if (gameToUpdate->isWheelGame())
@@ -667,6 +667,7 @@ std::string FileData::getMessageFromExitCode(int exitCode)
 	case 205:
 		return _("CORE IS MISSING");
 	case 299:
+	case 250:
 		{
 	#if WIN32
 			std::string messageFile = Utils::FileSystem::combine(Utils::FileSystem::getTempPath(), "launch_error.log");
@@ -735,6 +736,8 @@ bool FileData::launchGame(Window* window, LaunchGameOptions options)
 
 	mRunningGame = nullptr;
 
+	Utils::FileSystem::FileSystemCache::reset();
+
 	if (SaveStateRepository::isEnabled(this))
 	{
 		if (options.saveStateInfo != nullptr)
@@ -761,7 +764,7 @@ bool FileData::launchGame(Window* window, LaunchGameOptions options)
 	}
 	else
 		window->init(hideWindow);
-
+	
 	VolumeControl::getInstance()->init();
 	AudioManager::getInstance()->init();
 
@@ -902,7 +905,7 @@ std::set<std::string> FileData::getContentFiles()
 			files.insert(path + "/" + stem + ".bin");
 			files.insert(path + "/" + stem + ".sub");
 		}
-		else if (ext == ".m3u")
+		else if (ext == ".m3u" || ext == ".xbox360")
 		{
 			std::ifstream m3u(WINSTRINGW(mPath));
 			if (m3u && m3u.is_open())
@@ -911,10 +914,17 @@ std::set<std::string> FileData::getContentFiles()
 				while (std::getline(m3u, line))
 				{
 					auto trim = Utils::String::trim(line);
-					if (trim[0] == '#' || trim[0] == '\\' || trim[0] == '/')
+					if (trim.empty() || trim[0] == '#')
 						continue;
 
-					files.insert(path + "/" + trim);
+					trim = Utils::String::replace(trim, "\\", "/");
+
+					if (Utils::FileSystem::isAbsolute(trim))
+						files.insert(Utils::FileSystem::getGenericPath(trim));
+					else if (trim[0] == '/')
+						continue;
+					else
+						files.insert(Utils::FileSystem::getCanonicalPath(path + "/" + trim));
 				}
 
 				m3u.close();
@@ -943,15 +953,30 @@ std::set<std::string> FileData::getContentFiles()
 
 void FileData::deleteGameFiles()
 {
+	if (mType != FileType::GAME)
+		return;
+
+	std::string path = getPath();
+	if (path.empty() || getSystemEnvData()->mStartPath == path)
+		return;
+
 	for (auto mdd : mMetadata.getMDD())
 	{
 		if (mMetadata.getType(mdd.id) != MetaDataType::MD_PATH)
 			continue;
 
-		Utils::FileSystem::removeFile(mMetadata.get(mdd.id));
+		std::string path = mMetadata.get(mdd.id);
+		if (Utils::FileSystem::exists(path) && !Utils::FileSystem::isDirectory(path))
+			Utils::FileSystem::removeFile(mMetadata.get(mdd.id));
 	}
 
-	Utils::FileSystem::removeFile(getPath());
+	if (Utils::FileSystem::isDirectory(path))
+	{
+		Utils::FileSystem::deleteDirectoryFiles(path, true);
+		return;
+	}
+
+	Utils::FileSystem::removeFile(path);
 
 	for (auto contentFile : getContentFiles())
 		Utils::FileSystem::removeFile(contentFile);
@@ -1244,7 +1269,7 @@ void FolderData::getFilesRecursiveWithContext(std::vector<FileData*>& out, unsig
 					if (!filter->showHiddenFiles && it->getHidden())
 						continue;
 
-					if (filter->filterKidGame && it->getKidGame())
+					if (filter->filterKidGame && !it->getKidGame())
 						continue;
 
 					if (typeMask == GAME && filter->hiddenExtensions.size() > 0)
@@ -1328,14 +1353,12 @@ void FolderData::removeChild(FileData* file)
 	assert(file->getParent() == this);
 #endif
 
-	for (auto it = mChildren.cbegin(); it != mChildren.cend(); it++)
+	auto it = std::find(mChildren.begin(), mChildren.end(), file);
+	if (it != mChildren.end())
 	{
-		if (*it == file)
-		{
-			file->setParent(NULL);
-			mChildren.erase(it);
-			return;
-		}
+		file->setParent(nullptr);
+		std::iter_swap(it, mChildren.end() - 1);
+		mChildren.pop_back();
 	}
 
 	// File somehow wasn't in our children.
@@ -1344,21 +1367,48 @@ void FolderData::removeChild(FileData* file)
 #endif
 }
 
+void FolderData::bulkRemoveChildren(std::vector<FileData*>& mChildren, const std::unordered_set<FileData*>& filesToRemove)
+{
+	mChildren.erase(
+		std::remove_if(
+			mChildren.begin(),
+			mChildren.end(),
+			[&filesToRemove](FileData* file)
+			{
+				if (filesToRemove.count(file))
+				{
+					file->setParent(nullptr);
+					return true;
+				}
+				return false;
+			}
+		),
+		mChildren.end()
+	);
+}
+
 FileData* FolderData::FindByPath(const std::string& path)
 {
-	std::vector<FileData*> children = getChildren();
+	std::stack<FileData*> stack;	
+	for (FileData* c : mChildren)
+		if (c != nullptr)
+			stack.push(c);
 
-	for (std::vector<FileData*>::const_iterator it = children.cbegin(); it != children.cend(); ++it)
+	while (!stack.empty())
 	{
-		if ((*it)->getPath() == path)
-			return (*it);
+		FileData* item = stack.top();
+		stack.pop();
 
-		if ((*it)->getType() != FOLDER)
-			continue;
-		
-		auto item = ((FolderData*)(*it))->FindByPath(path);
-		if (item != nullptr)
+		if (item->getPath() == path)
 			return item;
+
+		if (item->getType() != FOLDER)
+			continue;
+
+		const auto& sub = static_cast<FolderData*>(item)->mChildren;
+		for (FileData* s : sub)
+			if (s != nullptr)
+				stack.push(s);
 	}
 
 	return nullptr;
@@ -1521,23 +1571,26 @@ void FileData::detectLanguageAndRegion(bool overWrite)
 		mMetadata.set(MetaDataId::Region, info.region);
 }
 
-void FolderData::removeVirtualFolders()
-{
+void FolderData::removeVirtualFolders() {
 	if (!mOwnsChildrens)
 		return;
 
-	for (int i = mChildren.size() - 1; i >= 0; i--)
+	std::unordered_set<FileData*> filesToRemove;
+
+	for (auto file : mChildren)
 	{
-		auto file = mChildren.at(i);
 		if (file->getType() != FOLDER)
 			continue;
 
-		if (((FolderData*)file)->mOwnsChildrens)
-			continue;
-
-		removeChild(file);
-		delete file;
+		auto folder = static_cast<FolderData*>(file);
+		if (!folder->mOwnsChildrens)
+			filesToRemove.insert(file);
 	}
+
+	bulkRemoveChildren(mChildren, filesToRemove);
+
+	for (auto file : filesToRemove)
+		delete file;
 }
 
 void FileData::checkCrc32(bool force)
@@ -1741,14 +1794,13 @@ FolderData::~FolderData()
 	clear();
 }
 
-void FolderData::clear()
-{
+void FolderData::clear() {
 	if (mOwnsChildrens)
-	{
-		for (int i = mChildren.size() - 1; i >= 0; i--)
-			delete mChildren.at(i);
-	}
-
+		for (auto* child : mChildren)
+		{
+			child->setParent(nullptr); // prevent each child from inefficiently removing itself from our mChildren vector, since we're about to clear it anyway
+			delete child;
+		}
 	mChildren.clear();
 }
 
@@ -1803,6 +1855,18 @@ std::string FileData::getGenre()
 		genre = getMetadata(MetaDataId::Genre);
 
 	return genre;
+}
+
+std::string FileData::getSortName() const
+{
+	// Try to get sortname first to get precedence over (scraped) name
+	std::string sortName = getMetadata().get(MetaDataId::SortName);
+
+	// If empty, fallback to the standard display name
+	if (sortName.empty())
+		sortName = const_cast<FileData*>(this)->getName();
+
+	return sortName;
 }
 
 BindableProperty FileData::getProperty(const std::string& name)
@@ -2003,9 +2067,9 @@ BindableProperty FileData::getProperty(const std::string& name)
 		return Utils::String::toFloat(finalValue);
 	case MetaDataType::MD_BOOL:
 		return finalValue == "1" || finalValue == "true";
-	case MetaDataType::MD_DATE:
 	case MetaDataType::MD_TIME:
-		return finalValue.empty() ? "" : Utils::Time::timeToString(Utils::Time::DateTime(finalValue).getTime(), Utils::Time::getSystemDateFormat());
+	case MetaDataType::MD_DATE:
+		return finalValue.empty() || finalValue == "0" ? "" : Utils::Time::timeToString(Utils::Time::DateTime(finalValue).getTime(), type == MetaDataType::MD_TIME ? "%Y%m%dT%H%M%S" : "%Y%m%d");
 	}
 
 	return finalValue;

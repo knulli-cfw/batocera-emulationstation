@@ -45,7 +45,7 @@ const std::map<PlatformId, unsigned short> screenscraper_platformid_map{
 	{ ATARI_JAGUAR_CD, 171 },
 	{ ATARI_LYNX, 28 },
 	{ ATARI_ST, 42},
-	// missing Atari XE ?
+	{ ATARI_XE, 43},
 	{ BBC_MICRO, 37 },
 	{ COLECOVISION, 48 },
 	{ COMMODORE_64, 66 },
@@ -94,7 +94,7 @@ const std::map<PlatformId, unsigned short> screenscraper_platformid_map{
 	{ PLAYSTATION, 57 },
 	{ PLAYSTATION_2, 58 },
 	{ PLAYSTATION_3, 59 },
-	// missing Sony Playstation 4 ?
+	{ PLAYSTATION_4, 60 },
 	{ PLAYSTATION_VITA, 62 },
 	{ PLAYSTATION_PORTABLE, 61 },
 	{ SUPER_NINTENDO, 4 },
@@ -107,6 +107,7 @@ const std::map<PlatformId, unsigned short> screenscraper_platformid_map{
 	{ VECTREX, 102 },
 	{ TRS80_COLOR_COMPUTER, 144 },
 	{ TANDY, 144 },
+	{ DRAGON32, 91 },
 	{ SUPERGRAFX, 105 },
 	{ GP32, 101},
 
@@ -138,6 +139,7 @@ const std::map<PlatformId, unsigned short> screenscraper_platformid_map{
 
 	// Misc
 	{ VIC20, 73 },
+	{ ELEKTRONIKA_BK, 93 },
 	{ ORICATMOS, 131 },
 	{ CHANNELF, 80 },
 	{ THOMSON_TO_MO, 141 },
@@ -150,6 +152,7 @@ const std::map<PlatformId, unsigned short> screenscraper_platformid_map{
 	{ DAPHNE, 49 },
 	{ SOLARUS, 223 },
 	{ PICO8, 234 },
+	{ CASSETTE_VISION, 300 },
 	{ SUPER_CASSETTE_VISION, 67 },
 	{ EASYRPG, 231 },
 	{ SONIC, 0 }, // All systems
@@ -157,6 +160,7 @@ const std::map<PlatformId, unsigned short> screenscraper_platformid_map{
 	{ SUPER_GAME_BOY, 127 },
 	{ COMMODORE_PET, 240 },
 	{ COMMODORE_PLUS4, 99 },
+	{ COMMODORE_16, 99 },
 	{ ACORN_ATOM, 36 },
 	{ NOKIA_NGAGE, 30 },
 	{ ACORN_BBC_MICRO, 37 },
@@ -184,7 +188,8 @@ const std::map<PlatformId, unsigned short> screenscraper_platformid_map{
 	{ VIRCON32, 272 },
 	{ GAMATE, 266 },
 	{ ARDUBOY, 263 },
-	{ LOWRESNX, 244 }
+	{ LOWRESNX, 244 },
+	{ VC4000, 281 }
 };
 
 const std::set<Scraper::ScraperMediaSource>& ScreenScraperScraper::getSupportedMedias()
@@ -202,6 +207,7 @@ const std::set<Scraper::ScraperMediaSource>& ScreenScraperScraper::getSupportedM
 		ScraperMediaSource::BoxBack,
 		ScraperMediaSource::TitleShot,
 		ScraperMediaSource::Wheel,
+		ScraperMediaSource::WheelHD,
 		ScraperMediaSource::Marquee,
 		ScraperMediaSource::Mix,
 		ScraperMediaSource::Manual,
@@ -334,22 +340,19 @@ void ScreenScraperScraper::generateRequests(const ScraperSearchParams& params,
 }
 
 // Process should return false only when we reached a maximum scrap by minute, to retry
-bool ScreenScraperRequest::process(HttpReq* request, std::vector<ScraperSearchResult>& results)
+bool ScreenScraperRequest::process(const std::string& response, std::vector<ScraperSearchResult>& results)
 {
-	assert(request->status() == HttpReq::REQ_SUCCESS);
-
-	auto content = request->getContent();
-	if (content.empty())
+	if (response.empty())
 		return false;
 
-	if (content.find("<html") == 0)
+	if (response.find("<html") == 0)
 	{
-		setError(Utils::String::removeHtmlTags(content));
+		setError(Utils::String::removeHtmlTags(response));
 		return false;
 	}
 
 	pugi::xml_document doc;
-	pugi::xml_parse_result parseResult = doc.load_string(content.c_str());
+	pugi::xml_parse_result parseResult = doc.load_string(response.c_str());
 
 	if (!parseResult)
 	{
@@ -359,7 +362,7 @@ bool ScreenScraperRequest::process(HttpReq* request, std::vector<ScraperSearchRe
 		//setError(err); Don't consider it an error -> Request is a success. Simply : Game is not found		
 		LOG(LogWarning) << err;
 				
-		if (Utils::String::toLower(content).find("maximum threads per minute reached") != std::string::npos)
+		if (Utils::String::toLower(response).find("maximum threads per minute reached") != std::string::npos)
 			return false;
 		
 		return true;
@@ -429,6 +432,8 @@ std::vector<std::string> ScreenScraperRequest::getRipList(std::string imageSourc
 		return { "box-3D", "box-2D" };
 	if (imageSource == "wheel")
 		return { "wheel", "wheel-hd", "wheel-steel", "wheel-carbon", "screenmarqueesmall", "screenmarquee" };
+	if (imageSource == "wheel-hd")
+		return { "wheel-hd", "wheel", "wheel-steel", "wheel-carbon", "screenmarqueesmall", "screenmarquee" };
 	if (imageSource == "marquee")
 		return { "screenmarqueesmall", "screenmarquee", "wheel", "wheel-hd", "wheel-steel", "wheel-carbon" };
 	if (imageSource == "video")

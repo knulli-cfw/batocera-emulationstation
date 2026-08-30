@@ -41,6 +41,9 @@
 #include "Scripting.h"
 #include "watchers/WatchersManager.h"
 #include "HttpReq.h"
+#include <thread>
+#include "ZaparooSupport.h"
+#include "utils/ThreadPool.h"
 #include "QuickResume.h"
 
 #ifdef WIN32
@@ -284,8 +287,6 @@ bool loadSystemConfigFile(Window* window, const char** errorString)
 
 	StopWatch stopWatch("loadSystemConfigFile :", LogDebug);
 
-	ImageIO::loadImageCache();
-
 	if(!SystemData::loadConfig(window))
 	{
 		LOG(LogError) << "Error while parsing systems configuration file!";
@@ -349,6 +350,8 @@ void signalHandler(int signum)
 		LOG(LogError) << "Interrupt signal SIGFPE received.\n";
 	else
 		LOG(LogError) << "Interrupt signal (" << signum << ") received.\n";
+
+	Log::flush();
 
 	// cleanup and close up stuff here  
 	exit(signum);
@@ -446,11 +449,16 @@ void launchStartupGame()
 	}	
 }
 
-#include "utils/MathExpr.h"
+// #include "utils/MathExpr.h"
 
 int main(int argc, char* argv[])
-{	
-	Utils::MathExpr::performUnitTests();
+{
+	// Utils::MathExpr::performUnitTests();
+
+#ifdef WIN32
+	// Must run before any window/message-queue APIs are touched.
+	Utils::Platform::setDpiAwareness();
+#endif
 
 	// signal(SIGABRT, signalHandler);
 	signal(SIGFPE, signalHandler);
@@ -532,48 +540,54 @@ int main(int argc, char* argv[])
 	}
 #endif
 
-	Scripting::fireEvent("start");
-
-	// metadata init
-	HttpReq::resetCookies();
-	Genres::init();
-	MetaDataList::initMetadata();
+	// Threaded initializations
+	auto threadPool = new Utils::ThreadPool("main()", -3);
+	auto vlcInit = threadPool->queueWorkItem([] { VideoVlcComponent::init(); });
+	threadPool->queueWorkItem([] { ApiSystem::getInstance()->getIpAddress(); });
+	threadPool->queueWorkItem([] { MetaDataList::initMetadata(); });
+	threadPool->queueWorkItem([] { MameNames::init(); });
+	threadPool->queueWorkItem([] { Genres::init(); });
+	threadPool->queueWorkItem([] { HttpReq::resetCookies(); });
+	threadPool->start();
 
 	Window window;
-	SystemScreenSaver screensaver(&window);
 	ViewController::init(&window);
-	CollectionSystemManager::init(&window);
-	VideoVlcComponent::init();
 
+	window.setReloadGamelistsCallback([&window] { ViewController::reloadAllGames(&window, true, true); });	
 	window.pushGui(ViewController::get());
-	if(!window.init(true, false))
+	if (!window.init(true, false))
 	{
 		LOG(LogError) << "Window failed to initialize!";
 		return 1;
 	}
 
-	PowerSaver::init();
+	Renderer::setWindowResizable(false);
 
 	bool splashScreen = Settings::getInstance()->getBool("SplashScreen");
 	bool splashScreenProgress = Settings::getInstance()->getBool("SplashScreenProgress");
 
 	if (splashScreen)
-	{
-		std::string progressText = _("Loading...");
-		if (splashScreenProgress)
-			progressText = _("Loading system config...");
+		window.renderSplashScreen(splashScreenProgress ? _("Loading system config...") : _("Loading..."));
 
-		window.renderSplashScreen(progressText);
-	}
+	Scripting::fireEvent("start");
 
-	MameNames::init();
+	SystemScreenSaver screensaver(&window);
+	CollectionSystemManager::init(&window);
+	
+	Zaparoo::checkZaparooEnabledAsync();
+	PowerSaver::init();
+	InputConfig::AssignActionButtons();
 
+	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::PDFEXTRACTION))
+		TextureData::PdfHandler = ApiSystem::getInstance();
+	
+	threadPool->waitAllExcept(vlcInit); // Wait for what's necessary for loadSystemConfigFile
 
 	const char* errorMsg = NULL;
-	if(!loadSystemConfigFile(splashScreen && splashScreenProgress ? &window : nullptr, &errorMsg))
+	if (!loadSystemConfigFile(splashScreen && splashScreenProgress ? &window : nullptr, &errorMsg))
 	{
 		// something went terribly wrong
-		if(errorMsg == NULL)
+		if (errorMsg == NULL)
 		{
 			LOG(LogError) << "Unknown error occured while parsing system config file.";
 			Renderer::deinit();
@@ -602,17 +616,11 @@ int main(int argc, char* argv[])
 	}
 #endif
 
-	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::PDFEXTRACTION))
-		TextureData::PdfHandler = ApiSystem::getInstance();
-
-	ApiSystem::getInstance()->getIpAdress();
-
 	// preload what we can right away instead of waiting for the user to select it
 	// this makes for no delays when accessing content, but a longer startup time
 	ViewController::get()->preload();
 
 	// Initialize input
-	InputConfig::AssignActionButtons();
 	InputManager::getInstance()->init();
 	SDL_StopTextInput();
 
@@ -623,7 +631,15 @@ int main(int argc, char* argv[])
 	TextToSpeech::getInstance()->enable(Settings::getInstance()->getBool("TTS"), false);
 	
 	if (errorMsg == NULL)
+	{
+		if (splashScreen)
+			window.renderSplashScreen(_("Loading theme"));
+
 		ViewController::get()->goToStart(true);
+	}
+
+	threadPool->wait();
+	delete threadPool;
 
 	window.closeSplashScreen();
 
@@ -657,17 +673,19 @@ int main(int argc, char* argv[])
 		timeLimit = 0;
 #endif
 
+	Renderer::setWindowResizable(true);
+
 	int lastTime = SDL_GetTicks();
 	int ps_time = SDL_GetTicks();
 
 	bool running = true;
 
-	while(running)
-	{
-#ifdef WIN32	
-		int processStart = SDL_GetTicks();
+#ifdef BATOCERA
+	bool hotkeyPressed = false;
 #endif
 
+	while(running)
+	{
 		SDL_Event event;
 
 		bool ps_standby = PowerSaver::getState() && (int) SDL_GetTicks() - ps_time > PowerSaver::getMode();
@@ -679,7 +697,63 @@ int main(int argc, char* argv[])
 
 			do
 			{
+#ifdef BATOCERA
+			  // global hotkeys
+			  bool eventTaken = false;
+			  if(event.type == SDL_JOYBUTTONDOWN || event.type == SDL_JOYBUTTONUP)
+			    {
+			      InputConfig* config = InputManager::getInstance()->getInputConfigByDevice(event.jbutton.which);
+			      if(config)
+				{
+				  // Find first player controller info
+				  auto playerDevices = InputManager::getInstance()->lastKnownPlayersDeviceIndexes();
+				  auto playerDevice = playerDevices.find(0);
+				  if (playerDevice != playerDevices.cend())
+				    {
+				      if (config->getDeviceIndex() == playerDevice->second.index)
+					{
+					  Input input = Input(event.jbutton.which, TYPE_BUTTON, event.jbutton.button, event.jbutton.state == SDL_PRESSED, false);
+					  if (config->isMappedTo("hotkey", input))
+					    hotkeyPressed = input.value != 0;
+
+					  if(hotkeyPressed && input.value != 0)
+					    {
+					      std::string hotkey_controlcenter = Settings::getInstance()->getString("HOTKEY_CONTROLCENTER");
+					      if (config->isMappedTo(hotkey_controlcenter, input))
+						{
+						  hotkeyPressed = false;
+						  ApiSystem::getInstance()->launchControlcenter();
+						  eventTaken = true;
+						}
+					    }
+					}
+				    }
+				}
+			    }
+			  //
+			  if(eventTaken)
+			    continue;
+#endif
+
 				TRYCATCH("InputManager::parseEvent", InputManager::getInstance()->parseEvent(event, &window));
+
+				if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_RESIZED && Settings::getInstance()->getBool("Windowed"))
+				{
+					if (Renderer::onScreenSizeChanged(event.window.data1, event.window.data2))
+					{
+						Renderer::setWindowResizable(false);
+
+						window.closeSplashScreen();
+
+						while (window.peekGui() && window.peekGui() != ViewController::get())
+							delete window.peekGui();
+
+						ViewController::get()->reloadAll(&window);
+						window.closeSplashScreen();
+
+						Renderer::setWindowResizable(true);
+					}
+				}				
 
 				if (event.type == SDL_QUIT)
 					running = false;
@@ -725,21 +799,20 @@ int main(int argc, char* argv[])
 		TRYCATCH("Window.update" ,window.update(deltaTime))	
 		TRYCATCH("Window.render", window.render())
 
-/*
-#ifdef WIN32		
-		int processDuration = SDL_GetTicks() - processStart;
-		if (processDuration < timeLimit)
+		int fpsLimit = Settings::FpsLimit();
+		if (fpsLimit > 0)
 		{
-			int timeToWait = timeLimit - processDuration;
-			if (timeToWait > 0 && timeToWait < 25 && Settings::VSync())
-				Sleep(timeToWait);
+			int frameTime = (1000 + fpsLimit / 2) / fpsLimit;
+			int processDuration = SDL_GetTicks() - curTime;
+			if (processDuration < frameTime)
+			{
+				int timeToWait = frameTime - processDuration;
+				if (timeToWait > 0 && timeToWait < 100)
+					SDL_Delay(timeToWait);
+			}
 		}
-#endif
-*/
 
-		Renderer::swapBuffers();
-
-		Log::flush();
+		Renderer::swapBuffers();		
 	}
 
 	if (Utils::Platform::isFastShutdown())
@@ -755,9 +828,8 @@ int main(int argc, char* argv[])
 		delete window.peekGui();
 
 	if (SystemData::hasDirtySystems())
-		window.renderSplashScreen(_("SAVING METADATAS. PLEASE WAIT..."));
+		window.renderSplashScreen(_("SAVING METADATA. PLEASE WAIT..."));
 
-	ImageIO::saveImageCache();
 	MameNames::deinit();
 	ViewController::saveState();
 	CollectionSystemManager::deinit();
@@ -778,6 +850,8 @@ int main(int argc, char* argv[])
 	Utils::Platform::processQuitMode();
 
 	LOG(LogInfo) << "EmulationStation cleanly shutting down.";
+
+	Log::flush();
 
 	return 0;
 }

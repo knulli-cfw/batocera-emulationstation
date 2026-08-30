@@ -23,6 +23,7 @@ IMPLEMENT_STATIC_BOOL_SETTING(ShowControllerBattery, true)
 IMPLEMENT_STATIC_BOOL_SETTING(DrawClock, true)
 IMPLEMENT_STATIC_BOOL_SETTING(ClockMode12, false)
 IMPLEMENT_STATIC_BOOL_SETTING(DrawFramerate, false)
+IMPLEMENT_STATIC_BOOL_SETTING(UseFileCache, true)
 IMPLEMENT_STATIC_BOOL_SETTING(VolumePopup, true)
 IMPLEMENT_STATIC_BOOL_SETTING(BackgroundMusic, true)
 IMPLEMENT_STATIC_BOOL_SETTING(VSync, true)
@@ -31,6 +32,7 @@ IMPLEMENT_STATIC_BOOL_SETTING(IgnoreLeadingArticles, false)
 IMPLEMENT_STATIC_BOOL_SETTING(ShowFoldersFirst, true)
 IMPLEMENT_STATIC_BOOL_SETTING(ScrollLoadMedias, false)
 IMPLEMENT_STATIC_INT_SETTING(ScreenSaverTime, 5 * 60 * 1000)
+IMPLEMENT_STATIC_INT_SETTING(FpsLimit, 0)
 
 #if WIN32
 IMPLEMENT_STATIC_BOOL_SETTING(ShowNetworkIndicator, false)
@@ -51,6 +53,7 @@ void Settings::updateCachedSetting(const std::string& name)
 	UPDATE_STATIC_BOOL_SETTING(DrawClock)
 	UPDATE_STATIC_BOOL_SETTING(ClockMode12)
 	UPDATE_STATIC_BOOL_SETTING(DrawFramerate)
+	UPDATE_STATIC_BOOL_SETTING(UseFileCache)
 	UPDATE_STATIC_BOOL_SETTING(ScrollLoadMedias)
 	UPDATE_STATIC_BOOL_SETTING(VolumePopup)
 	UPDATE_STATIC_BOOL_SETTING(VSync)
@@ -58,6 +61,16 @@ void Settings::updateCachedSetting(const std::string& name)
 	UPDATE_STATIC_BOOL_SETTING(IgnoreLeadingArticles)		
 	UPDATE_STATIC_BOOL_SETTING(ShowFoldersFirst)
 	UPDATE_STATIC_INT_SETTING(ScreenSaverTime)
+	UPDATE_STATIC_INT_SETTING(FpsLimit)
+
+	if (name == "HiddenSystems")
+	{
+		mHiddenSystems.clear();
+
+		for (auto hiddenSystem : Utils::String::split(mStringMap["HiddenSystems"], ';'))
+			if (mHiddenSystems.find(hiddenSystem) == mHiddenSystems.cend())
+				mHiddenSystems.insert(hiddenSystem);
+	}
 
 	if (mLoaded)
 		settingChanged.invoke([name](ISettingsChangedEvent* c) { c->onSettingChanged(name); });
@@ -91,6 +104,8 @@ std::vector<const char*> settings_dont_save {
 	{ "ScreenOffsetY" },
 	{ "ScreenRotate" },
 	{ "MonitorID" },
+	{ "PackGamelists" },
+	{ "BuildMultiDiskContentCache" }
 };
 
 Settings::Settings() : mLoaded(false)
@@ -130,6 +145,8 @@ void Settings::setDefaults()
 	mBoolMap["SplashScreenProgress"] = true;
 	mBoolMap["StartupOnGameList"] = false;
 	mStringMap["StartupSystem"] = "lastsystem";
+	mStringMap["ShowTags"] = "";
+	mBoolMap["UseFileCache"] = true;
 
 #if WIN32
 	mBoolMap["HidJoysticks"] = true;
@@ -147,6 +164,7 @@ void Settings::setDefaults()
     mBoolMap["DrawClock"] = Settings::_DrawClock;
 	mBoolMap["ClockMode12"] = Settings::_ClockMode12;
 	mBoolMap["ShowControllerNotifications"] = true;	
+	mBoolMap["ShowGunsNotifications"] = true;
 	mBoolMap["ShowControllerActivity"] = Settings::_ShowControllerActivity;
 	mBoolMap["ShowControllerBattery"] = Settings::_ShowControllerBattery;
     mIntMap["SystemVolume"] = 95;
@@ -180,6 +198,8 @@ void Settings::setDefaults()
 	mStringMap["ShowBattery"] = "text";
 	mBoolMap["CheckBiosesAtLaunch"] = true;
 	mBoolMap["RemoveMultiDiskContent"] = true;
+	mBoolMap["PackGamelists"] = false;
+	mBoolMap["BuildMultiDiskContentCache"] = false;	
 
 	mBoolMap["ShowNetworkIndicator"] = Settings::_ShowNetworkIndicator;
 
@@ -189,10 +209,13 @@ void Settings::setDefaults()
 
 	mBoolMap["GameOptionsAtNorth"] = false;
 	mBoolMap["LoadEmptySystems"] = false;
+	mBoolMap["HideUniqueGroups"] = true;
+	mBoolMap["DrawGunCrosshair"] = true;
 	
 	mIntMap["RecentlyScrappedFilter"] = 3;
 	
 	mIntMap["ScreenSaverTime"] = Settings::_ScreenSaverTime;
+	mIntMap["FpsLimit"] = 0;
 	mIntMap["ScraperResizeWidth"] = 640;
 	mIntMap["ScraperResizeHeight"] = 0;
 
@@ -346,6 +369,10 @@ void Settings::setDefaults()
 	mStringMap["INPUT P6NAME"] = "DEFAULT";
 	mStringMap["INPUT P7NAME"] = "DEFAULT";
 	mStringMap["INPUT P8NAME"] = "DEFAULT";
+
+#ifdef BATOCERA
+	mStringMap["HOTKEY_CONTROLCENTER"] = "a";
+#endif
 
 	// Audio settings
 	mBoolMap["audio.bgmusic"] = Settings::_BackgroundMusic;
@@ -552,4 +579,40 @@ bool Settings::setString(const std::string& name, const std::string& value)
 	}
 
 	return false;
+}
+
+SettingType Settings::getSettingType(const std::string& name)
+{
+	if (mStringMap.find(name) != mStringMap.cend())
+		return SettingType::String;
+
+	if (mBoolMap.find(name) != mBoolMap.cend())
+		return SettingType::Bool;
+
+	if (mIntMap.find(name) != mIntMap.cend())
+		return SettingType::Int;
+
+	if (mFloatMap.find(name) != mFloatMap.cend())
+		return SettingType::Float;
+
+	return SettingType::Unknown;
+}
+
+std::vector<std::string> Settings::getSettingsNames()
+{
+	std::vector<std::string> ret;
+	
+	for (auto item : mStringMap)
+		ret.push_back(item.first);
+
+	for (auto item : mBoolMap)
+		ret.push_back(item.first);
+
+	for (auto item : mIntMap)
+		ret.push_back(item.first);
+
+	for (auto item : mFloatMap)
+		ret.push_back(item.first);
+
+	return ret;
 }

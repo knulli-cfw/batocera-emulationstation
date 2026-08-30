@@ -46,7 +46,6 @@ void TextureData::initFromPath(const std::string& path)
 	mReloadable = true;
 }
 
-
 bool TextureData::initSVGFromMemory(const unsigned char* fileData, size_t length)
 {
 	// If already initialised then don't read again
@@ -71,7 +70,10 @@ bool TextureData::initSVGFromMemory(const unsigned char* fileData, size_t length
 	}
 
 	if (svgImage->width == 0 || svgImage->height == 0)
+	{
+		nsvgDelete(svgImage);
 		return false;
+	}
 
 	float sourceWidth = svgImage->width;
 	float sourceHeight = svgImage->height;
@@ -110,7 +112,6 @@ bool TextureData::initSVGFromMemory(const unsigned char* fileData, size_t length
 		// auto scale height to keep aspect
 		height = (size_t)Math::round(((float)width / svgImage->width) * svgImage->height);
 	}
-
 
 	if (OPTIMIZEVRAM && !mMaxSize.empty() && (width > mMaxSize.x() || height > mMaxSize.y()))
 	{
@@ -159,6 +160,9 @@ bool TextureData::initSVGFromMemory(const unsigned char* fileData, size_t length
 
 bool TextureData::initImageFromMemory(const unsigned char* fileData, size_t length, int subImageIndex)
 {
+	if (length == 0)
+		return false;
+
 	// If already initialised then don't read again
 	if (isLoaded())
 		return true;
@@ -320,8 +324,11 @@ bool TextureData::loadFromVideo()
 		libvlc_media_player_set_time(vlcMediaPlayer, ms);
 
 		auto time = libvlc_media_player_get_time(vlcMediaPlayer);
-		while (time <= ms)
+		int n = 100; // avoid infinite loop
+		while (time <= ms && n > 0) {
 			time = libvlc_media_player_get_time(vlcMediaPlayer);
+			n--;
+		}
 
 		int result = libvlc_video_take_snapshot(vlcMediaPlayer, 0, localFile.c_str(), 0, 0);
 
@@ -335,12 +342,7 @@ bool TextureData::loadFromVideo()
 	{
 		std::shared_ptr<ResourceManager>& rm = ResourceManager::getInstance();
 		const ResourceData& data = rm->getFileData(localFile);
-
-		if (initImageFromMemory((const unsigned char*)data.ptr.get(), data.length))
-		{
-			ImageIO::updateImageCache(mPath, Utils::FileSystem::getFileSize(mPath), Math::round((int)mPhysicalSize.x()), Math::round((int)mPhysicalSize.y()));
-			return true;
-		}
+		return initImageFromMemory((const unsigned char*)data.ptr.get(), data.length);
 	}
 
 	return false;
@@ -367,10 +369,7 @@ bool TextureData::loadFromPdf(int pageIndex)
 		const ResourceData& data = rm->getFileData(files[0]);
 		Utils::FileSystem::removeFile(files[0]);
 
-		retval = initImageFromMemory((const unsigned char*)data.ptr.get(), data.length);
-
-		if (retval)
-			ImageIO::updateImageCache(mPath, Utils::FileSystem::getFileSize(mPath), Math::round((int)mPhysicalSize.x()), Math::round((int)mPhysicalSize.y()));
+		initImageFromMemory((const unsigned char*)data.ptr.get(), data.length);
 	}
 
 	return retval;
@@ -407,7 +406,7 @@ bool TextureData::loadFromCbz()
 		size_t size = files[0].file_size;
 		unsigned char* buffer = new unsigned char[size];
 
-		Utils::Zip::zip_callback func = [](void *pOpaque, unsigned long long ofs, const void *pBuf, size_t n)
+		Utils::Zip::zip_callback func = [](void *pOpaque, uint64_t ofs, const void *pBuf, size_t n)
 		{
 			unsigned char* pSource = (unsigned char*)pBuf;
 			unsigned char* pDest = (unsigned char*)pOpaque;
@@ -417,18 +416,14 @@ bool TextureData::loadFromCbz()
 			return n;
 		};
 
-		zipFile.readBuffered(files[0].filename, func, buffer);
-		
+		zipFile.readBuffered(files[0].filename, func, buffer);		
 		retval = initImageFromMemory(buffer, size);
-
-		if (retval)
-			ImageIO::updateImageCache(mPath, Utils::FileSystem::getFileSize(mPath), Math::round((int)mPhysicalSize.x()), Math::round((int)mPhysicalSize.y()));
 	}
 
 	return retval;
 }
 
-bool TextureData::load(bool updateCache)
+bool TextureData::load()
 {
 	// Need to load. See if there is a file
 	if (mPath.empty())
@@ -459,6 +454,8 @@ bool TextureData::load(bool updateCache)
 	}
 
 	const ResourceData& data = ResourceManager::getInstance()->getFileData(path);
+	if (data.length == 0)
+		return false;
 
 	// is it an SVG?
 	if (ext == ".svg")
@@ -467,12 +464,7 @@ bool TextureData::load(bool updateCache)
 		return initSVGFromMemory((const unsigned char*)data.ptr.get(), data.length);
 	}
 
-	bool retval = initImageFromMemory((const unsigned char*)data.ptr.get(), data.length, subImageIndex);
-
-	if (updateCache && retval)
-		ImageIO::updateImageCache(mPath, data.length, Math::round((int)mPhysicalSize.x()), Math::round((int)mPhysicalSize.y()));
-
-	return retval;
+	return initImageFromMemory((const unsigned char*)data.ptr.get(), data.length, subImageIndex);
 }
 
 bool TextureData::isLoaded()
@@ -532,11 +524,6 @@ void TextureData::releaseRAM()
 		delete[] mDataRGBA;
 
 	mDataRGBA = 0;
-}
-
-void TextureData::setStoredSize(float width, float height)
-{
-	mSize = Vector2i(width, height);
 }
 
 void TextureData::setMaxSize(const MaxSizeInfo& maxSize)

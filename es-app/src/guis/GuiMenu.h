@@ -28,8 +28,7 @@ class GuiMenu : public GuiComponent
 public:
         GuiMenu(Window* window, bool animate = true);
 
-        bool input(InputConfig* config, Input input) override;
-        void onSizeChanged() override;
+        bool input(InputConfig* config, Input input) override;        
         std::vector<HelpPrompt> getHelpPrompts() override;      
         static void openQuitMenu_static(Window *window, bool quickAccessMenu = false, bool animate = true);
 
@@ -50,7 +49,7 @@ private:
         void openScreensaverOptions();  
         void openSoundSettings();
         void openUISettings();
-        void openUpdatesSettings();
+        void openUpdatesSettings(bool selectTorrentService = false);
         
         void openSystemSettings();
         void openGamesSettings();       
@@ -69,6 +68,10 @@ private:
         void openFormatDriveSettings();
         void exitKidMode();
 
+#ifdef BATOCERA
+        void openUnmountDriveSettings();
+#endif
+
         // windows
         void openEmulatorSettings();
         void openSystemEmulatorSettings(SystemData* system);
@@ -76,7 +79,7 @@ private:
         static void openWifiSettings(Window* win, std::string title, std::string data, const std::function<void(std::string)>& onsave);
 
         MenuComponent mMenu;
-        TextComponent mVersion;
+        std::shared_ptr<TextComponent> mVersion;
 
         static std::shared_ptr<OptionListComponent<std::string>> createRatioOptionList(Window *window, std::string configname);
         static std::shared_ptr<OptionListComponent<std::string>> createVideoResolutionModeOptionList(Window *window, std::string configname, std::string configoptname = "videomode", const std::string output = "");

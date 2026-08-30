@@ -100,10 +100,17 @@ Splash::Splash(Window* window, const std::string image, bool fullScreenBackGroun
 	mText.setHorizontalAlignment(ALIGN_CENTER);
 	mText.setFont(font);
 
+#ifdef BATOCERA
+	if (fullScreenBackGround)
+		mText.setPosition(0, Renderer::getScreenHeight() * 0.83f);
+	else
+		mText.setPosition(0, Renderer::getScreenHeight() * 0.86f);
+#else
 	if (fullScreenBackGround)
 		mText.setPosition(0, Renderer::getScreenHeight() * 0.78f);
 	else
 		mText.setPosition(0, Renderer::getScreenHeight() * 0.835f);
+#endif
 
 	mText.setSize(Renderer::getScreenWidth(), font->getLetterHeight());
 
@@ -145,8 +152,8 @@ Splash::Splash(Window* window, const std::string image, bool fullScreenBackGroun
 	float x = Renderer::getScreenWidth() / 2.0f - w / 2.0f;
 	float y = Renderer::getScreenHeight() - (Renderer::getScreenHeight() * 3 * baseHeight);
 
-	auto blankTexture = TextureResource::get("", false, true, true, false, false);
-
+	auto blankTexture = TextureResource::get(":/white.png", false, true, true, false, false);
+	
 	mInactiveProgressbar.setImage(blankTexture);
 	mActiveProgressbar.setImage(blankTexture);
 
