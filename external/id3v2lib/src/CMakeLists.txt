@@ -55,8 +55,7 @@ target_include_directories(id3v2lib
 
 set_target_properties(id3v2lib PROPERTIES C_STANDARD 99)
 
-target_compile_options(id3v2lib PUBLIC -Wall)
-target_compile_options(id3v2lib PUBLIC -g)
+target_compile_options(id3v2lib PRIVATE -Wall)
 
 install(
   TARGETS id3v2lib
