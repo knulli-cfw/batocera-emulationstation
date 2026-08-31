@@ -371,7 +371,10 @@ void GuiNetPlay::update(int deltaTime)
 
 	if (status != HttpReq::REQ_SUCCESS)
 	{
-		mWindow->pushGui(new GuiMsgBox(mWindow, _("FAILED") + std::string(" : ") + mLobbyRequest->getErrorMsg()));
+		// Games found on the LAN are already listed, so a failing lobby request is not an error the user needs to see
+		if (mList->size() == 0)
+			mWindow->pushGui(new GuiMsgBox(mWindow, _("FAILED") + std::string(" : ") + mLobbyRequest->getErrorMsg()));
+
 		mLobbyRequest.reset();
 		return;
 	}
