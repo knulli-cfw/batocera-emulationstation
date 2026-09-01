@@ -41,10 +41,10 @@ class GlobalBinding : public IBindable
 			return SystemConf::getInstance()->getBool("global.netplay") ? SystemConf::getInstance()->get("global.netplay.nickname") : "";
 
 		if (name == "ip")
-			return Utils::Platform::queryIPAdress();
+			return Utils::Platform::queryIPAddress();
 
 		if (name == "network")
-			return !Utils::Platform::queryIPAdress().empty();
+			return !Utils::Platform::queryIPAddress().empty();
 
 		if (name == "battery")
 			return Utils::Platform::queryBatteryInformation().hasBattery;
@@ -70,7 +70,31 @@ class GlobalBinding : public IBindable
 	std::string getBindableTypeName() override { return "global"; }
 };
 
+class SettingsBinding : public IBindable
+{
+	BindableProperty getProperty(const std::string& name) override
+	{
+		SettingType type = Settings::getInstance()->getSettingType(name);
+		switch (type)
+		{
+		case SettingType::String:
+			return Settings::getInstance()->getString(name);
+		case SettingType::Bool:
+			return Settings::getInstance()->getBool(name);
+		case SettingType::Int:
+			return Settings::getInstance()->getInt(name);
+		case SettingType::Float:
+			return Settings::getInstance()->getFloat(name);
+		}
+
+		return BindableProperty::Null;
+	}
+
+	std::string getBindableTypeName() override { return "settings"; }
+};
+
 static GlobalBinding globalBinding;
+static SettingsBinding settingsBinding;
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // BindingManager
@@ -156,7 +180,24 @@ std::string BindingManager::updateBoundExpression(std::string& xp, IBindable* bi
 	}
 
 	bindValues(&globalBinding, xp, showDefaultText, evaluableExpression);
+	bindValues(&settingsBinding, xp, showDefaultText, evaluableExpression);
+	
 	return evaluableExpression;
+}
+
+std::string   BindingManager::evaluateBindableExpression(const std::string& xp, IBindable* bindable)
+{
+	std::string val = xp;
+	std::string evaluableExpression = BindingManager::updateBoundExpression(val, bindable, false);
+	auto ret = Utils::MathExpr::evaluate(evaluableExpression.c_str());
+
+	if (ret.type == Utils::MathExpr::STRING)
+		return ret.string;
+
+	if (ret.type == Utils::MathExpr::NUMBER)
+		return std::to_string(ret.number);
+	
+	return "";
 }
 
 void BindingManager::updateBindings(GuiComponent* comp, IBindable* bindable, bool recursive)
@@ -181,6 +222,7 @@ void BindingManager::updateBindings(GuiComponent* comp, IBindable* bindable, boo
 			continue;
 
 		bool uniqueVariable = xp[0] == '{' && xp[xp.size() - 1] == '}' && Utils::String::occurs(xp, '{') == 1;
+		bool isColorProperty = Utils::String::toLower(propertyName).find("color") != std::string::npos;
 
 		std::string evaluableExpression = updateBoundExpression(xp, bindable, text != nullptr && (text->getBindingDefaults() || showDefaultText));
 		
@@ -192,7 +234,7 @@ void BindingManager::updateBindings(GuiComponent* comp, IBindable* bindable, boo
 			{
 				try
 				{
-					auto ret = Utils::MathExpr::evaluate(evaluableExpression.c_str());
+					auto ret = Utils::MathExpr::evaluate(evaluableExpression.c_str(), 0, isColorProperty);
 					if (ret.type == Utils::MathExpr::STRING)
 						xp = ret.string;
 					else if (ret.type == Utils::MathExpr::NUMBER)
@@ -218,7 +260,7 @@ void BindingManager::updateBindings(GuiComponent* comp, IBindable* bindable, boo
 				{
 					try
 					{
-						auto ret = Utils::MathExpr::evaluate(evaluableExpression.c_str());
+						auto ret = Utils::MathExpr::evaluate(evaluableExpression.c_str(), 0, isColorProperty);
 						if (ret.type == Utils::MathExpr::NUMBER)
 							value = (int)ret.number;
 					}
@@ -238,13 +280,13 @@ void BindingManager::updateBindings(GuiComponent* comp, IBindable* bindable, boo
 			break;
 		case ThemeData::ThemeElement::Property::PropertyType::Float:
 			{
-				float value = Utils::String::toFloat(xp);
+				double value = Utils::String::toDouble(xp);
 
 				if (bindable != nullptr && !uniqueVariable)
 				{
 					try
 					{
-						auto ret = Utils::MathExpr::evaluate(evaluableExpression.c_str());
+						auto ret = Utils::MathExpr::evaluate(evaluableExpression.c_str(), 0, isColorProperty);
 						if (ret.type == Utils::MathExpr::NUMBER)
 							value = ret.number;
 					}
@@ -275,7 +317,7 @@ void BindingManager::updateBindings(GuiComponent* comp, IBindable* bindable, boo
 				{
 					try
 					{
-						auto ret = Utils::MathExpr::evaluate(evaluableExpression.c_str());
+						auto ret = Utils::MathExpr::evaluate(evaluableExpression.c_str(), 0, isColorProperty);
 						if (ret.type == Utils::MathExpr::NUMBER)
 							value = (ret.number != 0);
 					}

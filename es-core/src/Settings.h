@@ -5,6 +5,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <set>
 #include "utils/Delegate.h"
 
 // Non-cached settings macros
@@ -26,7 +27,7 @@ private: \
 static int _##XX; \
 public: \
 inline static int XX() { return _##XX; }; \
-static bool set##XX(bool val) { _##XX = val; return Settings::getInstance()->setInt(#XX, val); };
+static bool set##XX(int val) { _##XX = val; return Settings::getInstance()->setInt(#XX, val); };
 
 // Cached static settings macros. To use in cpp to implement cached settings
 #define IMPLEMENT_STATIC_BOOL_SETTING(XX, VAL) bool Settings::_##XX = VAL;
@@ -42,6 +43,15 @@ public:
 	virtual void onSettingChanged(const std::string& name) = 0;
 };
 
+enum class SettingType
+{
+	Unknown,
+	String,
+	Int,
+	Float,
+	Bool	
+};
+
 //This is a singleton for storing settings.
 class Settings
 {
@@ -50,6 +60,9 @@ public:
 
 	void loadFile();
 	bool saveFile();
+
+	SettingType getSettingType(const std::string& name);
+	std::vector<std::string> getSettingsNames();
 
 	//You will get a warning if you try a get on a key that is not already present.
 	bool getBool(const std::string& name);
@@ -74,6 +87,7 @@ public:
 	DECLARE_STATIC_BOOL_SETTING(ShowControllerBattery)
 	DECLARE_STATIC_BOOL_SETTING(ShowNetworkIndicator)
 	DECLARE_STATIC_BOOL_SETTING(DrawFramerate)
+	DECLARE_STATIC_BOOL_SETTING(UseFileCache)
 	DECLARE_STATIC_BOOL_SETTING(VolumePopup)
 	DECLARE_STATIC_BOOL_SETTING(BackgroundMusic)
 	DECLARE_STATIC_BOOL_SETTING(ClockMode12)
@@ -83,6 +97,7 @@ public:
 	DECLARE_STATIC_BOOL_SETTING(ShowFoldersFirst)
 	DECLARE_STATIC_BOOL_SETTING(ScrollLoadMedias)
 	DECLARE_STATIC_INT_SETTING(ScreenSaverTime);
+	DECLARE_STATIC_INT_SETTING(FpsLimit);
 
 	// Non-cached settings with only shortcut methods
 	DEFINE_BOOL_SETTING(ShowHiddenFiles)
@@ -99,6 +114,10 @@ public:
 	DEFINE_BOOL_SETTING(NetPlayShowOnlyRelayServerGames)
 	DEFINE_BOOL_SETTING(NetPlayShowMissingGames)			
 	DEFINE_BOOL_SETTING(LoadEmptySystems)		
+	DEFINE_BOOL_SETTING(HideUniqueGroups)
+	DEFINE_BOOL_SETTING(DrawGunCrosshair)
+	DEFINE_BOOL_SETTING(PackGamelists)
+	DEFINE_BOOL_SETTING(BuildMultiDiskContentCache)
 	DEFINE_STRING_SETTING(HiddenSystems)
 	DEFINE_STRING_SETTING(TransitionStyle)
 	DEFINE_STRING_SETTING(GameTransitionStyle)		
@@ -106,6 +125,8 @@ public:
 	DEFINE_INT_SETTING(RecentlyScrappedFilter)
 
 	static Delegate<ISettingsChangedEvent> settingChanged;
+
+	const std::set<std::string>& getHiddenSystems() { return mHiddenSystems; }
 
 private:
 	static Settings* sInstance;
@@ -126,6 +147,8 @@ private:
 	std::map<std::string, int> mDefaultIntMap;
 	std::map<std::string, float> mDefaultFloatMap;
 	std::map<std::string, std::string> mDefaultStringMap;	
+
+	std::set<std::string> mHiddenSystems;
 
 	bool mLoaded;
 	void updateCachedSetting(const std::string& name);

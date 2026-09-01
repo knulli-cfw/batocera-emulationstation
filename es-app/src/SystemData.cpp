@@ -25,10 +25,16 @@
 #include "SaveStateRepository.h"
 #include "Paths.h"
 #include "SystemRandomPlaylist.h"
+#include "ThemeData.h"
 
 #if WIN32
 #include "Win32ApiSystem.h"
 #endif
+
+#include <rapidjson/rapidjson.h>
+#include <rapidjson/document.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/writer.h>
 
 using namespace Utils;
 
@@ -88,8 +94,8 @@ SystemData::SystemData(const SystemMetadata& meta, SystemEnvironmentData* envDat
 	if (pEmulators != nullptr)
 		mEmulators = *pEmulators;
 
-	auto hiddenSystems = Utils::String::split(Settings::HiddenSystems(), ';');
-	mHidden = (mIsCollectionSystem ? withTheme : (std::find(hiddenSystems.cbegin(), hiddenSystems.cend(), getName()) != hiddenSystems.cend()));
+	auto hiddenSystems = Settings::getInstance()->getHiddenSystems();
+	mHidden = (mIsCollectionSystem ? withTheme : (hiddenSystems.find(getName()) != hiddenSystems.cend()));
 
 	loadFeatures();
 
@@ -117,9 +123,14 @@ SystemData::SystemData(const SystemMetadata& meta, SystemEnvironmentData* envDat
 		}
 
 		if (!Settings::IgnoreGamelist())
-			parseGamelist(this, fileMap);		
+		{
+			if (!mHidden && Settings::PackGamelists())
+				packGamelist(this);
+
+			parseGamelist(this, fileMap);
+		}
 		
-		if (Settings::RemoveMultiDiskContent())
+		if (Settings::RemoveMultiDiskContent() || Settings::BuildMultiDiskContentCache())
 			removeMultiDiskContent(fileMap);
 	}
 	else
@@ -186,12 +197,70 @@ void SystemData::removeMultiDiskContent(std::unordered_map<std::string, FileData
 		FolderData* current = stack.top();
 		stack.pop();
 
+		bool loadFromJson = !Settings::BuildMultiDiskContentCache();
+
+		auto relativeTo = mRootFolder->getPath();
+
 		for (auto it : current->getChildren())
 		{
 			if (it->getType() == GAME && it->hasContentFiles())
 			{
-				for (auto ct : it->getContentFiles())
-					files.push_back(ct);
+				std::string stamp = "mtime:" + std::to_string(
+					(long long)Utils::FileSystem::getFileModificationDate(it->getPath()).getTime());
+
+				bool fromCache = false;
+
+				std::string json = loadFromJson ? it->getMetadata().get("multidisk") : "";
+				if (!json.empty())
+				{
+					rapidjson::Document doc;
+					doc.Parse(json.c_str());
+
+					if (doc.IsArray() && doc.Size() > 0 && doc[0].IsString() && stamp == doc[0].GetString())
+					{
+						fromCache = true;
+
+						for (auto& v : doc.GetArray())
+						{
+							if (v.IsString())
+							{
+								std::string file = v.GetString();
+								if (Utils::String::startsWith(file, "mtime:") || Utils::String::endsWith(file, "/"))
+									continue;
+
+								file = Utils::FileSystem::getAbsolutePath(file, relativeTo);
+								files.push_back(file);
+							}
+						}
+					}
+				}
+				if (!fromCache)
+				{
+					rapidjson::Document doc;
+					doc.SetArray();
+
+					auto& allocator = doc.GetAllocator();
+					doc.PushBack(rapidjson::Value(stamp.c_str(), allocator), allocator);
+
+					for (auto ct : it->getContentFiles())
+					{
+						auto relativePath = Utils::FileSystem::createRelativePath(ct, relativeTo, true);
+						doc.PushBack(rapidjson::Value(relativePath.c_str(), allocator), allocator);
+
+						files.push_back(ct);
+					}
+
+					rapidjson::StringBuffer buffer;
+					rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+					doc.Accept(writer);
+
+					std::string multidisk = buffer.GetString();
+					if (it->getMetadata().get("multidisk") != multidisk)
+					{
+						it->getMetadata().set("multidisk", multidisk);
+						it->getMetadata().setDirty();
+					}
+				}
 			}
 			else if (it->getType() == FOLDER)
 			{
@@ -204,7 +273,7 @@ void SystemData::removeMultiDiskContent(std::unordered_map<std::string, FileData
 	for (auto file : files)
 	{
 		auto it = fileMap.find(file);
-		if (it != fileMap.cend())
+		if (it != fileMap.cend() && it->second->getType() == GAME)
 		{
 			delete it->second;
 			fileMap.erase(it);
@@ -331,8 +400,10 @@ void SystemData::populateFolder(FolderData* folder, std::unordered_map<std::stri
 				}
 			}
 
+			static std::set<std::string> excludedFolders = { "media", "medias", "images", "manuals", "videos", "assets", "html_arrm", "bezels", "fonts", "logs", "screenshots" };
+
 			// Don't loose time looking in downloaded_images, downloaded_videos & media folders
-			if (fn == "media" || fn == "medias" || fn == "images" || fn == "manuals" || fn == "videos" || fn == "assets" || Utils::String::startsWith(fn, "downloaded_") || Utils::String::startsWith(fn, "."))
+			if (fn[0] == '.' || excludedFolders.find(fn) != excludedFolders.cend() || Utils::String::startsWith(fn, "downloaded_"))
 				continue;
 			
 			// Hardcoded optimisation : WiiU has so many files in content & meta directories
@@ -399,7 +470,7 @@ void SystemData::indexAllGameFilters(const FolderData* folder)
 
 void SystemData::createGroupedSystems()
 {
-	auto hiddenSystems = Utils::String::split(Settings::HiddenSystems(), ';');
+	auto hiddenSystems = Settings::getInstance()->getHiddenSystems();
 
 	std::map<std::string, std::vector<SystemData*>> map;
 
@@ -416,7 +487,7 @@ void SystemData::createGroupedSystems()
 			sys->getSystemEnvData()->mGroup = "";
 			continue;
 		}		
-		else if (std::find(hiddenSystems.cbegin(), hiddenSystems.cend(), sys->getName()) != hiddenSystems.cend())
+		else if (hiddenSystems.find(sys->getName()) != hiddenSystems.cend())
 			continue;
 		
 		map[sys->getSystemEnvData()->mGroup].push_back(sys);		
@@ -424,6 +495,17 @@ void SystemData::createGroupedSystems()
 
 	for (auto item : map)
 	{	
+		// Don't group if system count is only 1 		
+		if (item.second.size() == 1 && Settings::getInstance()->HideUniqueGroups())
+		{
+			auto groupSys = SystemData::getSystem(item.first);
+			if (groupSys == nullptr)
+			{
+				item.second[0]->getSystemEnvData()->mAutoUngroup = true;
+				continue;
+			}
+		}
+		
 		SystemData* system = nullptr;
 		bool existingSystem = false;
 
@@ -449,7 +531,7 @@ void SystemData::createGroupedSystems()
 			md.fullName = item.first;
 			md.themeFolder = item.first;
 
-			// Check if the system is described in es_systems but empty, to import metadatas )
+			// Check if the system is described in es_systems but empty, to import metadata )
 			auto sourceSystem = SystemData::loadSystem(item.first, false);
 			if (sourceSystem != nullptr)
 			{
@@ -474,7 +556,7 @@ void SystemData::createGroupedSystems()
 			system->mIsGameSystem = false;
 		}
 
-		if (std::find(hiddenSystems.cbegin(), hiddenSystems.cend(), system->getName()) != hiddenSystems.cend())
+		if (hiddenSystems.find(system->getName()) != hiddenSystems.cend())
 		{
 			system->mHidden = true;
 
@@ -603,29 +685,29 @@ bool SystemData::loadFeatures()
 			emul.features = it->second.features;
 			emul.customFeatures = it->second.customFeatures;			
 
-			for (auto essystem : it->second.systemFeatures)
+			for (auto& essystem : it->second.systemFeatures)
 			{
 				if (essystem.name != systemName)
 					continue;
 
 				emul.features = emul.features | essystem.features;
-				for (auto feat : essystem.customFeatures)
+				for (auto& feat : essystem.customFeatures)
 					emul.customFeatures.push_back(feat);
 			}
 
 			for (auto& core : emul.cores)
 			{
-				for (auto escore : it->second.cores)
+				for (auto& escore : it->second.cores)
 				{
 					if (core.name != escore.name)
 						continue;
 					
 					core.features = core.features | escore.features;
 
-					for (auto feat : escore.customFeatures)
+					for (auto& feat : escore.customFeatures)
 						core.customFeatures.push_back(feat);
 
-					for (auto essystem : escore.systemFeatures)
+					for (auto& essystem : escore.systemFeatures)
 					{
 						if (essystem.name != systemName)
 							continue;
@@ -813,8 +895,16 @@ bool SystemData::loadConfig(Window* window)
 	}
 
 	pugi::xml_document doc;
-	pugi::xml_parse_result res = doc.load_file(WINSTRINGW(path).c_str());
 
+	auto buffer = Utils::FileSystem::readAllBytes(path);
+	if (!buffer.size())
+	{
+		LOG(LogError) << "Could not open es_systems.cfg file!";
+		return false;
+	}
+
+	//	pugi::xml_parse_result res = doc.load_file(WINSTRINGW(path).c_str());
+	pugi::xml_parse_result res = doc.load_buffer_inplace(buffer.data(), buffer.size(), pugi::parse_default);
 	if (!res)
 	{
 		LOG(LogError) << "Could not parse es_systems.cfg file!";
@@ -847,8 +937,6 @@ bool SystemData::loadConfig(Window* window)
 		return false;
 	}
 
-	Utils::FileSystem::FileSystemCacheActivator fsc;
-
 	CustomFeatures::loadEsFeaturesFile();
 
 	int currentSystem = 0;
@@ -861,7 +949,7 @@ bool SystemData::loadConfig(Window* window)
 	// Allow threaded loading only if processor threads > 1 so it does not apply on machines like Pi0.
 	if (std::thread::hardware_concurrency() > 1 && Settings::ThreadedLoading())
 	{
-		pThreadPool = new ThreadPool();
+		pThreadPool = new ThreadPool("loadConfig");
 
 		systems = new SystemDataPtr[systemCount];
 		for (int i = 0; i < systemCount; i++)
@@ -887,7 +975,7 @@ bool SystemData::loadConfig(Window* window)
 			std::string fullname = system.child("fullname").text().get();
 
 			if (window != NULL)
-				window->renderSplashScreen(fullname, systemCount == 0 ? 0 : (float)currentSystem / (float)(systemCount + 1));
+				window->renderSplashScreen(fullname, systemCount == 0 ? 0 : (float)currentSystem / (float)(systemCount + 2));
 
 			std::string nm = system.child("name").text().get();
 
@@ -907,7 +995,7 @@ bool SystemData::loadConfig(Window* window)
 			{
 				int px = processedSystem - 1;
 				if (px >= 0 && px < systemsNames.size())
-					window->renderSplashScreen(systemsNames.at(px), (float)px / (float)(systemCount + 1));
+					window->renderSplashScreen(systemsNames.at(px), (float)px / (float)(systemCount + 2));
 			}, 50);
 		}
 		else
@@ -924,12 +1012,12 @@ bool SystemData::loadConfig(Window* window)
 		delete pThreadPool;
 
 		if (window != NULL)
-			window->renderSplashScreen(_("Collections"), systemCount == 0 ? 0 : currentSystem / systemCount);
+			window->renderSplashScreen(_("Collections"), systemCount == 0 ? 0 : currentSystem / (float)(systemCount + 1));
 	}
 	else
 	{
 		if (window != NULL)
-			window->renderSplashScreen(_("Collections"), systemCount == 0 ? 0 : currentSystem / systemCount);
+			window->renderSplashScreen(_("Collections"), systemCount == 0 ? 0 : currentSystem / (float)(systemCount + 1));
 
 		CollectionSystemManager::get()->loadCollectionSystems();
 	}
@@ -967,6 +1055,8 @@ bool SystemData::loadConfig(Window* window)
 		if (checkIndex != 0)
 			ThreadedHasher::start(window, (ThreadedHasher::HasherType)checkIndex, false, true);
 	}
+
+	ThemeFileCache::getInstance().clear();
 
 	return true;
 }
@@ -1065,28 +1155,28 @@ SystemData* SystemData::loadSystem(pugi::xml_node system, bool fullMode)
 	// platform id list
 	std::string platformList = system.child("platform").text().get();
 	std::vector<std::string> platformStrs = readList(platformList);
-	std::vector<PlatformIds::PlatformId> platformIds;
+	std::set<PlatformIds::PlatformId> platformIds;
 	for (auto it = platformStrs.cbegin(); it != platformStrs.cend(); it++)
 	{
 		const char* str = it->c_str();
-		PlatformIds::PlatformId platformId = PlatformIds::getPlatformId(str);
 
+		PlatformIds::PlatformId platformId = PlatformIds::getPlatformId(str);
 		if (platformId == PlatformIds::PLATFORM_IGNORE)
 		{
 			// when platform is ignore, do not allow other platforms
 			platformIds.clear();
 
 			if (md.name == "imageviewer")
-				platformIds.push_back(PlatformIds::IMAGEVIEWER);
+				platformIds.insert(PlatformIds::IMAGEVIEWER);
 			else
-				platformIds.push_back(platformId);
+				platformIds.insert(platformId);
 
 			break;
 		}
 
 		// if there appears to be an actual platform ID supplied but it didn't match the list, warn
 		if (platformId != PlatformIds::PLATFORM_UNKNOWN)
-			platformIds.push_back(platformId);
+			platformIds.insert(platformId);
 		else if (str != NULL && str[0] != '\0' && platformId == PlatformIds::PLATFORM_UNKNOWN)
 			LOG(LogWarning) << "  Unknown platform for system \"" << md.name << "\" (platform \"" << str << "\" from list \"" << platformList << "\")";
 	}
@@ -1429,6 +1519,8 @@ GameCountInfo* SystemData::getGameCountInfo()
 	mGameCountInfo->playTime = 0;
 	
 	int mostPlayCount = 0;
+	long gameTime = 0;
+	std::string mostCountPlayed;
 
 	for (auto game : games)
 	{
@@ -1443,22 +1535,33 @@ GameCountInfo* SystemData::getGameCountInfo()
 		{
 			mGameCountInfo->gamesPlayed++;
 			mGameCountInfo->playCount += playCount;
-
+			
 			if (playCount > mostPlayCount)
 			{
-				mGameCountInfo->mostPlayed = game->getName();
+				mostCountPlayed = game->getName();
 				mostPlayCount = playCount;
 			}
 		}
 
 		long seconds = atol(game->getMetadata(MetaDataId::GameTime).c_str());
 		if (seconds > 0)
+		{
 			mGameCountInfo->playTime += seconds;
+			
+			if (seconds > gameTime)
+			{
+				mGameCountInfo->mostPlayed = game->getName();
+				gameTime = seconds;
+			}
+		}
 
 		auto lastPlayed = game->getMetadata(MetaDataId::LastPlayed);
 		if (!lastPlayed.empty() && lastPlayed > mGameCountInfo->lastPlayedDate)
 			mGameCountInfo->lastPlayedDate = lastPlayed;
 	}
+
+	if (mGameCountInfo->mostPlayed.empty() && !mostCountPlayed.empty())
+		mGameCountInfo->mostPlayed = mostCountPlayed;
 
 	return mGameCountInfo;
 	/*
@@ -1517,7 +1620,7 @@ void SystemData::loadTheme()
 		sysData["system.netplay"] = SystemConf::getInstance()->getBool("global.netplay") && isNetplaySupported() ? "true" : "false";
 		sysData["system.savestates"] = isCurrentFeatureSupported(EmulatorFeatures::autosave) ? "true" : "false";
 
-		if (Settings::getInstance()->getString("SortSystems") == "hardware")
+		if (Settings::getInstance()->getString("SortSystems") == "hardware" || Settings::getInstance()->getString("SortSystems") == "hardware-year")
 			sysData["system.sortedBy"] = Utils::String::proper(getSystemMetadata().hardwareType);
 		else
 			sysData["system.sortedBy"] = getSystemMetadata().manufacturer;
@@ -1730,15 +1833,19 @@ bool SystemData::isNetplayActivated()
 bool SystemData::isGroupChildSystem() 
 { 
 	if (mEnvData != nullptr && !mEnvData->mGroup.empty())
-		return !Settings::getInstance()->getBool(mEnvData->mGroup + ".ungroup") && 
-			   !Settings::getInstance()->getBool(getName() + ".ungroup");
+	{
+		if (mEnvData->mAutoUngroup)
+			return false;
+
+		return !Settings::getInstance()->getBool(mEnvData->mGroup + ".ungroup") && !Settings::getInstance()->getBool(getName() + ".ungroup");
+	}
 
 	return false;
 }
 
 std::unordered_set<std::string> SystemData::getAllGroupNames()
 {
-	auto hiddenSystems = Utils::String::split(Settings::HiddenSystems(), ';');
+	auto hiddenSystems = Settings::getInstance()->getHiddenSystems();
 
 	std::unordered_set<std::string> names;
 	
@@ -1750,14 +1857,14 @@ std::unordered_set<std::string> SystemData::getAllGroupNames()
 		else if (sys->mEnvData != nullptr && !sys->mEnvData->mGroup.empty())
 			name = sys->mEnvData->mGroup;
 
-		if (!name.empty() && std::find(hiddenSystems.cbegin(), hiddenSystems.cend(), name) == hiddenSystems.cend())
+		if (!name.empty() && hiddenSystems.find(name) == hiddenSystems.cend())
 			names.insert(name);
 	}
 
 	return names;
 }
 
-std::unordered_set<std::string> SystemData::getGroupChildSystemNames(const std::string groupName)
+std::unordered_set<std::string> SystemData::getGroupChildSystemNames(const std::string& groupName)
 {
 	std::unordered_set<std::string> names;
 
@@ -1774,7 +1881,7 @@ SystemData* SystemData::getParentGroupSystem()
 		return this;
 
 	for (auto sys : SystemData::sSystemVector)
-		if (sys->isGroupSystem() && sys->getName() == mEnvData->mGroup)
+		if (sys->isGroupSystem() && sys->getName() == mEnvData->mGroup && !mEnvData->mAutoUngroup)
 			return sys;
 
 	return this;
@@ -1916,7 +2023,7 @@ bool SystemData::hasEmulatorSelection()
 	return ec > 1 || cc > 1;
 }
 
-SystemData* SystemData::getSystem(const std::string name)
+SystemData* SystemData::getSystem(const std::string& name)
 {	
 	for (auto sys : SystemData::sSystemVector)
 		if (Utils::String::compareIgnoreCase(sys->getName(), name) == 0)
@@ -2063,6 +2170,17 @@ bool SystemData::getShowCheevosIcon()
 		return isCollection() || isCheevosSupported();
 
 	return false;
+}
+
+int SystemData::getShowTags()
+{
+	int show = Utils::String::toInteger(Settings::getInstance()->getString("ShowTags"));
+
+	auto spf = Settings::getInstance()->getString(getName() + ".ShowTags");
+	if (spf == "" || spf == "auto")
+		return show;
+
+	return Utils::String::toInteger(spf);
 }
 
 int SystemData::getShowFlags()

@@ -225,7 +225,7 @@ int Win32ApiSystem::executeCMD(const char* lpCommandLine, std::string& output, c
 			//spawn the child process
 			std::wstring commandLineW = Utils::String::convertToWideString(lpCommandLine);
 			std::wstring directory = lpCurrentDirectory == NULL ? L"" : Utils::String::convertToWideString(lpCurrentDirectory);
-			if (CreateProcessW(NULL, (LPWSTR)commandLineW.c_str(), NULL, NULL, TRUE, CREATE_NEW_CONSOLE, NULL, lpCurrentDirectory == NULL ? NULL : (LPWSTR)directory.c_str(), &si, &pi))
+			if (CreateProcessW(NULL, (LPWSTR)commandLineW.c_str(), NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, lpCurrentDirectory == NULL ? NULL : (LPWSTR)directory.c_str(), &si, &pi))
 			{
 				if (m_hJob != nullptr)
 					AssignProcessToJobObject(m_hJob, pi.hProcess);
@@ -649,15 +649,15 @@ static std::string getScriptPath(const std::string& name)
 
 	for (auto path : paths)
 	{
-		std::string esUpdatePath = Utils::FileSystem::combine(path, name + ".cmd");
+		std::string esUpdatePath = Utils::FileSystem::combine(path, name + ".exe");
+		if (Utils::FileSystem::exists(esUpdatePath))
+			return Utils::FileSystem::getPreferredPath(esUpdatePath);
+
+		esUpdatePath = Utils::FileSystem::combine(path, name + ".cmd");
 		if (Utils::FileSystem::exists(esUpdatePath))
 			return Utils::FileSystem::getPreferredPath(esUpdatePath);
 
 		esUpdatePath = Utils::FileSystem::combine(path, name + ".bat");
-		if (Utils::FileSystem::exists(esUpdatePath))
-			return Utils::FileSystem::getPreferredPath(esUpdatePath);
-
-		esUpdatePath = Utils::FileSystem::combine(path, name + ".exe");
 		if (Utils::FileSystem::exists(esUpdatePath))
 			return Utils::FileSystem::getPreferredPath(esUpdatePath);
 	}
@@ -753,7 +753,7 @@ void Win32ApiSystem::installEmulationStationZip(const std::string& zipFile)
 	Utils::FileSystem::deleteDirectoryFiles(path);
 }
 
-std::pair<std::string, int> Win32ApiSystem::updateSystem(const std::function<void(const std::string)>& func)
+std::pair<std::string, int> Win32ApiSystem::updateSystem(const std::function<void(const std::string)>& func, bool fromlocalmedia)
 {
 	std::string esUpdateScript = getScriptPath("es-update");
 	if (!esUpdateScript.empty())
@@ -987,26 +987,29 @@ std::vector<std::string> Win32ApiSystem::getVideoModes(const std::string output)
 	{
 		if (vDevMode.dmDisplayFixedOutput == 0)
 		{			
+			std::string interlaced = (vDevMode.dmDisplayFlags & 2) == 2 ? "i": "";
+			std::string ifoInterlaced = (vDevMode.dmDisplayFlags & 2) == 2 ? " (" + _("Interlaced") + ")": "";
+
 			if (vDevMode.dmBitsPerPel == 32)
 				ret.push_back(
-					std::to_string(vDevMode.dmPelsWidth)+"x"+
-					std::to_string(vDevMode.dmPelsHeight)+"x"+
-					std::to_string(vDevMode.dmBitsPerPel)+"x"+
-					std::to_string(vDevMode.dmDisplayFrequency) + ":" +
+					std::to_string(vDevMode.dmPelsWidth)+"x" +
+					std::to_string(vDevMode.dmPelsHeight)+"x" +
+					std::to_string(vDevMode.dmBitsPerPel)+"x" +
+					std::to_string(vDevMode.dmDisplayFrequency) + interlaced + ":" +
 					std::to_string(vDevMode.dmPelsWidth) + "x" +
 					std::to_string(vDevMode.dmPelsHeight) + " " +
-					std::to_string(vDevMode.dmDisplayFrequency) + "Hz");
+					std::to_string((vDevMode.dmDisplayFlags & 2) == 2 ? vDevMode.dmDisplayFrequency * 2 : vDevMode.dmDisplayFrequency) + "Hz" + ifoInterlaced);
 			else
 			{
 				ret.push_back(
 					std::to_string(vDevMode.dmPelsWidth) + "x" +
 					std::to_string(vDevMode.dmPelsHeight) + "x" +
 					std::to_string(vDevMode.dmBitsPerPel) + "x" +
-					std::to_string(vDevMode.dmDisplayFrequency) + ":" +
+					std::to_string(vDevMode.dmDisplayFrequency) + interlaced + ":" +
 					std::to_string(vDevMode.dmPelsWidth) + "x" +
 					std::to_string(vDevMode.dmPelsHeight) + "x" +
 					std::to_string(vDevMode.dmBitsPerPel) + " " +
-					std::to_string(vDevMode.dmDisplayFrequency) + "Hz");
+					std::to_string((vDevMode.dmDisplayFlags & 2) == 2 ? vDevMode.dmDisplayFrequency * 2 : vDevMode.dmDisplayFrequency) + "Hz" + ifoInterlaced);
 			}				
 		}
 
@@ -1019,8 +1022,6 @@ std::vector<std::string> Win32ApiSystem::getVideoModes(const std::string output)
 
 std::vector<std::string> Win32ApiSystem::getShaderList(const std::string& system, const std::string& emulator, const std::string& core)
 {
-	Utils::FileSystem::FileSystemCacheActivator fsc;
-
 	std::vector<std::string> ret;
 
 	std::vector<std::string> folderList;
@@ -1163,7 +1164,10 @@ bool Win32ApiSystem::setPlaneMode(bool enable)
 	return false;
 }
 
-
+bool Win32ApiSystem::forgetBluetoothControllers()
+{
+	return executeScript("batocera-bluetooth forgetBT");
+}
 
 #endif
 

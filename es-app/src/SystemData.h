@@ -50,11 +50,14 @@ struct SystemMetadata
 
 struct SystemEnvironmentData
 {
+	SystemEnvironmentData() { mAutoUngroup = false; }
+
 	std::string mStartPath;
 	std::set<std::string> mSearchExtensions;
 	std::string mLaunchCommand;
-	std::vector<PlatformIds::PlatformId> mPlatformIds;
+	std::set<PlatformIds::PlatformId> mPlatformIds;
 	std::string mGroup;
+	bool mAutoUngroup;
 
 	inline bool isValidExtension(const std::string& extension)
 	{
@@ -85,7 +88,7 @@ public:
     SystemData(const SystemMetadata& type, SystemEnvironmentData* envData, std::vector<EmulatorData>* pEmulators, bool CollectionSystem = false, bool groupedSystem = false, bool withTheme = true, bool loadThemeOnlyIfElements = false);
 	~SystemData();
 
-	static SystemData* getSystem(const std::string name);
+	static SystemData* getSystem(const std::string& name);
 	static SystemData* getFirstVisibleSystem();
 
 	inline FolderData* getRootFolder() const { return mRootFolder; };
@@ -95,8 +98,8 @@ public:
 	inline const std::set<std::string>& getExtensions() const { return mEnvData->mSearchExtensions; }
 	inline const std::string& getThemeFolder() const { return mMetadata.themeFolder; }
 	inline SystemEnvironmentData* getSystemEnvData() const { return mEnvData; }
-	inline const std::vector<PlatformIds::PlatformId>& getPlatformIds() const { return mEnvData->mPlatformIds; }
-	inline bool hasPlatformId(PlatformIds::PlatformId id) { if (!mEnvData) return false; return std::find(mEnvData->mPlatformIds.cbegin(), mEnvData->mPlatformIds.cend(), id) != mEnvData->mPlatformIds.cend(); }
+	inline const std::set<PlatformIds::PlatformId>& getPlatformIds() const { return mEnvData->mPlatformIds; }
+	inline bool hasPlatformId(PlatformIds::PlatformId id) { if (!mEnvData) return false; return mEnvData->mPlatformIds.find(id) != mEnvData->mPlatformIds.cend(); }
 	inline const SystemMetadata& getSystemMetadata() const { return mMetadata; }
 
 	inline const std::shared_ptr<ThemeData>& getTheme() const { return mTheme; }
@@ -188,7 +191,7 @@ public:
 	SystemData* getParentGroupSystem();
 
 	static std::unordered_set<std::string> getAllGroupNames();
-	static std::unordered_set<std::string> getGroupChildSystemNames(const std::string groupName);
+	static std::unordered_set<std::string> getGroupChildSystemNames(const std::string& groupName);
 
 	std::string getEmulator(bool resolveDefault = true);
 	std::string getCore(bool resolveDefault = true);
@@ -223,6 +226,7 @@ public:
 	bool getShowFavoritesIcon();
 	bool getShowCheevosIcon();
 	int  getShowFlags();
+	int  getShowTags();
 	std::string getFolderViewMode();
 	bool getBoolSetting(const std::string& settingName);
 

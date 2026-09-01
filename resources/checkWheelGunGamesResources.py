@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 import xml.etree.ElementTree as ET
-
+import os
 
 def xml2systemsArrays(path):
     res = dict()
@@ -9,12 +9,12 @@ def xml2systemsArrays(path):
     root = tree.getroot()
 
     for nodesystem in root.findall(".//system"):
-        system = nodesystem.get("name")
+        system = nodesystem.get("id")
         if system in res:
             raise Exception("duplicated system found")
         res[system] = []
         for nodegame in nodesystem:
-            res[system].append(nodegame.get("name"))
+            res[system].append(nodegame.get("id"))
     return res
 
 def checkSystemGames(system, games):
@@ -33,7 +33,7 @@ def checkSystemGames(system, games):
 
 hasError = False
 
-for file in ["resources/gamesdb.xml"]:
+for file in [os.path.join(os.path.dirname(__file__), 'gamesdb.xml')]:
     systems = xml2systemsArrays(file)
     for system in systems:
         if checkSystemGames(system, systems[system]) == False:

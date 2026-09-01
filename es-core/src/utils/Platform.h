@@ -65,11 +65,16 @@ namespace Utils
 
 		BatteryInformation queryBatteryInformation();
 
-		std::string queryIPAdress();
+		std::string queryIPAddress();
 		std::string getArchString();
+		unsigned long long getTotalSystemMemory();
 
 #if WIN32
+		bool isWindows10();
 		bool isWindows11();
+		void setDpiAwareness();
+#else
+		bool isBuildroot();
 #endif
 	}
 }

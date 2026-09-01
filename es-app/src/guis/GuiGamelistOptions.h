@@ -34,7 +34,7 @@ private:
 	void jumpToLetter();
 	void editCollectionFilters();
 	void createNewCollectionFilter();
-	void createCollection(std::string inName);
+	void createCollection(const std::string& inName);
 	void deleteCollection();
 
 	

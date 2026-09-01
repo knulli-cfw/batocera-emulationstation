@@ -43,14 +43,14 @@ void GuiCollectionSystemsOptions::initializeMenu()
 				man = system->getSystemMetadata().manufacturer;
 			}
 
-			displayedSystems->add(system->getFullName(), system, std::find(hiddenSystems.cbegin(), hiddenSystems.cend(), system->getName()) == hiddenSystems.cend());
+			displayedSystems->add(system->getFullName(), system, std::find(hiddenSystems.cbegin(), hiddenSystems.cend(), system->getName()) == hiddenSystems.cend(), false);
 		}
 	}
 	else
 	{
 		for (auto system : SystemData::sSystemVector)
 			if (!system->isCollection()/* && !system->isGroupChildSystem()*/)
-				displayedSystems->add(system->getFullName(), system, std::find(hiddenSystems.cbegin(), hiddenSystems.cend(), system->getName()) == hiddenSystems.cend());
+				displayedSystems->add(system->getFullName(), system, std::find(hiddenSystems.cbegin(), hiddenSystems.cend(), system->getName()) == hiddenSystems.cend(), false);
 	}
 
 	addWithLabel(_("SYSTEMS DISPLAYED"), displayedSystems);
@@ -95,7 +95,25 @@ void GuiCollectionSystemsOptions::initializeMenu()
 
 		auto ungroupedSystems = std::make_shared<OptionListComponent<std::string>>(mWindow, _("GROUPED SYSTEMS"), true);
 		for (auto groupName : groupNames)
-		{			
+		{
+			std::vector<std::string> systemNames;
+			for (auto systemName : SystemData::getGroupChildSystemNames(groupName))
+				systemNames.push_back(systemName);
+
+			std::sort(systemNames.begin(), systemNames.end());
+
+			// Don't group if system count is only 1 ?
+			if (Settings::getInstance()->HideUniqueGroups())
+			{
+				int count = std::count_if(systemNames.cbegin(), systemNames.cend(), [&groupName](const std::string& name) { return name != groupName; });
+				if (count == 1)
+				{
+					auto groupSys = SystemData::getSystem(groupName);
+					if (groupSys == nullptr)
+						continue;
+				}
+			}
+
 			SystemData* pSystem = SystemData::getSystem(groupName);
 			if (pSystem != nullptr)
 				ungroupedSystems->addGroup(Utils::String::toUpper(pSystem->getFullName()));
@@ -103,12 +121,6 @@ void GuiCollectionSystemsOptions::initializeMenu()
 				ungroupedSystems->addGroup(Utils::String::toUpper(groupName));
 
 			std::string description;
-
-			std::vector<std::string> systemNames;
-			for (auto systemName : SystemData::getGroupChildSystemNames(groupName))
-				systemNames.push_back(systemName);
-				
-			std::sort(systemNames.begin(), systemNames.end());
 
 			for (auto systemName : systemNames)
 			{
@@ -229,7 +241,8 @@ void GuiCollectionSystemsOptions::initializeMenu()
 	if (SystemData::IsManufacturerSupported)
 	{
 		sortType->add(_("BY MANUFACTURER"), "manufacturer", sortMode == "manufacturer");
-		sortType->add(_("BY HARDWARE TYPE"), "hardware", sortMode == "hardware");
+		sortType->add(_("BY HARDWARE TYPE THEN ALPHABETICALLY"), "hardware", sortMode == "hardware");
+		sortType->add(_("BY HARDWARE TYPE THEN YEAR"), "hardware-year", sortMode == "hardware-year");
 		sortType->add(_("BY MANUFACTURER AND TYPE"), "subgroup", sortMode == "subgroup");
 		sortType->add(_("BY RELEASE YEAR"), "releaseDate", sortMode == "releaseDate");
 	}
@@ -351,7 +364,8 @@ void GuiCollectionSystemsOptions::initializeMenu()
 	});
 
 	addSwitch(_("SHOW EMPTY SYSTEMS"), "LoadEmptySystems", true, [&] { setVariable("reloadSystems", true); });
-	
+	addSwitch(_("DON'T SHOW GROUPS WITH ONLY ONE SYSTEM"), "HideUniqueGroups", true, [&] { setVariable("reloadSystems", true); });
+		
 #if defined(WIN32) && !defined(_DEBUG)		
 	if (!ApiSystem::getInstance()->isScriptingSupported(ApiSystem::GAMESETTINGS))
 		addEntry(_("UPDATE GAMELISTS"), false, [this] { GuiMenu::updateGameLists(mWindow); }); // Game List Update
@@ -408,7 +422,7 @@ void GuiCollectionSystemsOptions::initializeMenu()
 	});
 }
 
-void GuiCollectionSystemsOptions::createCollection(std::string inName) 
+void GuiCollectionSystemsOptions::createCollection(const std::string& inName) 
 {
 	std::string name = CollectionSystemManager::get()->getValidNewCollectionName(inName);
 	SystemData* newSys = CollectionSystemManager::get()->addNewCustomCollection(name);
@@ -435,7 +449,7 @@ void GuiCollectionSystemsOptions::createCollection(std::string inName)
 	window->closeSplashScreen();
 }
 
-void GuiCollectionSystemsOptions::createFilterCollection(std::string inName, bool editFilters)
+void GuiCollectionSystemsOptions::createFilterCollection(const std::string& inName, bool editFilters)
 {
 	std::string name = CollectionSystemManager::get()->getValidNewCollectionName(inName);
 	if (name.empty())
@@ -584,7 +598,7 @@ void GuiCollectionSystemsOptions::addSystemsToMenu()
 		addWithLabel(_("CUSTOM GAME COLLECTIONS"), customOptionList);
 }
 
-void GuiCollectionSystemsOptions::updateSettings(std::string newAutoSettings, std::string newCustomSettings)
+void GuiCollectionSystemsOptions::updateSettings(const std::string& newAutoSettings, const std::string& newCustomSettings)
 {
 	bool dirty = Settings::getInstance()->setString("CollectionSystemsAuto", newAutoSettings);
 	dirty |= Settings::getInstance()->setString("CollectionSystemsCustom", newCustomSettings);

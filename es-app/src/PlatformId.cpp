@@ -58,7 +58,7 @@ namespace PlatformIds
 		{ "pc88",					PC_88 },
 		{ "pc98",					PC_98 },
 		{ "sega32x",				SEGA_32X },
-		{ "segacd",					SEGA_CD },
+		{ "megacd",					SEGA_CD },
 		{ "dreamcast",				SEGA_DREAMCAST },
 		{ "gamegear",				SEGA_GAME_GEAR },
 		{ "genesis",				SEGA_GENESIS },
@@ -86,6 +86,7 @@ namespace PlatformIds
 		{ "vectrex",				VECTREX },
 		{ "trs-80",					TRS80_COLOR_COMPUTER },
 		{ "coco",					TANDY },
+		{ "dragon32",				DRAGON32 },
 		{ "supergrafx",				SUPERGRAFX },
 		{ "amigacd32",				AMIGACD32 },
 		{ "amigacdtv",				AMIGACDTV },
@@ -125,6 +126,7 @@ namespace PlatformIds
 		{ "vpinball",				VISUALPINBALL },
 		{ "fpinball",				FUTUREPINBALL },
 		{ "o2em",					VIDEOPAC_ODYSSEY2 },
+		{ "laseractive",			PIONEER_LASERACTIVE },
 
 		// Misc systems
 		{ "channelf",				CHANNELF },
@@ -145,6 +147,7 @@ namespace PlatformIds
 		{ "ti99_4a",				TI99 },
 		{ "pico8",					PICO8 },
 		{ "sgb",					SUPER_GAME_BOY },
+		{ "vc4000",					VC4000 },
 
 		{ "watara",					WATARA_SUPERVISION },
 		{ "supervision",			WATARA_SUPERVISION },
@@ -153,11 +156,13 @@ namespace PlatformIds
 			
 		{ "imageviewer",			IMAGEVIEWER },
 			
+		{ "cassettevision",			CASSETTE_VISION },
 		{ "scv",					SUPER_CASSETTE_VISION },
 		{ "easyrpg",				EASYRPG },			
 		{ "pet",					COMMODORE_PET },
 		{ "cpet",					COMMODORE_PET },
 		{ "cplus4",					COMMODORE_PLUS4 },
+		{ "c16",					COMMODORE_16 },
 		{ "atom",					ACORN_ATOM },
 		{ "bbcmicro",				ACORN_BBC_MICRO },
 		{ "bbc",					ACORN_BBC_MICRO },
@@ -167,6 +172,7 @@ namespace PlatformIds
 		{ "astrocade",				ASTROCADE },
 		{ "archimedes",				ARCHIMEDES },			
 		{ "adam",					ADAM },
+		{ "bk",						ELEKTRONIKA_BK },
 
 		{ "fmtowns",				FMTOWNS },
 		{ "cdi",					PHILIPS_CDI },			
@@ -242,7 +248,7 @@ namespace PlatformIds
 		{ 142, { "neogeo", "Neo-Geo" } },
 		{ 147, { "sega", "Sega" } },
 		{ 148, { "irem", "Irem" } },
-		{ 148, { "seta", "Seta" } },
+		{ 149, { "seta", "Seta" } },
 		{ 150, { "midway", "Midway" } },
 		{ 151, { "capcom", "Capcom" } },
 		{ 152, { "eighting", "Eighting/Raizing" } },		

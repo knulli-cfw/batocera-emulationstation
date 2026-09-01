@@ -1,8 +1,8 @@
 #include "GuiNetPlay.h"
 #include "Window.h"
 #include <string>
-#include <fcntl.h>
 #include <future>
+#include <fcntl.h>
 #include "Log.h"
 #include "Settings.h"
 #include "SystemConf.h"
@@ -162,16 +162,19 @@ static std::map<std::string, std::string> coreList =
 #endif
 };
 
-GuiNetPlay::GuiNetPlay(Window* window) 
+GuiNetPlay::GuiNetPlay(Window* window)
 	: GuiComponent(window), 
 	mFindingHotspot(false),
 	mBusyAnim(window),
 	mBackground(window, ":/frame.png"),
 	mGrid(window, Vector2i(1, 3)),
 	mList(nullptr),
-	mLanLobbySocket(-1), 
-	mLanLobbySocketTimeout(0)
-{
+	mLanLobbySocket(-1),
+	mLanLobbySocketTimeout(0),
+	mPopulateThread(nullptr),
+	mThreadFinished(false),
+	mLobbyGracePeriodElapsed(0)
+{	
 	addChild(&mBackground);
 	addChild(&mGrid);
 
@@ -189,19 +192,20 @@ GuiNetPlay::GuiNetPlay(Window* window)
 
 	mTitle = std::make_shared<TextComponent>(mWindow, _("CONNECT TO NETPLAY"), theme->Title.font, theme->Title.color, ALIGN_CENTER);
 	mSubtitle = std::make_shared<TextComponent>(mWindow, _("Select a game lobby to join"), theme->TextSmall.font, theme->TextSmall.color, ALIGN_CENTER);
+	
 	mHeaderGrid->setEntry(mTitle, Vector2i(0, 1), false, true);
 	mHeaderGrid->setEntry(mSubtitle, Vector2i(0, 3), false, true);
 
 	mGrid.setEntry(mHeaderGrid, Vector2i(0, 0), false, true);
 	// Lobby Entries List
 	mList = std::make_shared<ComponentList>(mWindow);
-	mGrid.setEntry(mList, Vector2i(0, 1), true, true);
+	mGrid.setEntry(mList, Vector2i(0, 1), true, true, Vector2i(1, 1), GridFlags::BORDER_TOP);
 
 	// Buttons
 	std::vector< std::shared_ptr<ButtonComponent> > buttons;
 	buttons.push_back(std::make_shared<ButtonComponent>(mWindow, _("REFRESH"), _("REFRESH"), [this] 
 	{
-			if (ApiSystem::getInstance()->getIpAdress() != "NOT CONNECTED")
+			if (ApiSystem::getInstance()->getIpAddress() != "NOT CONNECTED")
 				startRequest();
 			else if (SystemConf::getInstance()->getBool("wifi.enabled") && SystemConf::getInstance()->getBool("global.netplay.hotspot"))
 				findHotspot();
@@ -209,7 +213,7 @@ GuiNetPlay::GuiNetPlay(Window* window)
 	buttons.push_back(std::make_shared<ButtonComponent>(mWindow, _("CLOSE"), _("CLOSE"), [this] { delete this; }));
 
 	mButtonGrid = makeButtonGrid(mWindow, buttons);
-	mGrid.setEntry(mButtonGrid, Vector2i(0, 2), true, false);
+	mGrid.setEntry(mButtonGrid, Vector2i(0, 2), true, false, Vector2i(1,1), GridFlags::BORDER_TOP);
 
 	mGrid.setUnhandledInputCallback([this](InputConfig* config, Input input) -> bool 
 	{
@@ -239,7 +243,7 @@ GuiNetPlay::GuiNetPlay(Window* window)
 	// Loading
     mBusyAnim.setSize(Vector2f(Renderer::getScreenWidth(), Renderer::getScreenHeight()));
 	
-	if (ApiSystem::getInstance()->getIpAdress() != "NOT CONNECTED")
+	if (ApiSystem::getInstance()->getIpAddress() != "NOT CONNECTED")
 		startRequest();
 	else if (SystemConf::getInstance()->getBool("wifi.enabled") && SystemConf::getInstance()->getBool("global.netplay.hotspot"))
 		findHotspot();
@@ -325,10 +329,30 @@ void GuiNetPlay::update(int deltaTime)
 		startRequest();
 	}
 
-	if (mLanLobbySocketTimeout < 20000) // allow receiving answers from the LAN for 20 seconds
+	if (mLanLobbySocketTimeout < 20000 && mPopulateThread == nullptr) // allow receiving answers from the LAN for 20 seconds
 	{
 		mLanLobbySocketTimeout += deltaTime;
 		populateFromLan();
+	}
+
+	if (mPopulateThread != nullptr)
+	{
+		mBusyAnim.update(deltaTime);
+
+		if (mThreadFinished)
+		{
+			populateList();
+
+			if (mList->size() != 0)
+				mList->setCursorIndex(0, true);
+
+			mLobbyRequest.reset();
+
+			mPopulateThread->join();
+			delete mPopulateThread;
+			mPopulateThread = nullptr;
+		}
+		return;
 	}
 
 	if (!mLobbyRequest)
@@ -345,20 +369,26 @@ void GuiNetPlay::update(int deltaTime)
 		return;
 	}
 
-	if (status == HttpReq::REQ_SUCCESS)
-		populateFromJson(mLobbyRequest->getContent());
+	if (status != HttpReq::REQ_SUCCESS)
+	{
+		// Games found on the LAN are already listed, so a failing lobby request is not an error the user needs to see
+		if (mList->size() == 0)
+			mWindow->pushGui(new GuiMsgBox(mWindow, _("FAILED") + std::string(" : ") + mLobbyRequest->getErrorMsg()));
 
-	if (status != HttpReq::REQ_SUCCESS && mList->size() == 0)
-		mWindow->pushGui(new GuiMsgBox(mWindow, _("FAILED") + std::string(" : ") + mLobbyRequest->getErrorMsg()));
+		mLobbyRequest.reset();
+		return;
+	}
 
-	if (mList->size() != 0)
-		mList->setCursorIndex(0, true);
-
-	mLobbyRequest.reset();
+	if (status == HttpReq::REQ_SUCCESS && mPopulateThread == nullptr)
+	{
+		auto content = mLobbyRequest->getContent();
+		mThreadFinished = false;
+		mPopulateThread = new std::thread([&, content]() { populateFromJson(content); });
+	}
 }
 
 #if WIN32
-static std::vector<std::string> getBroadcastAddresses()
+static std::vector<std::string> getBroadcastAddresses() 
 {
 	std::vector<std::string> ret;
 
@@ -368,34 +398,34 @@ static std::vector<std::string> getBroadcastAddresses()
 
 	pAddresses = (IP_ADAPTER_ADDRESSES*)malloc(outBufLen);
 	if (pAddresses == nullptr)
-		return ret;
+		return ret;	
 
 	dwRetVal = GetAdaptersAddresses(AF_INET, GAA_FLAG_INCLUDE_PREFIX, nullptr, pAddresses, &outBufLen);
-	if (dwRetVal != NO_ERROR)
+	if (dwRetVal != NO_ERROR) 
 	{
 		free(pAddresses);
 		return ret;
 	}
-
-	for (pCurrAddress = pAddresses; pCurrAddress != nullptr; pCurrAddress = pCurrAddress->Next)
+	
+	for (pCurrAddress = pAddresses; pCurrAddress != nullptr; pCurrAddress = pCurrAddress->Next) 
 	{
-		if (pCurrAddress->OperStatus == IfOperStatusUp && pCurrAddress->FirstUnicastAddress)
+		if (pCurrAddress->OperStatus == IfOperStatusUp && pCurrAddress->FirstUnicastAddress) 
 		{
 			sockaddr_in* sa = (sockaddr_in*)pCurrAddress->FirstUnicastAddress->Address.lpSockaddr;
 			sockaddr_in* mask = (sockaddr_in*)pCurrAddress->FirstUnicastAddress->OnLinkPrefixLength;
 
 			if (sa->sin_family != AF_INET)
 				continue;
-
+			
 			uint32_t ip = sa->sin_addr.s_addr;
 			uint32_t subnetMask = htonl(~((1 << (32 - pCurrAddress->FirstUnicastAddress->OnLinkPrefixLength)) - 1));
 			uint32_t broadcast = ip | ~subnetMask;
 
 			struct in_addr broadcastInAddr;
 			broadcastInAddr.s_addr = broadcast;
-
+				
 			std::string broadcastAddr = inet_ntoa(broadcastInAddr);
-			ret.push_back(broadcastAddr);
+			ret.push_back(broadcastAddr);							
 		}
 	}
 
@@ -406,7 +436,7 @@ static std::vector<std::string> getBroadcastAddresses()
 		if (it != ret.cend())
 			ret.erase(it);
 	}
-
+	
 	free(pAddresses);
 	return ret;
 }
@@ -431,7 +461,7 @@ void GuiNetPlay::lanLobbyRequest()
 
 		int broadcastEnable = 1;
 		setsockopt(mLanLobbySocket, SOL_SOCKET, SO_BROADCAST, (const char*)&broadcastEnable, sizeof(broadcastEnable));
-
+	
 		int on = 1;
 		setsockopt(mLanLobbySocket, SOL_SOCKET, SO_REUSEADDR, (const char*)&on, sizeof(on));
 
@@ -441,7 +471,7 @@ void GuiNetPlay::lanLobbyRequest()
 		bindAddr.sin_port = htons(0);
 		bindAddr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-		if (bind(mLanLobbySocket, (struct sockaddr*)&bindAddr, sizeof(bindAddr)) < 0)
+		if (bind(mLanLobbySocket, (struct sockaddr*)&bindAddr, sizeof(bindAddr)) < 0) 
 		{
 			closesocket(mLanLobbySocket);
 			WSACleanup();
@@ -476,8 +506,8 @@ void GuiNetPlay::lanLobbyRequest()
 		struct sockaddr_in broadcastAddr;
 		memset(&broadcastAddr, 0, sizeof(broadcastAddr));
 		broadcastAddr.sin_family = AF_INET;
-		broadcastAddr.sin_port = htons(port);
-		broadcastAddr.sin_addr.s_addr = inet_addr(address.c_str());
+		broadcastAddr.sin_port = htons(port);		
+		broadcastAddr.sin_addr.s_addr = inet_addr(address.c_str());		
 
 		sendto(mLanLobbySocket, (const char*)&query_magic, sizeof(query_magic), 0, (struct sockaddr*)&broadcastAddr, sizeof(broadcastAddr));
 	}
@@ -489,7 +519,7 @@ void GuiNetPlay::lanLobbyRequest()
 	broadcastAddr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
 
 	sendto(mLanLobbySocket, &query_magic, sizeof(query_magic), 0, (struct sockaddr*)&broadcastAddr, sizeof(broadcastAddr));
-#endif
+#endif	
 }
 
 bool GuiNetPlay::input(InputConfig* config, Input input)
@@ -512,9 +542,9 @@ std::vector<HelpPrompt> GuiNetPlay::getHelpPrompts()
 }
 
 
-FileData* GuiNetPlay::getFileData(std::string gameInfo, bool crc, std::string coreName)
+FileData* GuiNetPlay::getFileData(const std::string& gameInfo, bool crc, const std::string& coreName)
 {
-	auto normalizeName = [](const std::string name)
+	auto normalizeName = [](const std::string& name)
 	{
 		auto ret = Utils::String::toLower(name);
 		ret = Utils::String::replace(ret, "_", " ");
@@ -614,7 +644,7 @@ public:
 		mText->setLineSpacing(1.5);
 		mText->setVerticalAlignment(ALIGN_TOP);
 
-		std::string userInfo = _U("\uf007  ") + entry.username + _U("  \uf0AC  ") + entry.country + _U("  \uf0E8  ") + entry.ip+ _U("  \uf108  ") + entry.frontend;
+		std::string userInfo = _U("\uf007  ") + entry.username + _U("  \uf0AC  ") + entry.country + _U("  \uf108  ") + entry.frontend; // _U("  \uf0E8  ") + entry.ip +  
 
 		mSubstring = std::make_shared<TextComponent>(mWindow, userInfo.c_str(), theme->TextSmall.font, theme->Text.color);
 		mSubstring->setOpacity(192);
@@ -923,13 +953,15 @@ bool GuiNetPlay::populateFromJson(const std::string json)
 		entries.push_back(std::move(game));
 	}	
 
+
 	std::sort(entries.begin(), entries.end(), [](const LobbyAppEntry& a, const LobbyAppEntry& b) {
 		return a.isCrcValid ? !b.isCrcValid : (a.coreExists && !b.coreExists);
 		});
 
 	mLobbyEntries = entries;
-	populateList();
+//	populateList();
 
+	mThreadFinished = true;
 	return true;
 }
 
