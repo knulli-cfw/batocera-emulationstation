@@ -91,6 +91,7 @@ public:
 	virtual bool allowSleep();
 	virtual void update(int deltaTime);
 	virtual bool isScreenSaverActive();
+	int getNextUpdateTimeout();
 
 	virtual FileData* getCurrentGame();
 	virtual void launchGame();
@@ -115,6 +116,7 @@ private:
 	std::shared_ptr<VideoScreenSaver>		mVideoScreensaver;
 	std::shared_ptr<ImageScreenSaver>		mFadingImageScreensaver;
 	std::shared_ptr<ImageScreenSaver>		mImageScreensaver;
+	bool mPowerSave;
 
 	std::vector<FileData*> mGamesWithImages;
 	std::vector<FileData*> mGamesWithVideos;

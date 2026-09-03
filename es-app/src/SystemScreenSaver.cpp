@@ -26,13 +26,16 @@
 #include "Paths.h"
 #include "ApiSystem.h"
 #include "BezelResolver.h"
+#include <algorithm>
 
 #define FADE_TIME					(500)
 #define DATE_TIME_UPDATE_INTERVAL	(100)
+#define STATIC_SCREENSAVER_POLL_INTERVAL	(100)
 
 SystemScreenSaver::SystemScreenSaver(Window* window) :
 	mVideoScreensaver(NULL),
 	mImageScreensaver(NULL),
+	mPowerSave(false),
 	mWindow(window),
 	mGamesWithVideosLoaded(false),
 	mGamesWithImagesLoaded(false),
@@ -68,6 +71,32 @@ bool SystemScreenSaver::allowSleep()
 bool SystemScreenSaver::isScreenSaverActive()
 {
 	return (mState != STATE_INACTIVE);
+}
+
+int SystemScreenSaver::getNextUpdateTimeout()
+{
+	// Fades and video require continuous rendering.
+	if (mState != STATE_SCREENSAVER_ACTIVE || mVideoScreensaver)
+		return 0;
+
+	if (mPowerSave)
+		return -1;
+	
+	// Black/dim periodically wake for polling-based input such as lightguns.
+	if (!mImageScreensaver)
+		return STATIC_SCREENSAVER_POLL_INTERVAL;
+
+	// Slideshow: wake for the next image change.
+	int timeout = mVideoChangeTime - mTimer;
+	if (timeout < 1)
+		timeout = 1;
+
+	// Without the clock, periodically wake for polling-based input.
+	if (!Settings::getInstance()->getBool("ScreenSaverDateTime"))
+		return std::min(timeout, STATIC_SCREENSAVER_POLL_INTERVAL);
+
+	// Use the existing date/time update cadence.
+	return std::min(timeout, DATE_TIME_UPDATE_INTERVAL);
 }
 
 void SystemScreenSaver::startScreenSaver()
@@ -195,7 +224,10 @@ void SystemScreenSaver::startScreenSaver()
 			PowerSaver::runningScreenSaver(true);
 			mTimer = 0;
 			return;
-		}	
+		}
+	else if (screensaver_behavior == "power save")
+	{
+		mPowerSave = true;
 	}
 
 	// No videos. Just use a standard screensaver
@@ -218,6 +250,7 @@ void SystemScreenSaver::stopScreenSaver()
 
 	mVideoScreensaver = nullptr;
 	mImageScreensaver = nullptr;
+	mPowerSave = false;
 
 	if(isExitingScreenSaver && mState != STATE_INACTIVE) {
 	  Scripting::fireEvent("screensaver-stop");
@@ -477,9 +510,12 @@ void SystemScreenSaver::update(int deltaTime)
 	else if (mState == STATE_SCREENSAVER_ACTIVE)
 	{
 		// Update the timer that swaps the videos
-		mTimer += deltaTime;
-		if (mTimer > mVideoChangeTime)
-			nextVideo();
+		if (mVideoScreensaver || mImageScreensaver)
+		{
+			mTimer += deltaTime;
+			if (mTimer >= mVideoChangeTime)
+				nextVideo();
+		}
 	}
 
 	// If we have a loaded video then update it

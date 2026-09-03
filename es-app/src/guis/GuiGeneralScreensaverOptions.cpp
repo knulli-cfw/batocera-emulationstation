@@ -13,7 +13,7 @@
 
 #define fake_gettext_randomvideo	_("random video")
 #define fake_gettext_slideshow		_("slideshow")
-
+#define fake_gettext_powersaveonly	_("power save")
 #define fake_gettext_always			_("always")
 #define fake_gettext_start_end		_("start & end")
 #define fake_gettext_never			_("never")
@@ -41,7 +41,7 @@ GuiGeneralScreensaverOptions::GuiGeneralScreensaverOptions(Window* window, int s
 	// Screensaver behavior
 	auto ctlBehavior = std::make_shared< OptionListComponent<std::string> >(mWindow, _("SCREENSAVER TYPE"), false);
 
-	ctlBehavior->addRange(std::vector<std::string>{ "slideshow", "random video" }, ssBehavior);
+	ctlBehavior->addRange(std::vector<std::string>{ "power save", "slideshow", "random video" }, ssBehavior);
 
 	addWithLabel(_("SCREENSAVER TYPE"), ctlBehavior, selectItem == 1);
 	ctlBehavior->setSelectedChangedCallback([this](const std::string& name)
