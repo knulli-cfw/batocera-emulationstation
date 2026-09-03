@@ -612,9 +612,41 @@ void SystemView::update(int deltaTime)
 	for (auto sb : mStaticBackgrounds)
 		sb->update(deltaTime);
 
-	for (auto& entry : mEntries)
-		for (auto extra : entry.backgroundExtras)
-			extra->update(deltaTime);
+	if (!mEntries.empty())
+	{
+		const int entryCount = (int)mEntries.size();
+
+		std::unordered_set<int> updateEntries;
+
+		auto addEntry = [&updateEntries, entryCount](int index)
+		{
+			index %= entryCount;
+			if (index < 0)
+				index += entryCount;
+
+			updateEntries.insert(index);
+		};
+
+		// Update systems visible in the active themed control.
+		int first;
+		int last;
+		mCarousel.getActiveRange(first, last);
+
+		for (int index = first; index <= last; index++)
+			addEntry(index);
+
+		// Keep systems involved in an active slide transition updating.
+		addEntry((int)mExtrasCamOffset);
+		addEntry((int)(mExtrasCamOffset + 0.99999f));
+
+		// Fade transitions explicitly render the previous system too.
+		if (mExtrasFadeOldCursor >= 0 && mExtrasFadeOldCursor < entryCount)
+			addEntry(mExtrasFadeOldCursor);
+
+		for (int index : updateEntries)
+			for (auto extra : mEntries[index].backgroundExtras)
+				extra->update(deltaTime);
+	}
 
 	GuiComponent::update(deltaTime);
 

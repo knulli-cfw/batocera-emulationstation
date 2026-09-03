@@ -81,6 +81,32 @@ public:
 		return mCarousel->size();
 	}
 
+	void getActiveRange(int& first, int& last) const
+	{
+		if (mText)
+		{
+			mText->getActiveRange(first, last);
+			return;
+		}
+
+		if (mGrid)
+		{
+			Vector2i range = mGrid->getVisibleRange();
+			first = range.x();
+			last = range.y();
+			return;
+		}
+
+		if (mCarousel)
+		{
+			mCarousel->getActiveRange(first, last);
+			return;
+		}
+
+		first = 0;
+		last = -1;
+	}
+
 	// GuiComponent wrapped methods
 	std::vector<HelpPrompt> getHelpPrompts() { return mComp->getHelpPrompts(); }
 	float getZIndex() const { return mComp->getZIndex(); }

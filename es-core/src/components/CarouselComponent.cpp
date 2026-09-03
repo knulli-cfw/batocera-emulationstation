@@ -8,6 +8,7 @@
 #include "Window.h"
 #include "Log.h"
 #include "BindingManager.h"
+#include <unordered_set>
 
 // buffer values for scrolling velocity (left, stopped, right)
 const int logoBuffersLeft[] = { -5, -2, -1 };
@@ -166,16 +167,74 @@ bool CarouselComponent::input(InputConfig* config, Input input)
 	return GuiComponent::input(config, input);
 }
 
-void CarouselComponent::update(int deltaTime)
-{		
-	for (int i = 0; i < mEntries.size(); i++)
+void CarouselComponent::getActiveRange(int& first, int& last)
+{
+	const int entryCount = (int)mEntries.size();
+
+	if (entryCount == 0)
 	{
-		const std::shared_ptr<GuiComponent> &comp = mEntries.at(i).data.logo;
-		if (comp != nullptr)
-			comp->update(deltaTime);
+		first = 0;
+		last = -1;
+		return;
 	}
-	
-	listUpdate(deltaTime);	
+
+	const int center = (int)mCamOffset;
+	const int logoCount = Math::min(mMaxLogoCount, entryCount);
+
+	int bufferIndex = Math::max(0, Math::min(2, getScrollingVelocity() + 1));
+	int bufferLeft = logoBuffersLeft[bufferIndex];
+	int bufferRight = logoBuffersRight[bufferIndex];
+
+	if (logoCount == 1 && mCamOffset == 0)
+	{
+		bufferLeft = 0;
+		bufferRight = 0;
+	}
+
+	first = center - logoCount / 2 + bufferLeft;
+	last = center + logoCount / 2 + bufferRight;
+}
+
+void CarouselComponent::update(int deltaTime)
+{
+	if (!mEntries.empty())
+	{
+		const int entryCount = (int)mEntries.size();
+
+		int first;
+		int last;
+		getActiveRange(first, last);
+
+		std::unordered_set<int> updateEntries;
+
+		auto addEntry = [&updateEntries, entryCount](int index)
+		{
+			index %= entryCount;
+			if (index < 0)
+				index += entryCount;
+
+			updateEntries.insert(index);
+		};
+
+		for (int i = first; i <= last; i++)
+			addEntry(i);
+
+		// Keep selected entries involved in activation/deactivation updating.
+		addEntry(mCursor);
+
+		if (mLastCursor >= 0 && mLastCursor < entryCount)
+			addEntry(mLastCursor);
+
+		for (int index : updateEntries)
+		{
+			const std::shared_ptr<GuiComponent>& comp = mEntries.at(index).data.logo;
+
+			if (comp != nullptr)
+				comp->update(deltaTime);
+		}
+	}
+
+	listUpdate(deltaTime);
 
 	GuiComponent::update(deltaTime);
 }
@@ -463,19 +522,9 @@ void CarouselComponent::renderCarousel(const Transform4x4f& trans)
 	if (mLogoPos.y() >= 0)
 		yOff = mLogoPos.y() - (mType == CarouselType::VERTICAL ? (mCamOffset * logoSpacing[1]) : 0);
 
-	int center = (int)(mCamOffset);
-	int logoCount = Math::min(mMaxLogoCount, (int)mEntries.size());
-
-	// Adding texture loading buffers depending on scrolling speed and status
-	int bufferIndex = Math::max(0, Math::min(2, getScrollingVelocity() + 1));
-	int bufferLeft = logoBuffersLeft[bufferIndex];
-	int bufferRight = logoBuffersRight[bufferIndex];
-
-	if (logoCount == 1 && mCamOffset == 0)
-	{
-		bufferLeft = 0;
-		bufferRight = 0;
-	}
+	int first;
+	int last;
+	getActiveRange(first, last);
 
 	auto renderLogo = [this, carouselTrans, logoSpacing, xOff, yOff](int i)
 	{
@@ -530,7 +579,8 @@ void CarouselComponent::renderCarousel(const Transform4x4f& trans)
 
 
 	std::vector<int> activePositions;
-	for (int i = center - logoCount / 2 + bufferLeft; i <= center + logoCount / 2 + bufferRight; i++)
+
+	for (int i = first; i <= last; i++)
 	{
 		int index = i % (int)mEntries.size();
 		if (index < 0)

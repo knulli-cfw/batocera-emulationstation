@@ -116,6 +116,20 @@ public:
 	void resetLastCursor() { mLastCursor = -1; }
 	int getLastCursor() { return mLastCursor; }
 
+	int getVisibleItemCount() const
+	{
+		float rowHeight = getRowHeight();
+
+		if (rowHeight <= 0.0f)
+			return 1;
+
+		return mLineCount > 0 ?
+			mLineCount :
+			(int)(mSize.y() / rowHeight);
+	}
+
+	void getActiveRange(int& first, int& last) const;
+
 	virtual bool onMouseClick(int button, bool pressed, int x, int y) override;
 	virtual void onMouseMove(int x, int y) override;
 	virtual bool onMouseWheel(int delta) override;
@@ -273,8 +287,10 @@ void TextListComponent<T>::render(const Transform4x4f& parentTrans)
 
 	if (!mItemTemplate.type.empty())
 	{
-		startEntry = Math::max(0, startEntry - 2);
-		lastEntry = Math::min((int) mEntries.size(), lastEntry + 2);
+		getActiveRange(startEntry, lastEntry);
+
+		// Render uses an exclusive end.
+		lastEntry++;
 
 		loopStart = 0;
 		loopEnd = mEntries.size();
@@ -515,13 +531,21 @@ void TextListComponent<T>::update(int deltaTime)
 
 	mScrollbar.update(deltaTime);
 
-	if (!mItemTemplate.type.empty())
+	if (!mItemTemplate.type.empty() && !mEntries.empty())
 	{
-		for (unsigned int i = 0; i < mEntries.size(); i++)
+		int first;
+		int last;
+		getActiveRange(first, last);
+
+		for (int i = first; i <= last; i++)
 		{
 			auto& entry = mEntries.at(i);
-			if (entry.data.itemTemplate && entry.data.itemTemplate->isShowing())
+
+			if (entry.data.itemTemplate &&
+				entry.data.itemTemplate->isShowing())
+			{
 				entry.data.itemTemplate->update(deltaTime);
+			}
 		}
 	}
 
@@ -617,6 +641,35 @@ template <typename T>
 float TextListComponent<T>::getTotalRowHeight() const
 {
 	return getRowHeight() * mEntries.size();
+}
+
+template <typename T>
+void TextListComponent<T>::getActiveRange(int& first, int& last) const
+{
+	if (mEntries.empty())
+	{
+		first = 0;
+		last = -1;
+		return;
+	}
+
+	const float rowHeight = getRowHeight();
+
+	if (rowHeight <= 0.0f)
+	{
+		first = 0;
+		last = 0;
+		return;
+	}
+
+	const int firstVisible = (int)(mCameraOffset / rowHeight);
+	const int visibleCount = Math::max(1, getVisibleItemCount());
+
+	// Include nearby rows for smooth scrolling.
+	first = Math::max(0, firstVisible - 2);
+	last = Math::min(
+		(int)mEntries.size() - 1,
+		firstVisible + visibleCount + 2);
 }
 
 template <typename T>
@@ -943,7 +996,7 @@ void TextListComponent<T>::setOpacity(unsigned char opacity)
 template<typename T>
 void TextListComponent<T>::onShow()
 {
-	IList<TextListData, T>::onShow();	
+	IList<TextListData, T>::onShow();
 
 	if (!mItemTemplate.type.empty())
 	{

@@ -97,6 +97,7 @@ public:
 	void	applyTheme(const std::shared_ptr<ThemeData>& theme, const std::string& view, const std::string& element, unsigned int properties);
 
 	int getLastCursor() { return mLastCursor; }
+	void getActiveRange(int& first, int& last);
 	void resetLastCursor() { mLastCursor = -1; }
 
 	virtual bool onMouseClick(int button, bool pressed, int x, int y) override;

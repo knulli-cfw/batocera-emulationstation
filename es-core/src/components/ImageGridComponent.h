@@ -119,6 +119,8 @@ public:
 	void resetLastCursor() { mLastCursor = -1; mLastCursorState = CursorState::CURSOR_STOPPED; }
 	int getLastCursor() { return mLastCursor; }
 
+	Vector2i getVisibleRange();
+
 	virtual bool onMouseClick(int button, bool pressed, int x, int y) override;
 	virtual void onMouseMove(int x, int y) override;
 	virtual bool onMouseWheel(int delta) override;
@@ -145,7 +147,6 @@ private:
 	void		calcGridDimension();
 	
 	void		ensureVisibleTileExist();
-	Vector2i	getVisibleRange();
 	void		loadTile(std::shared_ptr<GridTileComponent> tile, typename IList<ImageGridData, T>::Entry& entry);
 	std::shared_ptr<GridTileComponent> createTile(int i, int dimOpposite, Vector2f tileDistance, Vector2f startPosition);
 
