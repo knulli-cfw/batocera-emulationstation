@@ -12,9 +12,6 @@ class IWatcher
 {
 	friend class WatchersManager;
 
-public:
-	virtual void handleEvent(const std::string& event, const std::string& value) {};
-
 protected:
 	virtual bool enabled() = 0;
 	virtual int  updateTime() = 0;
@@ -47,8 +44,6 @@ public:
 		return nullptr;
 	}
 
-	static void FireEvent(const std::string& event, const std::string& value);
-
 	static void RegisterComponent(IWatcher* instance);
 	static void UnregisterComponent(IWatcher* instance);
 
@@ -59,6 +54,8 @@ public:
 
 	static WatchersManager* getInstance();
 	static void             stop();
+	static void             pause();
+	static void             resume();
 
 	virtual ~WatchersManager();
 
@@ -72,7 +69,7 @@ private:
 		WatcherInfo() { component = nullptr; nextCheckTime = std::chrono::steady_clock::now(); }
 
 		IWatcher*	component;
-		std::chrono::time_point<std::chrono::steady_clock>	nextCheckTime;
+		std::chrono::steady_clock::time_point nextCheckTime;
 	};
 
 	void NotifyComponentChanged(IWatcher* component);
@@ -86,6 +83,7 @@ private:
 	std::mutex										mThreadLock;
 	std::condition_variable							mEvent;
 	bool											mRunning;
+	bool											mPaused;
 	
 	std::thread*									mThread;
 

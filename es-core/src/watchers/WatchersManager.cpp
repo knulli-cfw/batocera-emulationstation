@@ -1,7 +1,6 @@
 #include "WatchersManager.h"
 #include "Log.h"
 #include <chrono>
-#include <SDL.h>
 
 std::mutex											WatchersManager::mNotificationLock;
 std::list<IWatcherNotify*>							WatchersManager::mNotification;
@@ -27,26 +26,39 @@ void WatchersManager::stop()
 	}
 }
 
+void WatchersManager::pause()
+{
+	if (mInstance == nullptr)
+		return;
+
+	{
+		std::unique_lock<std::mutex> lock(mInstance->mThreadLock);
+		mInstance->mPaused = true;
+	}
+
+	mInstance->mEvent.notify_all();
+}
+
+void WatchersManager::resume()
+{
+	if (mInstance == nullptr)
+		return;
+
+	{
+		std::unique_lock<std::mutex> lock(mInstance->mThreadLock);
+		mInstance->mPaused = false;
+	}
+
+	mInstance->mEvent.notify_all();
+}
+
 WatchersManager::WatchersManager()
 {
 	LOG(LogDebug) << "WatchersManager : Starting";
 
 	mRunning = true;
+	mPaused = false;
 	mThread = new std::thread(&WatchersManager::run, this);
-}
-
-void WatchersManager::ResetComponent(IWatcher* instance)
-{
-	std::unique_lock<std::mutex> lock(mWatchersLock);
-
-	for (auto comp : mWatchers)
-	{
-		if (comp->component == instance)
-		{
-			comp->nextCheckTime = std::chrono::steady_clock::now();
-			return;
-		}
-	}
 }
 
 void WatchersManager::RegisterComponent(IWatcher* instance)
@@ -55,7 +67,9 @@ void WatchersManager::RegisterComponent(IWatcher* instance)
 
 	WatcherInfo* info = new WatcherInfo();
 	info->component = instance;
-	info->nextCheckTime = std::chrono::steady_clock::now() + std::chrono::milliseconds(instance->initialUpdateTime());
+	info->nextCheckTime =
+		std::chrono::steady_clock::now() + std::chrono::milliseconds(instance->initialUpdateTime());
+
 	mWatchers.push_back(info);
 }
 
@@ -70,6 +84,20 @@ void WatchersManager::UnregisterComponent(IWatcher* instance)
 		{
 			mWatchers.erase(it);
 			delete info;
+			return;
+		}
+	}
+}
+
+void WatchersManager::ResetComponent(IWatcher* instance)
+{
+	std::unique_lock<std::mutex> lock(mWatchersLock);
+
+	for (auto comp : mWatchers)
+	{
+		if (comp->component == instance)
+		{
+			comp->nextCheckTime = std::chrono::steady_clock::now();
 			return;
 		}
 	}
@@ -103,21 +131,11 @@ void WatchersManager::NotifyComponentChanged(IWatcher* component)
 		n->OnWatcherChanged(component);
 }
 
-void WatchersManager::FireEvent(const std::string& event, const std::string& value)
-{
-    std::unique_lock<std::mutex> lock(mWatchersLock);
-    for (auto info : mWatchers)
-    {
-        if (info->component)
-            info->component->handleEvent(event, value);
-    }
-}
-
 WatchersManager::~WatchersManager()
 {
 	if (mThread == nullptr)
 		return;
-	
+
 	LOG(LogDebug) << "WatchersManager : Exit";
 
 	// Remove locks
@@ -135,7 +153,7 @@ WatchersManager::~WatchersManager()
 
 	mThread->join();
 	delete mThread;
-	mThread = nullptr;	
+	mThread = nullptr;
 }
 
 void WatchersManager::run()
@@ -143,12 +161,19 @@ void WatchersManager::run()
 	while (mRunning)
 	{
 		// ThreadLock
-		{			
+		{
 			std::unique_lock<std::mutex> lock(mThreadLock);
-			mEvent.wait_for(lock, std::chrono::seconds(1));
-			
+
+			if (mPaused)
+				mEvent.wait(lock, [this]() { return !mPaused || !mRunning; });
+			else
+				mEvent.wait_for(lock, std::chrono::seconds(1));
+
 			if (!mRunning)
 				return;
+
+			if (mPaused)
+				continue;
 		}
 
 		// Notification Lock
@@ -172,8 +197,7 @@ void WatchersManager::run()
 					NotifyComponentChanged(item->component);
 
 				item->nextCheckTime = now + std::chrono::milliseconds(item->component->updateTime());
-
 			}
-		}		
+		}
 	}
 }

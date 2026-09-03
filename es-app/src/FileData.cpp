@@ -35,6 +35,7 @@
 #include "resources/TextureData.h"
 #include "views/gamelist/GameNameFormatter.h"
 #include "QuickResume.h"
+#include "watchers/WatchersManager.h"
 
 using namespace Utils::Platform;
 
@@ -726,11 +727,18 @@ bool FileData::launchGame(Window* window, LaunchGameOptions options)
 	auto p2kConv = convertP2kFile();
 
 	mRunningGame = gameToUpdate;
+	
+	// Pause watchers before game launch
+	WatchersManager::pause();
 
 	ProcessStartInfo process(command);
 	process.window = hideWindow ? NULL : window;
 	
 	int exitCode = process.run();
+	
+	// Resume watchers when returning to ES
+	WatchersManager::resume();
+	
 	if (exitCode != 0)
 		LOG(LogWarning) << "...launch terminated with nonzero exit code " << exitCode << "!";
 
