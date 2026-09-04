@@ -225,6 +225,7 @@ void SystemScreenSaver::startScreenSaver()
 			mTimer = 0;
 			return;
 		}
+	}
 	else if (screensaver_behavior == "power save")
 	{
 		mPowerSave = true;
