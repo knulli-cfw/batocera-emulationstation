@@ -99,7 +99,9 @@ Font::Font(int size, const std::string& path, bool menuScaling) : mSize(size), m
 		mSize = 2;
 
 	mLoaded = true;
-	mMaxGlyphHeight = 0;
+
+	// Provide a valid initial height while glyphs are loaded lazily.
+	mMaxGlyphHeight = mSize;
 
 	if(!sLibrary)
 		initLibrary();
@@ -107,9 +109,7 @@ Font::Font(int size, const std::string& path, bool menuScaling) : mSize(size), m
 	for (unsigned int i = 0; i < 255; i++)
 		mGlyphCacheArray[i] = NULL;
 
-	// always initialize ASCII characters
-	for(unsigned int i = 32; i < 128; i++)
-		getGlyph(i);
+	// Glyphs are loaded on demand instead of preloading.
 
 	clearFaceCache();
 }
@@ -252,21 +252,21 @@ void Font::getTextureForNewGlyph(const Vector2i& glyphSize, FontTexture*& tex_ou
 	// make a new one
 	FontTexture* tex = new FontTexture();
 
-	int x = Math::min(2048, mSize * 64);
-	int y = Math::min(2048, Math::max(glyphSize.y(), mSize) + 2) * 1.2;
+	int atlasSize = Math::min(2048, Math::max(mSize * 6, Math::max(glyphSize.x(), glyphSize.y()) + 2));
 
-	tex->textureSize = Vector2i(x, y);
+	tex->textureSize = Vector2i(atlasSize, atlasSize);
 	tex->initTexture();
 
 	tex_out = tex;
 
 	mTextures.push_back(tex);
-	
+
 	bool ok = tex_out->findEmpty(glyphSize, cursor_out);
 	if(!ok)
 	{
 		LOG(LogError) << "Glyph too big to fit on a new texture (glyph size > " << tex_out->textureSize.x() << ", " << tex_out->textureSize.y() << ")!";
 		delete tex;
+		mTextures.pop_back();
 		tex_out = NULL;
 	}
 }
