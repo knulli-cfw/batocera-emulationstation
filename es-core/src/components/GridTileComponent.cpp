@@ -22,6 +22,7 @@
 GridTileComponent::GridTileComponent(Window* window) : GuiComponent(window), mBackground(window), mLabel(window), mVideo(nullptr), mVideoPlaying(false), mHasItemTemplate(false)
 {
 	mHasStandardMarquee = false;
+	mSelected = false;
 	mSelectedZoomPercent = 1.0f;
 	mAnimPosition = Vector3f(0, 0);
 	mVideo = nullptr;
@@ -46,7 +47,7 @@ GridTileComponent::GridTileComponent(Window* window) : GuiComponent(window), mBa
 	addChild(&(*mImage));
 	addChild(&mLabel);
 
-	setSelected(false);
+	setSelected(false, false, nullptr, true);
 	setVisible(true);
 }
 

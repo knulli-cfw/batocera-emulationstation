@@ -148,7 +148,9 @@ public:
 		return mVideoPath; 
 	}
 
-	void setPlaylist(std::shared_ptr<IPlaylist> playList);
+	void setPlaylist(std::shared_ptr<IPlaylist> playList, bool selectFirst = true);
+	std::shared_ptr<IPlaylist> getPlaylist() const { return mPlaylist; }
+	std::string getPlaylistMediaPath() const { return mVideoPath; }
 	void onPositionChanged() override;
 
 	bool getPlayAudio() { return mPlayAudio; }

@@ -548,10 +548,10 @@ void VideoComponent::topWindow(bool isTop)
 	manageState();
 }
 
-void VideoComponent::setPlaylist(std::shared_ptr<IPlaylist> playList)
+void VideoComponent::setPlaylist(std::shared_ptr<IPlaylist> playList, bool selectFirst)
 {
 	mPlaylist = playList;
-	if (mPlaylist == nullptr)
+	if (mPlaylist == nullptr || !selectFirst)
 		return;
 
 	auto video = mPlaylist->getNextItem();

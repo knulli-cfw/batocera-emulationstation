@@ -27,6 +27,99 @@
 #include "utils/HtmlColor.h"
 #include "utils/VectorEx.h"
 #include <unordered_set>
+#include <mutex>
+#include <vector>
+
+namespace
+{
+	using SharedPropertyMap = ThemeData::ThemeElement::PropertyMap;
+
+	std::mutex sharedPropertiesMutex;
+	std::unordered_map<std::string, std::shared_ptr<SharedPropertyMap>>
+		sharedPropertySets;
+
+	void shareElementProperties(ThemeData::ThemeElement& element)
+	{
+		element.shareProperties();
+
+		for (auto& child : element.children)
+			shareElementProperties(child.second);
+	}
+
+	bool buildPropertyKey(const ThemeData::ThemeElement& element, std::string& key)
+	{
+		using Property = ThemeData::ThemeElement::Property;
+
+		std::vector<std::string> names;
+		names.reserve(element.getProperties().size());
+
+		for (const auto& property : element.getProperties())
+			names.push_back(property.first);
+
+		std::sort(names.begin(), names.end());
+
+		key.clear();
+
+		auto appendBytes = [&](const void* data, size_t size)
+		{
+			key.append(static_cast<const char*>(data), size);
+		};
+
+		auto appendString = [&](const std::string& value)
+		{
+			const size_t size = value.size();
+			appendBytes(&size, sizeof(size));
+			key.append(value);
+		};
+
+		for (const auto& name : names)
+		{
+			const auto& property = element.getProperties().at(name);
+			appendString(name);
+			appendBytes(&property.type, sizeof(property.type));
+			appendString(property.s);
+
+			switch (property.type)
+			{
+			case Property::String:
+				break;
+			case Property::Int:
+				appendBytes(&property.i, sizeof(property.i));
+				break;
+			case Property::Float:
+				appendBytes(&property.f, sizeof(property.f));
+				break;
+			case Property::Bool:
+			{
+				const char value = property.b ? 1 : 0;
+				appendBytes(&value, sizeof(value));
+				break;
+			}
+			case Property::Pair:
+			{
+				const float values[] = { property.v.x(), property.v.y() };
+				appendBytes(values, sizeof(values));
+				break;
+			}
+			case Property::Rect:
+			{
+				const float values[] = {
+					property.r.x(), property.r.y(),
+					property.r.z(), property.r.w(),
+					property.v.x(), property.v.y()
+				};
+				appendBytes(values, sizeof(values));
+				break;
+			}
+			default:
+				// Do not classify unrecognized values as duplicates.
+				return false;
+			}
+		}
+
+		return true;
+	}
+}
 
 std::set<std::string> ThemeData::sSupportedItemTemplate { "imagegrid", "carousel", "gamecarousel", "textlist" };
 std::set<std::string> ThemeData::sSupportedViews        { "system", "basic", "detailed", "grid", "video", "gamecarousel", "menu", "screen", "splash" };
@@ -721,6 +814,7 @@ std::string& ThemeFileCache::getXmlDocument(const std::string& path)
 	auto it = _cache.find(path);
 	if (it != _cache.cend())
 		return it->second;
+
 	/*
 	pugi::xml_document* doc = new pugi::xml_document();
 	pugi::xml_parse_result res = doc->load_file(WINSTRINGW(path).c_str());
@@ -730,9 +824,45 @@ std::string& ThemeFileCache::getXmlDocument(const std::string& path)
 		throw error << "XML parsing error: \n    " << res.description();
 	}
 	*/
+
 	_cache[path] = Utils::FileSystem::readAllText(path);
+
 	std::string& buffer = _cache[path];	
 	return buffer;
+}
+
+std::shared_ptr<const pugi::xml_document>
+ThemeFileCache::getParsedXmlDocument(const std::string& path)
+{
+	std::shared_ptr<const pugi::xml_document> source;
+
+	{
+		std::unique_lock<std::mutex> lock(_lock);
+
+		auto cached = _domCache.find(path);
+		if (cached != _domCache.end())
+		{
+			source = cached->second;
+		}
+		else
+		{
+			auto text = _cache.find(path);
+			if (text == _cache.end())
+			{
+				text = _cache.emplace(path, Utils::FileSystem::readAllText(path)).first;
+			}
+
+			auto document = std::make_shared<pugi::xml_document>();
+			auto result = document->load_buffer(text->second.c_str(), text->second.size());
+
+			source = document;
+
+			if (result)
+				_domCache.emplace(path, source);
+		}
+	}
+
+	return source;
 }
 
 void ThemeFileCache::clear()
@@ -743,6 +873,12 @@ void ThemeFileCache::clear()
 //		delete item.second;
 
 	_cache.clear();
+	_domCache.clear();
+
+	{
+		std::lock_guard<std::mutex> propertiesLock(sharedPropertiesMutex);
+		decltype(sharedPropertySets)().swap(sharedPropertySets);
+	}
 }
 
 void ThemeData::loadFile(const std::string& system, const std::map<std::string, std::string>& sysDataMap, const std::string& path, bool fromFile)
@@ -806,11 +942,11 @@ void ThemeData::loadFile(const std::string& system, const std::map<std::string, 
 	}
 
 	pugi::xml_document doc;
-	
+	std::shared_ptr<const pugi::xml_document> sharedDoc;
+
 	if (fromFile)
 	{
-		const std::string& xmlData = ThemeFileCache::getInstance().getXmlDocument(path);
-		doc.load_buffer(xmlData.c_str(), xmlData.size());
+		sharedDoc = ThemeFileCache::getInstance().getParsedXmlDocument(path);
 	}
 	else
 	{
@@ -819,7 +955,7 @@ void ThemeData::loadFile(const std::string& system, const std::map<std::string, 
 			throw error << "XML parsing error: \n    " << res.description();
 	}
 
-	pugi::xml_node root = doc.child("theme");
+	pugi::xml_node root = fromFile ? sharedDoc->child("theme") : doc.child("theme");
 	if(!root)
 		throw error << "Missing <theme> tag!";
 
@@ -844,12 +980,16 @@ void ThemeData::loadFile(const std::string& system, const std::map<std::string, 
 			auto systemcarousel = systemView->second.elements.find("systemcarousel");
 			if (systemcarousel != systemView->second.elements.cend())
 			{
-				auto defaultTransition = systemcarousel->second.properties.find("defaultTransition");
-				if (defaultTransition == systemcarousel->second.properties.cend() || defaultTransition->second.s == "instant")
-					systemcarousel->second.properties["defaultTransition"] = std::string("fade & slide");
+				auto defaultTransition = systemcarousel->second.getProperties().find("defaultTransition");
+				if (defaultTransition == systemcarousel->second.getProperties().cend() || defaultTransition->second.s == "instant")
+					systemcarousel->second.setProperty("defaultTransition", std::string("fade & slide"));
 			}
 		}
 	}
+
+	for (auto& view : mViews)
+		for (auto& element : view.second.elements)
+			shareElementProperties(element.second);
 
 	if (system != "splash" && system != "imageviewer" && system != "default")
 	{
@@ -1259,6 +1399,7 @@ void ThemeData::parseViewElement(const pugi::xml_node& node)
 	const std::string nameAttr = node.attribute("name").as_string();
 	size_t prevOff = nameAttr.find_first_not_of(delim, 0);
 	size_t off = nameAttr.find_first_of(delim, prevOff);
+	std::map<pugi::xml_node, std::shared_ptr<ThemeStoryboard>> storyboardCache;
 	std::string viewKey;
 	while (off != std::string::npos || prevOff != std::string::npos)
 	{
@@ -1269,14 +1410,14 @@ void ThemeData::parseViewElement(const pugi::xml_node& node)
 		if (sSupportedViews.find(viewKey) != sSupportedViews.cend())
 		{	
 			ThemeView& view = mViews.insert(viewKey, std::move(ThemeView())).first->second;
-			parseView(node, view);
+			parseView(node, view, true, &storyboardCache);
 
 			for (auto it = mViews.cbegin(); it != mViews.cend(); ++it)
 			{
 				if (it->second.isCustomView && it->second.baseType == viewKey)
 				{
 					ThemeView& customView = (ThemeView&)it->second;
-					parseView(node, customView);
+					parseView(node, customView, true, &storyboardCache);
 				}
 			}
 		}
@@ -1531,8 +1672,11 @@ void ThemeData::parseSubsetElement(const pugi::xml_node& root)
 	const std::string displayName = resolvePlaceholders(root.attribute("displayName").as_string());
 	const std::string appliesTo = root.attribute("appliesTo").as_string();
 
-	for (pugi::xml_node node = root.child("include"); node; node = node.next_sibling("include"))
+	for (pugi::xml_node source = root.child("include"); source; source = source.next_sibling("include"))
 	{
+		pugi::xml_document includeDocument;
+		pugi::xml_node node = includeDocument.append_copy(source);
+
 		node.remove_attribute("subset");
 		node.append_attribute("subset") = name.c_str();
 
@@ -1563,7 +1707,7 @@ void ThemeData::parseViews(const pugi::xml_node& root)
 }
 
 void ThemeData::parseCustomViewBaseClass(const pugi::xml_node& root, ThemeView& view, const std::string& baseClass)
-{	
+{
 	auto baseviewit = mViews.find(baseClass);
 	if (baseviewit == mViews.cend())
 		return;
@@ -1584,7 +1728,7 @@ void ThemeData::parseCustomViewBaseClass(const pugi::xml_node& root, ThemeView& 
 	for (auto& element : baseView.elements)
 	{
 		view.elements.erase(element.first);
-		view.elements.insert(std::move(std::pair<std::string, ThemeElement>(element.first, element.second)));
+		view.elements.emplace(element.first, element.second);
 
 		if (existingKeys.find(element.first) == existingKeys.cend())
 		{
@@ -1640,7 +1784,8 @@ void ThemeData::parseCustomView(const pugi::xml_node& node, const pugi::xml_node
 }
 
 
-void ThemeData::parseView(const pugi::xml_node& root, ThemeView& view, bool overwriteElements)
+void ThemeData::parseView(const pugi::xml_node& root, ThemeView& view, bool overwriteElements,
+	std::map<pugi::xml_node, std::shared_ptr<ThemeStoryboard>>* sharedStoryboardCache)
 {
 	// ThemeException error;
 	// error.setFiles(mPaths);
@@ -1690,6 +1835,7 @@ void ThemeData::parseView(const pugi::xml_node& root, ThemeView& view, bool over
 		const std::string nameAttr = node.attribute("name").as_string();
 		size_t prevOff = nameAttr.find_first_not_of(delim, 0);
 		size_t off = nameAttr.find_first_of(delim, prevOff);
+		std::map<pugi::xml_node, std::shared_ptr<ThemeStoryboard>> storyboardCache;
 		while (off != std::string::npos || prevOff != std::string::npos)
 		{
 			std::string elemKey = nameAttr.substr(prevOff, off - prevOff);
@@ -1697,7 +1843,7 @@ void ThemeData::parseView(const pugi::xml_node& root, ThemeView& view, bool over
 			off = nameAttr.find_first_of(delim, prevOff);
 
 			parseElement(node, elemTypeIt->second,
-				view.elements.insert(std::pair<std::string, ThemeElement>(elemKey, ThemeElement())).first->second, view, overwriteElements);
+				view.elements.insert(std::pair<std::string, ThemeElement>(elemKey, ThemeElement())).first->second, view, overwriteElements, sharedStoryboardCache ? sharedStoryboardCache : &storyboardCache);
 
 			if (std::find(view.orderedKeys.cbegin(), view.orderedKeys.cend(), elemKey) == view.orderedKeys.cend())
 				view.orderedKeys.push_back(elemKey);
@@ -1776,41 +1922,41 @@ void ThemeData::processElement(const pugi::xml_node& root, ThemeElement& element
 	{
 	case STRING:
 		if (str.find("{") != std::string::npos && str.find(":") != std::string::npos && str.find("}") != std::string::npos)
-			element.properties[name + "_binding"] = str;
+			element.setProperty(name + "_binding", str);
 		else
 		{
-			element.properties.erase(name + "_binding");
-			element.properties[name] = str;
+			element.eraseProperty(name + "_binding");
+			element.setProperty(name, str);
 		}
 		
 		break;
 
 	case FLOAT:
 		if (str.find("{") != std::string::npos && str.find(":") != std::string::npos && str.find("}") != std::string::npos)
-			element.properties[name + "_binding"] = str;
+			element.setProperty(name + "_binding", str);
 		else
 		{
-			element.properties.erase(name + "_binding");
-			element.properties[name] = Utils::String::toFloat(str);
+			element.eraseProperty(name + "_binding");
+			element.setProperty(name, Utils::String::toFloat(str));
 		}
 
 		break;
 
 	case NORMALIZED_RECT:
-		element.properties[name] = Vector4f::parseString(str);
+		element.setProperty(name, Vector4f::parseString(str));
 		break;
 
 	case NORMALIZED_PAIR:
-		element.properties[name] = Vector2f::parseString(str);
+		element.setProperty(name, Vector2f::parseString(str));
 		break;
 
 	case COLOR:
 		if (str.find("{") != std::string::npos && str.find(":") != std::string::npos && str.find("}") != std::string::npos)
-			element.properties[name + "_binding"] = str;
+			element.setProperty(name + "_binding", str);
 		else
 		{
-			element.properties.erase(name + "_binding");
-			element.properties[name] = Utils::HtmlColor::parse(str);
+			element.eraseProperty(name + "_binding");
+			element.setProperty(name, Utils::HtmlColor::parse(str));
 		}
 				
 		break;
@@ -1818,13 +1964,13 @@ void ThemeData::processElement(const pugi::xml_node& root, ThemeElement& element
 	case BOOLEAN:
 		if (str.find("{") != std::string::npos && str.find(":") != std::string::npos && str.find("}") != std::string::npos)
 		{
-			element.properties[name+"_binding"] = str;
-			element.properties[name] = true;
+			element.setProperty(name + "_binding", str);
+			element.setProperty(name, true);
 		}
 		else
 		{
-			element.properties.erase(name + "_binding");
-			element.properties[name] = Utils::String::toBoolean(str);
+			element.eraseProperty(name + "_binding");
+			element.setProperty(name, Utils::String::toBoolean(str));
 		}
 
 		break;
@@ -1851,7 +1997,7 @@ void ThemeData::processElement(const pugi::xml_node& root, ThemeElement& element
 			else if (element.type == "image" && path != "{random}" && path != "{random:thumbnail}" && path != "{random:marquee}" && path != "{random:image}" && path != "{random:fanart}" && path != "{random:titleshot}")
 				LOG(LogWarning) << "unknow random element " << path;
 			else
-				element.properties[name] = path;
+				element.setProperty(name, path);
 
 			break;
 		}
@@ -1865,24 +2011,24 @@ void ThemeData::processElement(const pugi::xml_node& root, ThemeElement& element
 
 		if (path == "none")
 		{
-			if (element.properties.find(name) != element.properties.cend())
-				element.properties.erase(name);
+			if (element.getProperties().find(name) != element.getProperties().cend())
+				element.eraseProperty(name);
 		}
 		else
 		{
 			// Allow variables in the form "{game:image}"
 			if (path.find("{") != std::string::npos && path.find(":") != std::string::npos && path.find("}") != std::string::npos)
 			{
-				element.properties[name + "_binding"] = path;
-				element.properties[name] = path;
+				element.setProperty(name + "_binding", path);
+				element.setProperty(name, path);
 				break;
 			}
 			else
-				element.properties.erase(name + "_binding");
+				element.eraseProperty(name + "_binding");
 
 			if (ResourceManager::getInstance()->fileExists(path))
 			{
-				element.properties[name] = path;
+				element.setProperty(name, path);
 				break;
 			}
 			else if ((str[0] == '.' || str[0] == '~') && mPaths.size() > 1)
@@ -1890,7 +2036,7 @@ void ThemeData::processElement(const pugi::xml_node& root, ThemeElement& element
 				std::string rootPath = Utils::FileSystem::resolveRelativePath(str, Utils::FileSystem::getParent(mPaths.front()), true);
 				if (rootPath != path && ResourceManager::getInstance()->fileExists(rootPath))
 				{
-					element.properties[name] = rootPath;
+					element.setProperty(name, rootPath);
 					break;
 				}
 			}
@@ -1937,7 +2083,8 @@ static std::set<std::string> _reservedNames =
 	"background",
 };*/
 
-void ThemeData::parseElement(const pugi::xml_node& root, const std::map<std::string, ElementPropertyType>& typeMap, ThemeElement& element, ThemeView& view, bool overwrite)
+void ThemeData::parseElement(const pugi::xml_node& root, const std::map<std::string, ElementPropertyType>& typeMap, ThemeElement& element, ThemeView& view, bool overwrite,
+	std::map<pugi::xml_node, std::shared_ptr<ThemeStoryboard>>* storyboardCache)
 {
 	// ThemeException error;
 	// error.setFiles(mPaths);
@@ -1978,15 +2125,15 @@ void ThemeData::parseElement(const pugi::xml_node& root, const std::map<std::str
 		auto importIt = view.elements.find(imports);
 		if (importIt != view.elements.cend())
 		{
-			for (auto prop : importIt->second.properties)
+			for (auto prop : importIt->second.getProperties())
 			{
 				auto typeIt = typeMap.find(prop.first);
 				if (typeIt != typeMap.cend())
-					element.properties[prop.first] = prop.second;
+					element.setProperty(prop.first, prop.second);
 			}
 
 			for (auto sb : importIt->second.mStoryBoards)
-				element.mStoryBoards[sb.first] = new ThemeStoryboard(*sb.second);
+				element.mStoryBoards[sb.first] = std::make_shared<ThemeStoryboard>(*sb.second);
 		}
 	}
 
@@ -2004,7 +2151,7 @@ void ThemeData::parseElement(const pugi::xml_node& root, const std::map<std::str
 		else if (!findPropertyFromBaseClass(root.name(), name, type))
 			continue;
 
-		if (!overwrite && element.properties.find(name) != element.properties.cend())
+		if (!overwrite && element.getProperties().find(name) != element.getProperties().cend())
 			continue;
 
 		processElement(root, element, name, attribute.as_string(), type);
@@ -2016,6 +2163,9 @@ void ThemeData::parseElement(const pugi::xml_node& root, const std::map<std::str
 			continue;
 
 		std::string name = node.name();
+
+		if (name == "animate" && strcmp(root.name(), "imagegrid") == 0)
+			name = "animateSelection";
 
 		ElementPropertyType type = STRING;
 
@@ -2052,33 +2202,40 @@ void ThemeData::parseElement(const pugi::xml_node& root, const std::map<std::str
 					auto sb = element.mStoryBoards.find(eventName);
 					if (sb != element.mStoryBoards.cend())
 					{
-						delete sb->second;
 						element.mStoryBoards.erase(eventName);
 					}
 				}
 				else
 				{
-					auto storyBoard = new ThemeStoryboard();
+					if (storyboardCache)
+					{
+						auto cached = storyboardCache->find(node);
+						if (cached != storyboardCache->end())
+						{
+							element.mStoryBoards[cached->second->getEventName()] =
+							std::make_shared<ThemeStoryboard>(*cached->second);
+							continue;
+						}
+					}
+
+					auto storyBoard = std::make_shared<ThemeStoryboard>();
 
 					if (!storyBoard->fromXmlNode(node, typeMap, mPaths.size() ? Utils::FileSystem::getParent(mPaths.back()) : "", mVariables))
 					{
-						auto sb = element.mStoryBoards.find(storyBoard->eventName);
+						auto sb = element.mStoryBoards.find(storyBoard->getEventName());
 						if (sb != element.mStoryBoards.cend())
 						{
-							delete sb->second;
-							element.mStoryBoards.erase(storyBoard->eventName);
+							element.mStoryBoards.erase(storyBoard->getEventName());
 						}
 
 						LOG(LogWarning) << "Storyboard \"" << name << "\" has no <animation> items !";
-						delete storyBoard;
 					}
 					else
 					{
-						auto sb = element.mStoryBoards.find(storyBoard->eventName);
-						if (sb != element.mStoryBoards.cend())
-							delete sb->second;
+						element.mStoryBoards[storyBoard->getEventName()] = storyBoard;
 
-						element.mStoryBoards[storyBoard->eventName] = storyBoard;
+						if (storyboardCache && !node.child("sound"))
+							storyboardCache->emplace(node, storyBoard);
 						// LOG(LogInfo) << "Storyboard \"" << node.name() << "\"!";
 					}
 				}
@@ -2088,8 +2245,6 @@ void ThemeData::parseElement(const pugi::xml_node& root, const std::map<std::str
 			// Exception for menuIcons that can be extended
 			if (element.type == "menuIcons")
 				type = PATH;
-			else if (name == "animate" && std::string(root.name()) == "imagegrid")
-				node.set_name("animateSelection");
 			else if (element.type == "shader" || element.type == "screenshader" || element.type == "menuShader" || element.type == "fadeShader")
 			{
 				// Child properties of shaders are to be added dynamically. They can't be described here as they are used for uniforms arguments, except "path"
@@ -2097,7 +2252,7 @@ void ThemeData::parseElement(const pugi::xml_node& root, const std::map<std::str
 			}
 			else if (name == "itemTemplate" && sSupportedItemTemplate.find(root.name()) != sSupportedItemTemplate.cend())
 			{
-				if (!overwrite && element.properties.find(name) != element.properties.cend())
+				if (!overwrite && element.getProperties().find(name) != element.getProperties().cend())
 					continue;
 
 				element.children.emplace_back("itemTemplate", std::move(ThemeElement()));
@@ -2158,7 +2313,7 @@ void ThemeData::parseElement(const pugi::xml_node& root, const std::map<std::str
 		else
 			type = typeIt->second;
 
-		if (!overwrite && element.properties.find(name) != element.properties.cend())
+		if (!overwrite && element.getProperties().find(name) != element.getProperties().cend())
 			continue;
 
 		processElement(root, element, name, node.text().as_string(), type);
@@ -2634,7 +2789,7 @@ ThemeData::ThemeMenu::ThemeMenu(ThemeData* theme)
 	elem = theme->getElement("menu", "menuicons", "menuIcons");
 	if (elem)
 	{
-		for (auto prop : elem->properties)
+		for (auto prop : elem->getProperties())
 		{
 			std::string path = prop.second.s;
 			if (!path.empty() && ResourceManager::getInstance()->fileExists(path))
@@ -2730,24 +2885,41 @@ bool ThemeData::ThemeView::isOfType(const std::string type)
 	return baseType == type || std::find(baseTypes.cbegin(), baseTypes.cend(), type) != baseTypes.cend();
 }
 
+void ThemeData::ThemeElement::ensurePrivateProperties()
+{
+	if (properties.unique())
+		return;
+
+	properties = std::make_shared<PropertyMap>(*properties);
+}
+
+void ThemeData::ThemeElement::shareProperties()
+{
+	std::string key;
+	if (!buildPropertyKey(*this, key))
+		return;
+
+	std::lock_guard<std::mutex> lock(sharedPropertiesMutex);
+
+	auto existing = sharedPropertySets.find(key);
+	if (existing != sharedPropertySets.end())
+		properties = existing->second;
+	else
+		sharedPropertySets.emplace(std::move(key), properties);
+}
+
 ThemeData::ThemeElement::ThemeElement(const ThemeElement& src)
+	: properties(src.properties)
 {
 	extra = src.extra;
 	type = src.type;
-	properties = src.properties;
 	children = src.children;
 
 	for (auto sb : src.mStoryBoards)
-		mStoryBoards[sb.first] = new ThemeStoryboard(*sb.second);
+		mStoryBoards[sb.first] = std::make_shared<ThemeStoryboard>(*sb.second);
 }
 
-ThemeData::ThemeElement::~ThemeElement()
-{
-	for (auto sb : mStoryBoards)
-		delete sb.second;
-
-	mStoryBoards.clear();
-}
+ThemeData::ThemeElement::~ThemeElement() = default;
 
 std::shared_ptr<ThemeData> ThemeData::clone(const std::string& viewName)
 {
@@ -2784,12 +2956,11 @@ bool ThemeData::appendFile(const std::string& path, bool perGameOverride)
 	mPaths.push_back(path);
 	mVariables["currentPath"] = Utils::FileSystem::getParent(mPaths.back());
 
-	pugi::xml_document includeDoc;
+	std::shared_ptr<const pugi::xml_document> includeDoc;
 
 	try
 	{
-		const std::string& xmlData = ThemeFileCache::getInstance().getXmlDocument(path);
-		includeDoc.load_buffer(xmlData.c_str(), xmlData.size());
+		includeDoc = ThemeFileCache::getInstance().getParsedXmlDocument(path);
 	}
 	catch (ThemeException& e)
 	{
@@ -2816,7 +2987,7 @@ bool ThemeData::appendFile(const std::string& path, bool perGameOverride)
 	}
 	*/
 
-	pugi::xml_node theme = includeDoc.child("theme");
+	pugi::xml_node theme = includeDoc->child("theme");
 	if (!theme)
 	{
 		mPaths.pop_back();
@@ -2860,7 +3031,7 @@ bool ThemeData::parseCustomShader(const ThemeData::ThemeElement* elem, Renderer:
 			{
 				pShader->path = path;
 
-				for (auto prop : child.second.properties)
+				for (auto prop : child.second.getProperties())
 				{
 					if (prop.first == "pos" || prop.first == "path" || prop.first == "size" || prop.first == "zIndex")
 						continue;
@@ -2882,13 +3053,11 @@ bool ThemeData::parseCustomShader(const ThemeData::ThemeElement* elem, Renderer:
 
 void ThemeData::applySelfTheme(GuiComponent* comp, const ThemeElement& elem)
 {
-	auto theme = std::make_shared<ThemeData>(true);	
-	
+	auto theme = std::make_shared<ThemeData>(true);
+
 	ThemeView& view = theme->mViews.insert("default", std::move(ThemeView())).first->second;
-	auto element = view.elements.insert(std::pair<std::string, ThemeElement>("default", elem));
+	view.elements.insert(std::pair<std::string, ThemeElement>("default", elem));
 
 	comp->applyTheme(theme, "default", "default", ThemeFlags::ALL);
 
-	// Clear storyboard or they'll be deleted as we use a temporary fake theme...
-	element.first->second.mStoryBoards.clear();
 }

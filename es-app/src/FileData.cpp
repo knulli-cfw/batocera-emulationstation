@@ -36,6 +36,7 @@
 #include "views/gamelist/GameNameFormatter.h"
 #include "QuickResume.h"
 #include "watchers/WatchersManager.h"
+#include <unordered_map>
 
 using namespace Utils::Platform;
 
@@ -1147,7 +1148,7 @@ const std::vector<FileData*> FolderData::getChildrenListToDisplay()
 
 	if (idx != nullptr && idx->hasRelevency())
 	{
-		auto compf = sort.comparisonFunction;
+		auto compf = FileSorts::prepareComparison(ret, sort);
 
 		std::sort(ret.begin(), ret.end(), [scoringBoard, compf](const FileData* file1, const FileData* file2) -> bool
 		{ 
@@ -1165,7 +1166,9 @@ const std::vector<FileData*> FolderData::getChildrenListToDisplay()
 		bool foldersFirst = Settings::ShowFoldersFirst();
 		bool favoritesFirst = getSystem()->getShowFavoritesFirst();
 
-		std::stable_sort(ret.begin(), ret.end(), [sort, foldersFirst, favoritesFirst](const FileData* file1, const FileData* file2) -> bool
+		auto compf = FileSorts::prepareComparison(ret, sort);
+
+		std::stable_sort(ret.begin(), ret.end(), [&sort, foldersFirst, favoritesFirst, &compf](const FileData* file1, const FileData* file2) -> bool
 			{
 				if (favoritesFirst && file1->getFavorite() != file2->getFavorite())
 					return file1->getFavorite();
@@ -1173,7 +1176,9 @@ const std::vector<FileData*> FolderData::getChildrenListToDisplay()
 				if (foldersFirst && file1->getType() != file2->getType())
 					return (file1->getType() == FOLDER);
 
-				return sort.comparisonFunction(file1, file2) == sort.ascending;
+				return sort.ascending
+					? compf(file1, file2)
+					: compf(file2, file1);
 			});
 	}
 

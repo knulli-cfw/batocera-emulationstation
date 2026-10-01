@@ -223,7 +223,7 @@ public:
 
 	void			setAmbientOpacity(unsigned char opacity);
 
-	std::map<std::string, ThemeStoryboard*>& getStoryBoards() { return mStoryBoards; };
+	std::map<std::string, std::shared_ptr<ThemeStoryboard>>& getStoryBoards() { return mStoryBoards; };
 
 protected:
 	void			beginCustomClipRect();
@@ -292,7 +292,7 @@ private:
 	std::map<unsigned char, AnimationController*> mAnimationMap;
 
 	StoryboardAnimator* mStoryboardAnimator;
-	std::map<std::string, ThemeStoryboard*> mStoryBoards;
+	std::map<std::string, std::shared_ptr<ThemeStoryboard>> mStoryBoards;
 };
 
 #endif // ES_CORE_GUI_COMPONENT_H

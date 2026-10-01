@@ -8,6 +8,8 @@
 #include <stack>
 #include <set>
 #include "MultiStateInput.h"
+#include <string>
+#include <vector>
 
 class ISimpleGameListView : public IGameListView
 {
@@ -36,6 +38,17 @@ public:
 	
 	virtual std::vector<std::string> getEntriesLetters() override;
 	// virtual std::vector<FileData*> getFileDataEntries() = 0;
+
+	struct NavigationState
+	{
+		std::vector<std::string> folders;
+		std::string cursorPath;
+		int cursorIndex = 0;
+		bool syntheticCursor = false;
+	};
+
+	NavigationState saveNavigationState();
+	void restoreNavigationState(const NavigationState& state);
 
 	void	moveToFolder(FolderData* folder);
 	FolderData*		getCurrentFolder();

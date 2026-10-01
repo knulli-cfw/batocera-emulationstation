@@ -5,6 +5,7 @@
 #include <mutex>
 #include <string>
 #include <vector>
+#include <unordered_set>
 #include "ImageIO.h"
 #include "TextureDataManager.h"
 
@@ -82,8 +83,17 @@ public:
 
 	bool updateFromExternalRGBA(unsigned char* dataRGBA, size_t width, size_t height);
 
-	inline bool isRequired() { return mRequired; };
-	void setRequired(bool value) { mRequired = value; };
+	inline bool isRequired() { return mRequired || !mRequiredOwners.empty(); };
+
+	void setRequired(bool value, const void* owner = nullptr)
+	{
+		if (owner == nullptr)
+			mRequired = value;
+		else if (value)
+			mRequiredOwners.insert(owner);
+		else
+			mRequiredOwners.erase(owner);
+	}
 
 	inline bool isDynamic() { return mDynamic; };
 	void setDynamic(bool value) { mDynamic = value; };
@@ -95,6 +105,7 @@ public:
 
 private:
 	bool			mRequired;
+	std::unordered_set<const void*> mRequiredOwners;
 
 	std::mutex		mMutex;
 	bool			mTile;

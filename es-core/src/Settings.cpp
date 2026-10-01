@@ -338,7 +338,6 @@ void Settings::setDefaults()
 
 	mBoolMap["ThreadedLoading"] = true;
 	mBoolMap["AsyncImages"] = true;
-	mBoolMap["PreloadUI"] = false;
 	mBoolMap["PreloadMedias"] = Settings::_PreloadMedias;
 	mBoolMap["OptimizeVRAM"] = true;
 	mBoolMap["OptimizeVideo"] = true;

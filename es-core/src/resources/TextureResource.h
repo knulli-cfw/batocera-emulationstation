@@ -39,7 +39,7 @@ public:
 	bool isLoaded() const;
 	bool isTiled() const;
 	void prioritize() const;
-	void setRequired(bool value) const;
+	void setRequired(bool value, const void* owner = nullptr) const;
 	bool isScalable() const;
 
 	bool bind();

@@ -59,7 +59,7 @@ ImageComponent::ImageComponent(Window* window, bool forceLoad, bool dynamic) : G
 ImageComponent::~ImageComponent()
 {
 	if (mTexture != nullptr)
-		mTexture->setRequired(false);
+		mTexture->setRequired(false, this);
 }
 
 void ImageComponent::setSize(float w, float h)
@@ -292,6 +292,7 @@ void ImageComponent::setDefaultImage(const std::string& path)
 void ImageComponent::setImage(const std::string&  path, bool tile, const MaxSizeInfo& maxSize, bool checkFileExists, bool allowMultiImagePlaylist)
 {
 	std::string canonicalPath = (path[0] == '{' ? "" : Utils::FileSystem::getCanonicalPath(path));
+
 	if (!mPath.empty() && mPath == canonicalPath)
 		return;
 	
@@ -325,7 +326,7 @@ void ImageComponent::setImage(const std::string&  path, bool tile, const MaxSize
 	mPath = canonicalPath;
 
 	if (mTexture != nullptr)
-		mTexture->setRequired(false);
+		mTexture->setRequired(false, this);
 
 	// If the previous image is in the async queue, remove it
 	if (mLoadingTexture && mLoadingTexture.use_count() == 1 && !mLoadingTexture->isLoaded())
@@ -388,7 +389,7 @@ void ImageComponent::setImage(const std::string&  path, bool tile, const MaxSize
 	if (mShowing && mTexture != nullptr)
 	{
 		mTexture->reload();
-		mTexture->setRequired(true);
+		mTexture->setRequired(true, this);
 	}
 
 	mLoadingTextureLoaded = mLoadingTexture != nullptr && mLoadingTexture->isLoaded();
@@ -402,7 +403,7 @@ void ImageComponent::setImage(const char* path, size_t length, bool tile)
 {
 	mPath = "";
 	if (mTexture != nullptr)
-		mTexture->setRequired(false);
+		mTexture->setRequired(false, this);
 
 	mTexture.reset();
 
@@ -420,13 +421,13 @@ void ImageComponent::setImage(const char* path, size_t length, bool tile)
 void ImageComponent::setImage(const std::shared_ptr<TextureResource>& texture)
 {
 	if (mTexture != nullptr)
-		mTexture->setRequired(false);
+		mTexture->setRequired(false, this);
 
 	mTexture = texture;
 	mTextureLoaded = mTexture != nullptr && mTexture->isLoaded();
 
 	if (isShowing() && mTexture != nullptr)
-		mTexture->setRequired(true);
+		mTexture->setRequired(true, this);
 
 	resize();
 }
@@ -762,10 +763,10 @@ bool ImageComponent::watchTextureLoading()
 	if (!mLoadingTextureLoaded && mLoadingTexture && mLoadingTexture->isLoaded())
 	{
 		if (mTexture != nullptr)
-			mTexture->setRequired(false);
+			mTexture->setRequired(false, this);
 
 		mTexture = mLoadingTexture;
-		mTexture->setRequired(isShowing());
+		mTexture->setRequired(isShowing(), this);
 		mLoadingTexture.reset();
 
 		resize();
@@ -782,7 +783,7 @@ bool ImageComponent::watchTextureLoading()
 
 	if (!mTextureLoaded && mTexture->getSize() != Vector2i::Zero())
 	{
-		mTexture->setRequired(isShowing());
+		mTexture->setRequired(isShowing(), this);
 
 		resize();
 		updateVertices();
@@ -992,7 +993,7 @@ void ImageComponent::applyTheme(const std::shared_ptr<ThemeData>& theme, const s
 		if (child.second.has("enabled"))
 			mCustomShaderEnabled = child.second.get<bool>("enabled");
 
-		for (auto prop : child.second.properties)
+		for (const auto& prop : child.second.getProperties())
 		{
 			if (prop.second.type == ThemeData::ThemeElement::Property::PropertyType::String && Utils::String::endsWith(prop.first, "_binding"))
 				mBindingExpressions["shader." + Utils::String::replace(prop.first, "_binding", "")] = prop.second.s;				
@@ -1007,11 +1008,11 @@ std::vector<HelpPrompt> ImageComponent::getHelpPrompts()
 	return ret;
 }
 
-void ImageComponent::setPlaylist(std::shared_ptr<IPlaylist> playList)
+void ImageComponent::setPlaylist(std::shared_ptr<IPlaylist> playList, bool selectFirst)
 {
 	mPlaylistCache.clear();
 	mPlaylist = playList;
-	if (mPlaylist == nullptr)
+	if (mPlaylist == nullptr || !selectFirst)
 		return;
 
 	auto image = mPlaylist->getNextItem();
@@ -1037,14 +1038,14 @@ void ImageComponent::onShow()
 	if (mTexture != nullptr)
 	{
 		mTexture->reload();			
-		mTexture->setRequired(true);
+		mTexture->setRequired(true, this);
 	}
 }
 
 void ImageComponent::onHide()
 {
 	if (mTexture)
-		mTexture->setRequired(false);
+		mTexture->setRequired(false, this);
 
 	if (mShowing)
 	{

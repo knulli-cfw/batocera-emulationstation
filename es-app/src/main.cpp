@@ -616,10 +616,6 @@ int main(int argc, char* argv[])
 	}
 #endif
 
-	// preload what we can right away instead of waiting for the user to select it
-	// this makes for no delays when accessing content, but a longer startup time
-	ViewController::get()->preload();
-
 	// Initialize input
 	InputManager::getInstance()->init();
 	SDL_StopTextInput();

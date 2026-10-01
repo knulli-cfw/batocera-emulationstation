@@ -112,7 +112,9 @@ public:
 	void update(int deltaTime) override;
 	void onPaddingChanged() override;
 
-	void setPlaylist(std::shared_ptr<IPlaylist> playList);
+	void setPlaylist(std::shared_ptr<IPlaylist> playList, bool selectFirst = true);
+	std::shared_ptr<IPlaylist> getPlaylist() const { return mPlaylist; }
+	std::string getPlaylistMediaPath() const { return mPath; }
 
 	std::string getImagePath() { return mPath; }
 	bool isTiled();

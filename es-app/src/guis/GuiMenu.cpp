@@ -1127,12 +1127,6 @@ void GuiMenu::openDeveloperSettings()
 
 	s->addGroup(_("OPTIMIZATIONS"));
 
-	// preload UI
-	auto preloadUI = std::make_shared<SwitchComponent>(mWindow);
-	preloadUI->setState(Settings::getInstance()->getBool("PreloadUI"));
-	s->addWithDescription(_("PRELOAD UI ELEMENTS ON BOOT"), _("Reduces lag when entering gamelists from the system menu, increases boot time"), preloadUI);
-	s->addSaveFunc([preloadUI] { Settings::getInstance()->setBool("PreloadUI", preloadUI->getState()); });
-
 	// preload Medias
 	auto preloadMedias = std::make_shared<SwitchComponent>(mWindow);
 	preloadMedias->setState(Settings::getInstance()->getBool("PreloadMedias"));

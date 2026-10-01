@@ -105,12 +105,12 @@ void ISimpleGameListView::onThemeChanged(const std::shared_ptr<ThemeData>& theme
 
 void ISimpleGameListView::onFileChanged(FileData* /*file*/, FileChangeType /*change*/)
 {
-	// we could be tricky here to be efficient;
-	// but this shouldn't happen very often so we'll just always repopulate
+	// Rebuild the list and restore selection
 	FileData* cursor = getCursor();
 	if (!cursor->isPlaceHolder()) 
 	{
 		populateList(cursor->getParent()->getChildrenListToDisplay());
+		resetLastCursor();
 		setCursor(cursor);
 	}
 	else
@@ -119,8 +119,78 @@ void ISimpleGameListView::onFileChanged(FileData* /*file*/, FileChangeType /*cha
 			mCursorStack.pop();
 
 		populateList(mRoot->getChildrenListToDisplay());
+		resetLastCursor();
 		setCursor(cursor);
 	}
+}
+
+ISimpleGameListView::NavigationState
+ISimpleGameListView::saveNavigationState()
+{
+	NavigationState state;
+
+	auto folders = mCursorStack;
+	while (!folders.empty())
+	{
+		state.folders.push_back(folders.top()->getPath());
+		folders.pop();
+	}
+
+	state.cursorIndex = getCursorIndex();
+
+	auto cursor = getCursor();
+	if (cursor != nullptr)
+	{
+		state.syntheticCursor = cursor == mLastParentFolderData || cursor->isPlaceHolder();
+
+		if (!state.syntheticCursor)
+			state.cursorPath = cursor->getPath();
+	}
+
+	return state;
+}
+
+void ISimpleGameListView::restoreNavigationState(const NavigationState& state)
+{
+	std::stack<FileData*> folders;
+
+	// Saved paths run from the deepest folder back toward the root.
+	for (auto it = state.folders.rbegin(); it != state.folders.rend(); ++it)
+	{
+		auto file = mRoot->FindByPath(*it);
+		if (file == nullptr || file->getType() != FOLDER)
+			return;
+
+		folders.push(file);
+	}
+
+	mCursorStack = folders;
+
+	if (!folders.empty())
+		repopulate();
+
+	resetLastCursor();
+
+	auto entries = getFileDataEntries();
+
+	if (!state.cursorPath.empty())
+	{
+		for (auto file : entries)
+		{
+			if (file != nullptr && !file->isPlaceHolder() &&
+				file->getPath() == state.cursorPath)
+			{
+				setCursor(file);
+				return;
+			}
+		}
+	}
+
+	// Parent-folder entries and empty-list placeholders belong to
+	// the old view, so restore their position without retaining pointers.
+	if (state.syntheticCursor && state.cursorIndex >= 0 &&
+		state.cursorIndex < static_cast<int>(entries.size()))
+		setCursorIndex(state.cursorIndex);
 }
 
 void ISimpleGameListView::moveToFolder(FolderData* folder)

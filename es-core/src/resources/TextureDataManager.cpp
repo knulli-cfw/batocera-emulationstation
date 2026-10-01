@@ -26,6 +26,8 @@ std::shared_ptr<TextureData> TextureDataManager::add(const TextureResource* key,
 	auto it = mTextureLookup.find(key);
 	if (it != mTextureLookup.cend())
 	{
+		// Cancel pending loading before releasing the texture data.
+		mLoader->remove(*(*it).second);
 		// Remove the list entry
 		mTextures.erase((*it).second);
 		// And the lookup
@@ -47,6 +49,8 @@ void TextureDataManager::remove(const TextureResource* key)
 	auto it = mTextureLookup.find(key);
 	if (it != mTextureLookup.cend())
 	{
+		// Cancel pending loading before releasing the texture data.
+		mLoader->remove(*(*it).second);
 		// Remove the list entry
 		mTextures.erase((*it).second);
 		// And the lookup
@@ -78,14 +82,10 @@ std::shared_ptr<TextureData> TextureDataManager::get(const TextureResource* key,
 		if (enableLoading == TextureLoadMode::NOLOAD)
 			return tex;
 
-		if (mTextures.cbegin() != (*it).second)
+		if (mTextures.cbegin() != it->second)
 		{
-			// Remove the list entry
-			mTextures.erase((*it).second);
-			// Put it at the top
-			mTextures.push_front(tex);
-			// Store it back in the lookup
-			mTextureLookup[key] = mTextures.cbegin();
+			// Move the existing node; its lookup iterator remains valid.
+			mTextures.splice(mTextures.cbegin(), mTextures, it->second);
 		}
 
 		// Make sure it's loaded or queued for loading
@@ -116,7 +116,7 @@ size_t TextureDataManager::getTotalMemoryUsage(MemoryUsageType type)
 
 	size_t total = 0;
 
-	for (auto tex : mTextures)
+	for (const auto& tex : mTextures)
 		total += tex->getMemoryUsage(type);
 
 	return total;

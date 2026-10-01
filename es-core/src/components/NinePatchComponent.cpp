@@ -27,7 +27,7 @@ NinePatchComponent::~NinePatchComponent()
 	}
 
 	if (mTexture != nullptr)
-		mTexture->setRequired(false);
+		mTexture->setRequired(false, this);
 
 	if (mVertices != NULL)
 		delete[] mVertices;
@@ -152,7 +152,7 @@ void NinePatchComponent::render(const Transform4x4f& parentTrans)
 	if (!mTextureLoaded && mTexture && mTexture->isLoaded())
 	{
 		mTextureLoaded = true;
-		mTexture->setRequired(isShowing());
+		mTexture->setRequired(isShowing(), this);
 
 		buildVertices();
 		updateColors();
@@ -320,14 +320,14 @@ void NinePatchComponent::setImagePath(const std::string& path, bool asyncLoading
 	mPath = path;
 
 	if (mTexture != nullptr)
-		mTexture->setRequired(false);
+		mTexture->setRequired(false, this);
 
 	auto prev = mTexture;
 	mTexture = TextureResource::get(mPath, false, true, !asyncLoading);
 	mTextureLoaded = mTexture != nullptr && mTexture->isLoaded();
 
 	if (isShowing() && mTexture != nullptr)
-		mTexture->setRequired(true);
+		mTexture->setRequired(true, this);
 
 	buildVertices();
 }
@@ -405,7 +405,7 @@ void NinePatchComponent::onShow()
 	GuiComponent::onShow();
 
 	if (mTexture != nullptr)
-		mTexture->setRequired(true);	
+		mTexture->setRequired(true, this);
 }
 
 void NinePatchComponent::onHide()
@@ -413,7 +413,7 @@ void NinePatchComponent::onHide()
 	GuiComponent::onHide();
 
 	if (mTexture != nullptr)
-		mTexture->setRequired(false);	
+		mTexture->setRequired(false, this);
 }
 
 ThemeData::ThemeElement::Property NinePatchComponent::getProperty(const std::string name)

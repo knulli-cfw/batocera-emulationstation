@@ -221,14 +221,14 @@ void TextureResource::prioritize() const
 		sTextureDataManager.get(this, TextureLoadMode::MOVETOTOPONLY);
 }
 
-void TextureResource::setRequired(bool value) const
+void TextureResource::setRequired(bool value, const void* owner) const
 {
 	if (mTextureData != nullptr)
 		return;
 	
 	auto data = sTextureDataManager.get(this, TextureLoadMode::NOLOAD);
 	if (data != nullptr)
-		data->setRequired(value);	
+		data->setRequired(value, owner);
 }
 
 bool TextureResource::bind()

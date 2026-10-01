@@ -16,19 +16,29 @@
 #include <functional>
 #include <map>
 #include <unordered_set>
+#include <vector>
 
 #include "SystemViewControlWrapper.h"
 
 class AnimatedImageComponent;
 class SystemData;
 class VideoVlcComponent;
+class IPlaylist;
+
+struct SystemViewPlaylistState
+{
+	std::shared_ptr<IPlaylist> playlist;
+	std::string path;
+	bool tiled = false;
+};
 
 struct SystemViewData
 {
 	SystemData* object;
 	std::vector<GuiComponent*> backgroundExtras;
+	bool extrasLoaded = false;
+	std::map<std::vector<std::string>, SystemViewPlaylistState> playlists;
 };
-
 
 class SystemView : public GuiComponent
 {
@@ -40,6 +50,9 @@ public:
 
 	void onThemeChanged(const std::shared_ptr<ThemeData>& theme);
 	void reloadTheme(SystemData* system);
+
+	void releaseExtrasForGameLaunch() { updateExtraResidency(ExtraResidencyMode::GameLaunch); }
+	void releaseHiddenExtras() { updateExtraResidency(ExtraResidencyMode::Hidden); }
 
 	SystemData* getActiveSystem();
 
@@ -75,7 +88,18 @@ protected:
 	SystemData* getSelected();
 
 private:
-	void	 loadExtras(SystemData* system);
+	enum class ExtraResidencyMode
+	{
+		Navigation,
+		Hidden,
+		GameLaunch
+	};
+
+	void	 loadExtras(SystemData* system, bool preservePlaylists = false);
+	void	 saveExtraPlaylists(SystemViewData& entry);
+	void	 ensureExtras(int index);
+	void	 ensureWarmExtras();
+	void	 releaseExtras(SystemViewData& entry);
 	void	 ensureTexture(GuiComponent* extra, TextureLoadMode mode = TextureLoadMode::LOADNOMOVETOTOP);
 
 	void	 updateExtraTextBinding();
@@ -86,6 +110,9 @@ private:
 
 	void	 activateExtras(int cursor, bool activate = true);	
 	void	 updateExtras(const std::function<void(GuiComponent*)>& func);
+	void	 collectExtraUpdateEntries(std::unordered_set<int>& entries);
+	void	 collectExtraResidencyEntries(std::unordered_set<int>& entries, int padding);
+	void	 updateExtraResidency(ExtraResidencyMode mode);
 	void	 clearEntries();
 
 	int		 moveCursorFast(bool forward = true);

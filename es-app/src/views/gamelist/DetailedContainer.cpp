@@ -402,7 +402,7 @@ void DetailedContainer::loadIfThemed(ImageComponent** pImage, const std::shared_
 
 	auto elem = theme->getElement(getName(), element, "image");
 
-	if (forceLoad || (elem && elem->properties.size() > 0 && (!elem->has("visible") || elem->get<bool>("visible"))))
+	if (forceLoad || (elem && !elem->getProperties().empty() && (!elem->has("visible") || elem->get<bool>("visible"))))
 	{
 		createImageComponent(pImage, element == "md_fanart", element == "md_fanart" && Settings::AllImagesAsync());			
 		(*pImage)->applyTheme(theme, getName(), element, loadPath ? ALL : ALL ^ (PATH));	

@@ -28,6 +28,7 @@
 #include <thread>
 #include "../es-app/src/ApiSystem.h"
 #include "utils/StringUtil.h"
+#include "resources/ResourceManager.h"
 
 #if WIN32
 #include <SDL_syswm.h>
@@ -432,6 +433,7 @@ void Window::processSongTitleNotifications()
 
 void Window::update(int deltaTime)
 {
+	ResourceManager::getInstance()->cleanupExpiredReloadables();
 	TextureResource::cleanupVRAM();
 
 	if (mLastShowCursor >= 0)
