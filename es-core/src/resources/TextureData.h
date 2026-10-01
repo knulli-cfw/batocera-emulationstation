@@ -54,7 +54,8 @@ public:
 
 	// Get the amount of VRAM currenty used by this texture
 	size_t getMemoryUsage(MemoryUsageType type = MemoryUsageType::Allocated)
-	{ 
+	{
+		std::unique_lock<std::mutex> lock(mMutex);
 		if (type == MemoryUsageType::RAM)
 			return mDataRGBA != nullptr ? mSize.x() * mSize.y() * 4 : 0;
 
@@ -67,8 +68,17 @@ public:
 		return mTextureID != 0 || mDataRGBA != nullptr ? mSize.x() * mSize.y() * 4 : 0;
 	}
 
-	const 	Vector2i& getSize() const { return mSize; }
-	const 	Vector2f& getPhysicalSize() const { return mPhysicalSize; }
+	Vector2i getSize() const
+	{
+		std::unique_lock<std::mutex> lock(mMutex);
+		return mSize;
+	}
+
+	Vector2f getPhysicalSize() const
+	{
+		std::unique_lock<std::mutex> lock(mMutex);
+		return mPhysicalSize;
+	}
 
 	bool rasterizeAt(float width, float height);
 
@@ -100,14 +110,24 @@ public:
 
 	inline bool isReloadable() { return mReloadable; };
 	
-	inline bool isScalable() { return mScalable; }
-	void setScalable(bool value) { mScalable = value; };
+	bool isScalable()
+	{
+		std::unique_lock<std::mutex> lock(mMutex);
+		return mScalable;
+	}
+
+	void setScalable(bool value)
+	{
+		std::unique_lock<std::mutex> lock(mMutex);
+		mScalable = value;
+	}
 
 private:
 	bool			mRequired;
 	std::unordered_set<const void*> mRequiredOwners;
 
-	std::mutex		mMutex;
+	mutable std::mutex	mMutex;
+	std::mutex		mSVGLoadMutex;
 	bool			mTile;
 	bool			mLinear;
 	std::string		mPath;
