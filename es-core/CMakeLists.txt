@@ -133,6 +133,8 @@ set(CORE_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/Randomizer.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/VectorEx.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/HtmlColor.h
+	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/stb_image.h
+	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/stb_image_resize2.h
 
 	# Watchers
 	${CMAKE_CURRENT_SOURCE_DIR}/src/watchers/WatchersManager.h

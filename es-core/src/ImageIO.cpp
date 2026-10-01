@@ -13,8 +13,182 @@
 #include "renderers/Renderer.h"
 #include "Paths.h"
 #include "math/Vector4f.h"
+#include <limits>
+#include <memory>
+#include <new>
+
+#define STB_IMAGE_RESIZE_STATIC
+#define STB_IMAGE_RESIZE_IMPLEMENTATION
+#include "utils/stb_image_resize2.h"
+
+#define STB_IMAGE_STATIC
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_ONLY_PNG
+#define STBI_NO_STDIO
+#include "utils/stb_image.h"
 
 const MaxSizeInfo MaxSizeInfo::Empty;
+
+namespace
+{
+	unsigned char* loadStbRGBA(
+		const unsigned char* data, size_t size,
+		size_t& width, size_t& height,
+		MaxSizeInfo* maxSize, Vector2i* baseSize, Vector2i* packedSize)
+	{
+		const bool isPng =
+			size >= 8 &&
+			data[0] == 0x89 && data[1] == 'P' &&
+			data[2] == 'N' && data[3] == 'G' &&
+			data[4] == 0x0D && data[5] == 0x0A &&
+			data[6] == 0x1A && data[7] == 0x0A;
+
+		if (!isPng || size > static_cast<size_t>(std::numeric_limits<int>::max()))
+			return nullptr;
+
+		int sourceWidth = 0;
+		int sourceHeight = 0;
+		int channels = 0;
+
+		std::unique_ptr<unsigned char, decltype(&stbi_image_free)>
+			pixels(nullptr, &stbi_image_free);
+
+		pixels.reset(stbi_load_from_memory(
+			data, static_cast<int>(size),
+			&sourceWidth, &sourceHeight, &channels, 4));
+
+		if (!pixels)
+			return nullptr;
+
+		const int maxStride = std::numeric_limits<int>::max();
+		if (sourceWidth <= 0 || sourceHeight <= 0 || sourceWidth > maxStride / 4)
+			return nullptr;
+
+		Vector2i target(sourceWidth, sourceHeight);
+
+		const size_t maxX = maxSize == nullptr ?
+			0 : static_cast<size_t>(Math::round(maxSize->x()));
+		const size_t maxY = maxSize == nullptr ?
+			0 : static_cast<size_t>(Math::round(maxSize->y()));
+
+		if (maxSize != nullptr && maxX > 0 && maxY > 0 &&
+			(static_cast<size_t>(sourceWidth) > maxX ||
+			 static_cast<size_t>(sourceHeight) > maxY))
+		{
+			target = ImageIO::adjustPictureSize(
+				Vector2i(sourceWidth, sourceHeight),
+				Vector2i(maxX, maxY), maxSize->externalZoom());
+
+			if (target.x() > Renderer::getScreenWidth() || target.y() > Renderer::getScreenHeight())
+			{
+				target = ImageIO::adjustPictureSize(
+					target,
+					Vector2i(Renderer::getScreenWidth(),
+                                            Renderer::getScreenHeight()),
+					false);
+			}
+		}
+
+		if (target.x() <= 0 || target.y() <= 0 || target.x() > maxStride / 4)
+			return nullptr;
+
+		const size_t rowBytes = static_cast<size_t>(target.x()) * 4;
+		if (static_cast<size_t>(target.y()) >
+			std::numeric_limits<size_t>::max() / rowBytes)
+			return nullptr;
+
+		const bool resized = target.x() != sourceWidth || target.y() != sourceHeight;
+
+		std::unique_ptr<unsigned char[]> output(new (std::nothrow) unsigned char[rowBytes * target.y()]);
+		if (!output)
+			return nullptr;
+
+		if (resized)
+		{
+			// Write bottom-up RGBA directly into ES's output buffer.
+			void* result = stbir_resize(
+				pixels.get(), sourceWidth, sourceHeight, sourceWidth * 4,
+				output.get() + rowBytes * (target.y() - 1),
+				target.x(), target.y(), -static_cast<int>(rowBytes),
+				STBIR_4CHANNEL, STBIR_TYPE_UINT8,
+				STBIR_EDGE_CLAMP, STBIR_FILTER_BOX);
+
+			if (result == nullptr)
+				return nullptr;
+		}
+		else
+		{
+			// ES owns this buffer, stb uses its own allocator.
+			for (int y = 0; y < sourceHeight; ++y)
+			{
+				memcpy(
+					output.get() + rowBytes * (sourceHeight - 1 - y),
+					pixels.get() + rowBytes * y,
+					rowBytes);
+			}
+		}
+
+		width = target.x();
+		height = target.y();
+
+		if (baseSize != nullptr)
+			*baseSize = Vector2i(sourceWidth, sourceHeight);
+
+		if (packedSize != nullptr)
+			*packedSize = resized ? target : Vector2i(0, 0);
+
+		return output.release();
+	}
+
+	FIBITMAP* resizeBitmap(FIBITMAP* source, int width, int height)
+	{
+		const unsigned int bpp = FreeImage_GetBPP(source);
+		const unsigned int sourceWidth = FreeImage_GetWidth(source);
+		const unsigned int sourceHeight = FreeImage_GetHeight(source);
+		const unsigned int sourcePitch = FreeImage_GetPitch(source);
+		const unsigned int intMax =
+			static_cast<unsigned int>(std::numeric_limits<int>::max());
+
+		if (FreeImage_GetImageType(source) == FIT_BITMAP &&
+			(bpp == 24 || bpp == 32) &&
+			sourceWidth > 0 && sourceHeight > 0 &&
+			sourceWidth <= intMax && sourceHeight <= intMax &&
+			sourcePitch <= intMax &&
+			width > 0 && height > 0)
+		{
+			FIBITMAP* result = FreeImage_Allocate(width, height, bpp);
+
+			if (result != nullptr)
+			{
+				const unsigned int destinationPitch = FreeImage_GetPitch(result);
+
+				if (destinationPitch <= intMax)
+				{
+					// Preserve channel order and filter alpha independently.
+					const stbir_pixel_layout layout = bpp == 32 ? STBIR_4CHANNEL : STBIR_RGB;
+
+					void* resized = stbir_resize(
+						FreeImage_GetBits(source),
+						static_cast<int>(sourceWidth),
+						static_cast<int>(sourceHeight),
+						static_cast<int>(sourcePitch),
+						FreeImage_GetBits(result),
+						width, height,
+						static_cast<int>(destinationPitch),
+						layout, STBIR_TYPE_UINT8,
+						STBIR_EDGE_CLAMP, STBIR_FILTER_BOX);
+
+					if (resized != nullptr)
+						return result;
+				}
+
+				FreeImage_Unload(result);
+			}
+		}
+
+		return FreeImage_Rescale(source, width, height, FILTER_BOX);
+	}
+}
 
 unsigned char* ImageIO::loadFromMemoryRGBA32(const unsigned char * data, const size_t size, size_t & width, size_t & height, MaxSizeInfo* maxSize, Vector2i* baseSize, Vector2i* packedSize, int subImageIndex)
 {
@@ -23,13 +197,26 @@ unsigned char* ImageIO::loadFromMemoryRGBA32(const unsigned char * data, const s
 	if (baseSize != nullptr)
 		*baseSize = Vector2i(0, 0);
 
-	if (baseSize != nullptr)
+	if (packedSize != nullptr)
 		*packedSize = Vector2i(0, 0);
 
 	std::vector<unsigned char> rawData;
 	width = 0;
 	height = 0;
+
+	if (data == nullptr || size == 0)
+		return nullptr;
+
+	if (subImageIndex < 0)
+	{
+		unsigned char* result = loadStbRGBA(data, size, width, height, maxSize, baseSize, packedSize);
+
+		if (result != nullptr)
+			return result;
+	}
+
 	FIMEMORY * fiMemory = FreeImage_OpenMemory((BYTE *)data, (DWORD)size);
+
 	if (fiMemory != nullptr) 
 	{
 		//detect the filetype from data
@@ -100,7 +287,7 @@ unsigned char* ImageIO::loadFromMemoryRGBA32(const unsigned char * data, const s
 						{
 							LOG(LogDebug) << "ImageIO : rescaling image from " << std::string(std::to_string(width) + "x" + std::to_string(height)).c_str() << " to " << std::string(std::to_string(sz.x()) + "x" + std::to_string(sz.y())).c_str();
 
-							FIBITMAP* imageRescaled = FreeImage_Rescale(fiBitmap, sz.x(), sz.y(), FILTER_BOX);
+							FIBITMAP* imageRescaled = resizeBitmap(fiBitmap, sz.x(), sz.y());
 
 							if (fiMultiBitmap != nullptr)
 							{
