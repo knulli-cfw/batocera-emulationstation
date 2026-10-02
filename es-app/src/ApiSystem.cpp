@@ -233,6 +233,19 @@ bool ApiSystem::setOverclock(std::string mode)
 	return executeScript("knulli-overclock set " + mode);
 }
 
+#ifdef KNULLI
+bool ApiSystem::isDebugBootEnabled()
+{
+	auto result = executeEnumerationScript("knulli-boot-debug status");
+	return !result.empty() && Utils::String::trim(result.front()) == "enabled";
+}
+
+bool ApiSystem::setDebugBootEnabled(bool enabled)
+{
+	return executeScript(std::string("knulli-boot-debug ") + (enabled ? "enable" : "disable"));
+}
+#endif
+
 #ifdef BATOCERA
 bool ApiSystem::areCpuMitigationsEnabled()
 {

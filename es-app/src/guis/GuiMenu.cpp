@@ -835,6 +835,23 @@ void GuiMenu::openDeveloperSettings()
 		}
 	});
 
+#ifdef KNULLI
+	auto debugBoot = std::make_shared<SwitchComponent>(mWindow);
+	debugBoot->setState(ApiSystem::getInstance()->isDebugBootEnabled());
+	s->addWithDescription(_("DEBUG BOOT"), _("Boot with default settings and no saved overlay. Restart required."), debugBoot);
+
+	s->addSaveFunc([debugBoot, s, window]
+	{
+		if (!debugBoot->changed())
+			return;
+
+		if (ApiSystem::getInstance()->setDebugBootEnabled(debugBoot->getState()))
+			s->setVariable("reboot", true);
+		else
+			window->displayNotificationMessage(_("FAILED TO CHANGE DEBUG BOOT SETTING"));
+	});
+#endif
+
 	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::SUPPORTFILE))
 	{
 		// support

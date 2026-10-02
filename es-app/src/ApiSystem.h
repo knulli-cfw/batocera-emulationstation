@@ -198,6 +198,11 @@ public:
 
     bool setOverclock(std::string mode);
 
+#ifdef KNULLI
+    bool isDebugBootEnabled();
+    bool setDebugBootEnabled(bool enabled);
+#endif
+
 #ifdef BATOCERA
     bool areCpuMitigationsEnabled();
     bool setCpuMitigationsEnabled(bool enabled);
