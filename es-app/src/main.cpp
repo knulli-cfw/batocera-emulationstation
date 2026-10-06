@@ -441,7 +441,33 @@ void launchStartupGame()
 	if (!command.empty())
 	{
 		InputManager::getInstance()->init();
-		command = Utils::String::replace(command, "%CONTROLLERSCONFIG%", InputManager::getInstance()->configureEmulators());
+                // KNULLI - QUICK RESUME MODE >>>>>
+                if (QuickResume::quickResumeEnabled())
+		{
+			// Holding Start during boot cancels quick resume.
+			SDL_PumpEvents();
+			SDL_JoystickUpdate();
+			for (int index = 0; index < SDL_NumJoysticks(); index++)
+			{
+				auto joystick = SDL_JoystickFromInstanceID(SDL_JoystickGetDeviceInstanceID(index));
+				if (joystick == nullptr)
+					continue;
+
+				auto config = InputManager::getInstance()->getInputConfigByDevice(SDL_JoystickInstanceID(joystick));
+				Input start;
+				if (config == nullptr || !config->getInputByName("start", &start) || start.type != TYPE_BUTTON)
+					continue;
+
+				if (SDL_JoystickGetButton(joystick, start.id))
+				{
+					LOG(LogInfo) << "Quick Resume cancelled by holding Start.";
+					QuickResume::clearQuickResume();
+					return;
+				}
+			}
+		}
+		// KNULLI - QUICK RESUME MODE <<<<<
+                command = Utils::String::replace(command, "%CONTROLLERSCONFIG%", InputManager::getInstance()->configureEmulators());
 		Utils::Platform::ProcessStartInfo(command).run();
 		// KNULLI - QUICK RESUME MODE >>>>>
 		QuickResume::postLaunchConditionalClean();
