@@ -436,13 +436,13 @@ void launchStartupGame()
 	auto gamePath = SystemConf::getInstance()->get("global.bootgame.path");
 	if (gamePath.empty() || !Utils::FileSystem::exists(gamePath))
 		return;
-	
+
 	auto command = SystemConf::getInstance()->get("global.bootgame.cmd");
 	if (!command.empty())
 	{
 		InputManager::getInstance()->init();
-                // KNULLI - QUICK RESUME MODE >>>>>
-                if (QuickResume::quickResumeEnabled())
+		// KNULLI - QUICK RESUME MODE >>>>>
+		if (QuickResume::quickResumeEnabled())
 		{
 			// Holding Start during boot cancels quick resume.
 			SDL_PumpEvents();
@@ -467,12 +467,12 @@ void launchStartupGame()
 			}
 		}
 		// KNULLI - QUICK RESUME MODE <<<<<
-                command = Utils::String::replace(command, "%CONTROLLERSCONFIG%", InputManager::getInstance()->configureEmulators());
+		command = Utils::String::replace(command, "%CONTROLLERSCONFIG%", InputManager::getInstance()->configureEmulators());
 		Utils::Platform::ProcessStartInfo(command).run();
 		// KNULLI - QUICK RESUME MODE >>>>>
 		QuickResume::postLaunchConditionalClean();
 		// KNULLI - QUICK RESUME MODE <<<<<
-	}	
+	}
 }
 
 // #include "utils/MathExpr.h"
