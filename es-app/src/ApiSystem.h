@@ -252,6 +252,10 @@ public:
 #else
 	bool enableWifi(std::string ssid, std::string key);
 #endif
+#if !WIN32
+	bool configureWifi();
+	bool connectWifi(const std::string& ssid);
+#endif
     bool disableWifi();
 
 	virtual std::string getIpAddress();
@@ -361,6 +365,7 @@ public:
 	void setLEDMode(const std::string& mode);
 
 	std::vector<std::string> getWifiNetworks(bool scan = false);
+	std::string getConnectedWifiSsid();
 	void scanWifiNetworks();
 	std::string getWifiRoute();
 

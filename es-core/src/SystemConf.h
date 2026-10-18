@@ -5,6 +5,7 @@
 #include <string>
 #include <map>
 #include <set>
+#include <vector>
 
 class SystemConf 
 {
@@ -19,6 +20,7 @@ public:
     bool saveSystemConf();
 
     std::string get(const std::string &name);
+	std::vector<std::string> getKeysStartingWith(const std::string &prefix);
     bool set(const std::string &name, const std::string &value);
 
 	bool getBool(const std::string &name, bool defaultValue = false);

@@ -636,9 +636,13 @@ bool ApiSystem::launchFileManager(Window *window)
 }
 
 #if !WIN32
-bool ApiSystem::enableWifi(std::string ssid, std::string key, std::string country) 
+bool ApiSystem::enableWifi(std::string ssid, std::string key, std::string country)
 {
-	return executeScript("batocera-wifi enable \"" + ssid + "\" \"" + key + "\" \"" + country + "\"");
+	ssid = Utils::String::replace(ssid, "'", "'\\''");
+	key = Utils::String::replace(key, "'", "'\\''");
+	country = Utils::String::replace(country, "'", "'\\''");
+
+	return executeScript("knulli-wifi enable '" + ssid + "' '" + key + "' '" + country + "'");
 }
 #else
 bool ApiSystem::enableWifi(std::string ssid, std::string key)
@@ -647,6 +651,20 @@ bool ApiSystem::enableWifi(std::string ssid, std::string key)
 	key = Utils::String::replace(key, "'", "'\\''");
 
 	return executeScript("knulli-wifi enable '" + ssid + "' '" + key + "'");
+}
+#endif
+
+#if !WIN32
+bool ApiSystem::configureWifi()
+{
+	return executeScript("knulli-wifi configure");
+}
+
+bool ApiSystem::connectWifi(const std::string& ssid)
+{
+	const std::string escapedSSID = Utils::String::replace(ssid, "'", "'\\''");
+
+	return executeScript("knulli-wifi connect '" + escapedSSID + "'");
 }
 #endif
 
@@ -2064,6 +2082,12 @@ bool ApiSystem::isLEDMonochrome()
 std::vector<std::string> ApiSystem::getWifiNetworks(bool scan)
 {
 	return executeEnumerationScript(scan ? "knulli-wifi scanlist" : "knulli-wifi list");
+}
+
+std::string ApiSystem::getConnectedWifiSsid()
+{
+	std::vector<std::string> result = executeEnumerationScript("knulli-wifi connected");
+	return result.empty() ? "" : result[0];
 }
 
 void ApiSystem::scanWifiNetworks()
