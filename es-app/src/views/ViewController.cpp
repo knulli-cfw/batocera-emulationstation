@@ -575,6 +575,9 @@ void ViewController::promptMissingBios(FileData* game, LaunchGameOptions options
 		_("NO"), nullptr, ICON_ERROR));
 }
 
+// textures are dropped while a game runs and fade back in, so stay zoomed until the view is drawn again
+static const int RETURN_HOLD = 250;
+
 void ViewController::launch(FileData* game, LaunchGameOptions options, Vector3f center, Vector2f targetSize, bool allowCheckLaunchOptions)
 {
 	if (allowCheckLaunchOptions && !checkLaunchOptions(game, options, center, targetSize))
@@ -690,6 +693,7 @@ void ViewController::launch(FileData* game, LaunchGameOptions options, Vector3f 
 			else
 			{
 				setAnimation(new LambdaAnimation(fadeFunc, 800), 0, [this] { GuiComponent::isLaunchTransitionRunning = false; mLockInput = false; mWindow->closeSplashScreen(); }, true, 3);
+				this->onFileChanged(game, FILE_METADATA_CHANGED);
 			}
 		});
 	}
@@ -701,9 +705,7 @@ void ViewController::launch(FileData* game, LaunchGameOptions options, Vector3f 
 		{
 			if (missingBios.valid() && missingBios.get())
 			{
-				mCamera = origCamera;
-				setAnimation(new LaunchAnimation(mCamera, mFadeOpacity, center, 600, zoom), 0, [this, game, options, center, targetSize] { GuiComponent::isLaunchTransitionRunning = false; mLockInput = false; mWindow->closeSplashScreen(); promptMissingBios(game, options, center, targetSize); }, true, 3);
-				advanceAnimation(3, 0);
+				setAnimation(new LaunchAnimation(mCamera, origCamera, mFadeOpacity, center, 600, zoom), 0, [this, game, options, center, targetSize] { GuiComponent::isLaunchTransitionRunning = false; mLockInput = false; mWindow->closeSplashScreen(); promptMissingBios(game, options, center, targetSize); }, true, 3);
 				return;
 			}
 
@@ -716,9 +718,8 @@ void ViewController::launch(FileData* game, LaunchGameOptions options, Vector3f 
 			}
 			else
 			{
-				mCamera = origCamera;
-				setAnimation(new LaunchAnimation(mCamera, mFadeOpacity, center, 600, zoom), 0, [this] { GuiComponent::isLaunchTransitionRunning = false; mLockInput = false; mWindow->closeSplashScreen(); }, true, 3);
-				advanceAnimation(3, 0);
+				setAnimation(new LaunchAnimation(mCamera, origCamera, mFadeOpacity, center, 600, zoom), RETURN_HOLD, [this] { GuiComponent::isLaunchTransitionRunning = false; mLockInput = false; mWindow->closeSplashScreen(); }, true, 3);
+				this->onFileChanged(game, FILE_METADATA_CHANGED);
 			}
 		});
 	}
@@ -728,9 +729,7 @@ void ViewController::launch(FileData* game, LaunchGameOptions options, Vector3f 
 		{
 			if (missingBios.valid() && missingBios.get())
 			{
-				mCamera = origCamera;
-				setAnimation(new LaunchAnimation(mCamera, mFadeOpacity, center, 10, zoom), 0, [this, game, options, center, targetSize] { GuiComponent::isLaunchTransitionRunning = false; mLockInput = false; mWindow->closeSplashScreen(); promptMissingBios(game, options, center, targetSize); }, true, 3);
-				advanceAnimation(3, 0);
+				setAnimation(new LaunchAnimation(mCamera, origCamera, mFadeOpacity, center, 10, zoom), 0, [this, game, options, center, targetSize] { GuiComponent::isLaunchTransitionRunning = false; mLockInput = false; mWindow->closeSplashScreen(); promptMissingBios(game, options, center, targetSize); }, true, 3);
 				return;
 			}
 
@@ -743,14 +742,13 @@ void ViewController::launch(FileData* game, LaunchGameOptions options, Vector3f 
 			}
 			else
 			{
-				mCamera = origCamera;
-				setAnimation(new LaunchAnimation(mCamera, mFadeOpacity, center, 10, zoom), 0, [this] { GuiComponent::isLaunchTransitionRunning = false; mLockInput = false; mWindow->closeSplashScreen(); }, true, 3);
-				advanceAnimation(3, 0);
+				setAnimation(new LaunchAnimation(mCamera, origCamera, mFadeOpacity, center, 10, zoom), 0, [this] { GuiComponent::isLaunchTransitionRunning = false; mLockInput = false; mWindow->closeSplashScreen(); }, true, 3);
+				this->onFileChanged(game, FILE_METADATA_CHANGED);
 			}
 		});
 	}
 
-	mWindow->normalizeNextUpdate();
+	mWindow->normalizeNextUpdate(); // Ensure the beginning of the animation plays
 }
 
 void ViewController::removeGameListView(SystemData* system)
