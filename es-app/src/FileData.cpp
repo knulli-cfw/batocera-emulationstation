@@ -38,6 +38,9 @@
 #include "QuickResume.h"
 #include "watchers/WatchersManager.h"
 #include <unordered_map>
+#include <malloc.h>
+#include <cstdio>
+#include "components/VideoVlcComponent.h"
 
 using namespace Utils::Platform;
 
@@ -733,10 +736,18 @@ bool FileData::launchGame(Window* window, LaunchGameOptions options)
 	// Pause watchers before game launch
 	WatchersManager::pause();
 
+	VideoVlcComponent::shutdown();
+
+#ifdef __GLIBC__
+	malloc_trim(0);
+#endif
+
 	ProcessStartInfo process(command);
 	process.window = hideWindow ? NULL : window;
 
 	int exitCode = process.run();
+
+	VideoVlcComponent::resume();
 
 	// Resume watchers when returning to ES
 	WatchersManager::resume();

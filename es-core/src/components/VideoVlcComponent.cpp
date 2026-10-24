@@ -13,6 +13,8 @@
 #include "ThemeData.h"
 #include <SDL_timer.h>
 #include "AudioManager.h"
+#include <algorithm>
+#include <condition_variable>
 #include <thread>
 #include <vector>
 
@@ -25,6 +27,17 @@
 #define MATHPI          3.141592653589793238462643383279502884L
 
 libvlc_instance_t* VideoVlcComponent::mVLC = NULL;
+
+namespace
+{
+	std::mutex sVlcMutex;
+	std::mutex sReleaseMutex;
+	std::condition_variable sReleaseFinished;
+	std::vector<VideoVlcComponent*> sVideoComponents;
+
+	unsigned int sPendingReleases = 0;
+	bool sVlcSuspended = false;
+}
 
 // VLC prepares to render a video frame.
 static void *lock(void *data, void **p_pixels) 
@@ -80,6 +93,7 @@ VideoVlcComponent::VideoVlcComponent(Window* window) : VideoComponent(window),
 
 	// Make sure VLC has been initialised
 	init();
+	sVideoComponents.push_back(this);
 }
 
 static void mediaplayer_release_async(VideoContext* ctx, libvlc_media_player_t* p_mi)
@@ -87,16 +101,29 @@ static void mediaplayer_release_async(VideoContext* ctx, libvlc_media_player_t* 
 	if (p_mi == nullptr)
 		return;
 
+	{
+		std::lock_guard<std::mutex> lock(sReleaseMutex);
+		++sPendingReleases;
+	}
+
 	std::thread([p_mi, ctx]()
 	{
 		libvlc_media_player_release(p_mi);
 		delete ctx;
+
+		{
+			std::lock_guard<std::mutex> lock(sReleaseMutex);
+			--sPendingReleases;
+		}
+
+		sReleaseFinished.notify_all();
 	}).detach();
 }
 
 VideoVlcComponent::~VideoVlcComponent()
 {
 	stopVideo();
+	sVideoComponents.erase(std::remove(sVideoComponents.begin(), sVideoComponents.end(), this), sVideoComponents.end());
 }
 
 Vector2f VideoVlcComponent::getSize() const
@@ -643,7 +670,9 @@ void _checkUpgradedVlcVersion()
 
 void VideoVlcComponent::init()
 {
-	if (mVLC != nullptr)
+	std::lock_guard<std::mutex> lock(sVlcMutex);
+
+	if (sVlcSuspended || mVLC != nullptr)
 		return;
 
 	std::vector<std::string> cmdline;
@@ -670,6 +699,45 @@ void VideoVlcComponent::init()
 	mVLC = libvlc_new(cmdline.size(), theArgs);
 
 	delete[] theArgs;
+}
+
+void VideoVlcComponent::shutdown()
+{
+	{
+		std::lock_guard<std::mutex> lock(sVlcMutex);
+		sVlcSuspended = true;
+	}
+
+	for (auto* video : sVideoComponents)
+	{
+		video->stopVideo();
+		video->mTexture.reset();
+	}
+
+	{
+		std::unique_lock<std::mutex> lock(sReleaseMutex);
+		sReleaseFinished.wait(lock, [] {
+			return sPendingReleases == 0;
+		});
+	}
+
+	std::lock_guard<std::mutex> lock(sVlcMutex);
+
+	if (mVLC)
+	{
+		libvlc_release(mVLC);
+		mVLC = nullptr;
+	}
+}
+
+void VideoVlcComponent::resume()
+{
+	{
+		std::lock_guard<std::mutex> lock(sVlcMutex);
+		sVlcSuspended = false;
+	}
+
+	init();
 }
 
 void VideoVlcComponent::handleLooping()

@@ -68,6 +68,8 @@ class VideoVlcComponent : public VideoComponent
 
 public:
 	static void init();
+	static void shutdown();
+	static void resume();
 
 	VideoVlcComponent(Window* window);
 	virtual ~VideoVlcComponent();
