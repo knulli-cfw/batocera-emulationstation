@@ -410,10 +410,10 @@ msgid "SEARCHING WI-FI NETWORKS"
 msgstr "TÌM KIẾM MẠNG WI-FI"
 
 msgid "DEVICE OPTIONS"
-msgstr ""
+msgstr "TUỲ CHỌN THIẾT BỊ"
 
 msgid "DISCONNECT"
-msgstr ""
+msgstr "NGẮT KẾT NỐI"
 
 msgid "CONNECT"
 msgstr ""
@@ -423,7 +423,7 @@ msgstr ""
 
 #, c-format
 msgid "ARE YOU SURE YOU WANT TO FORGET '%s' ?"
-msgstr ""
+msgstr "BẠN CÓ CHẮC MUỐN QUÊN '%s' ?"
 
 msgid "YES"
 msgstr "CÓ"
@@ -433,11 +433,11 @@ msgstr "KHÔNG"
 
 #, c-format
 msgid "ARE YOU SURE YOU WANT TO CONNECT TO '%s' ?"
-msgstr ""
+msgstr "BẠN CÓ CHẮC MUỐN KẾT NỐI TỚI '%s' ?"
 
 #, c-format
 msgid "ARE YOU SURE YOU WANT TO DISCONNECT '%s' ?"
-msgstr ""
+msgstr "BẠN CÓ CHẮC MUỐN NGẮT KẾT NỐI '%s' ?"
 
 msgid "PAD TO KEYBOARD CONFIGURATION"
 msgstr "CẤU HÌNH PAD VÀO BÀN PHÍM"
@@ -551,7 +551,7 @@ msgid "CUSTOM"
 msgstr ""
 
 msgid "CUSTOM RELAY SERVER"
-msgstr ""
+msgstr "MÁY CHỦ CHUYỂN TIẾP TUỲ CHỈNH"
 
 msgid "SHOW UNAVAILABLE GAMES"
 msgstr "HIỂN THỊ CÁC TRÒ CHƠI KHÔNG CÓ SẴN"
@@ -678,7 +678,7 @@ msgid "UNABLE TO ACTIVATE RETROACHIEVEMENTS:"
 msgstr "KHÔNG THỂ KÍCH HOẠT RETROACHIEVEMENTS:"
 
 msgid "BLUETOOTH DEVICE LIST"
-msgstr ""
+msgstr "DANH SÁCH THIẾT BỊ BLUETOOTH"
 
 msgid "REMOVE ALL"
 msgstr "XOÁ TẤT CẢ"
@@ -1039,10 +1039,10 @@ msgid "DISABLED"
 msgstr "VÔ HIỆU"
 
 msgid "DMDSERVER (for real dmd)"
-msgstr ""
+msgstr "DMDSERVER (cho DMD thật)"
 
 msgid "SIMULATOR (for web dmd)"
-msgstr ""
+msgstr "GIẢ LẬP (cho DMD web)"
 
 msgid "dmd server"
 msgstr ""
@@ -1075,7 +1075,7 @@ msgid "DMDSERVER started"
 msgstr ""
 
 msgid "MULTISCREENS"
-msgstr ""
+msgstr "NHIỀU MÀN HÌNH"
 
 msgid "BACKGLASS / INFORMATION SCREEN"
 msgstr ""
@@ -1090,10 +1090,10 @@ msgid "VIDEO MODE"
 msgstr "CHẾ ĐỘ VIDEO"
 
 msgid "Sets the display's resolution."
-msgstr ""
+msgstr "Đặt độ phân giải màn hình."
 
 msgid "ROTATION"
-msgstr ""
+msgstr "XOAY MÀN HÌNH"
 
 msgid "0 DEGREES"
 msgstr "0 ĐỘ"
@@ -1111,7 +1111,7 @@ msgid "SCREEN ROTATION"
 msgstr "XOAY MÀN HÌNH"
 
 msgid "DMD SCREEN"
-msgstr ""
+msgstr "MÀN HÌNH DMD"
 
 msgid "FRONTEND DEVELOPER OPTIONS"
 msgstr "LỰA CHỌN NHÀ PHÁT TRIỂN TRƯỚC"
@@ -1208,22 +1208,22 @@ msgid "Building image cache"
 msgstr "Đang dựng hình ảnh bộ nhớ tạm"
 
 msgid "DISPLAY SETTINGS"
-msgstr ""
+msgstr "CÀI ĐẶT HIỂN THỊ"
 
 msgid "MENU FONT SCALE"
-msgstr ""
+msgstr "TỈ LỆ PHÔNG CHỮ MENU"
 
 msgid "FONT SCALE"
-msgstr ""
+msgstr "TỈ LỆ PHÔNG CHỮ"
 
 msgid "THEME FONT SCALE"
-msgstr ""
+msgstr "TỈ LỆ PHÔNG CHỮ THEME"
 
 msgid "FULL SCREEN MENUS"
-msgstr ""
+msgstr "MENU TOÀN MÀN HÌNH"
 
 msgid "FORCE SMALL SCREEN THEMING"
-msgstr ""
+msgstr "ÉP GIAO DIỆN MÀN HÌNH NHỎ"
 
 msgid "DATA MANAGEMENT"
 msgstr "QUẢN LÝ DỮ LIỆU"
@@ -1303,10 +1303,10 @@ msgid "GUN MOVE TOLERENCE"
 msgstr "KHẢ NĂNG DI CHUYỂN SÚNG"
 
 msgid "ENABLE PS3 CONTROLLER SUPPORT"
-msgstr ""
+msgstr "BẬT HỖ TRỢ TAY CẦM PS3"
 
 msgid "Might have negative impact on security."
-msgstr ""
+msgstr "Có thể ảnh hưởng xấu đến bảo mật."
 
 msgid "ENABLE HID JOYSTICK DRIVERS"
 msgstr "BẬT TRÌNH ĐIỀU KHIỂN JOYSTICK HID"
@@ -1859,10 +1859,10 @@ msgid "SHOW WHEEL ICON"
 msgstr "HIỂN THỊ BIỂU TƯỢNG BÁNH XE"
 
 msgid "SHOW TRACKBALL ICON"
-msgstr ""
+msgstr "HIỆN BIỂU TƯỢNG TRACKBALL"
 
 msgid "SHOW SPINNER ICON"
-msgstr ""
+msgstr "HIỆN BIỂU TƯỢNG XOAY"
 
 msgid "SHOW FILENAMES INSTEAD"
 msgstr "HIỂN THỊ TÊN TỆP THAY THẾ"
@@ -2297,7 +2297,7 @@ msgid "PREFERED REGION"
 msgstr "KHU VỰC ƯU TIÊN"
 
 msgid "OVERWRITE NAMES"
-msgstr ""
+msgstr "GHI ĐÈ TÊN"
 
 msgid "OVERWRITE DESCRIPTIONS"
 msgstr "GHI ĐÈ MÔ TẢ"
@@ -2636,7 +2636,7 @@ msgid "BLUETOOTH"
 msgstr "BLUETOOTH"
 
 msgid "ENABLE BLUETOOTH"
-msgstr ""
+msgstr "BẬT BLUETOOTH"
 
 msgid "PAIR BLUETOOTH PADS AUTOMATICALLY"
 msgstr "KẾT NỐI BLUETOOTH PADS TỰ ĐỘNG"
@@ -2645,7 +2645,7 @@ msgid "PAIR A BLUETOOTH DEVICE MANUALLY"
 msgstr "KẾT NỐI THIẾT BỊ BLUETOOTH THỦ CÔNG"
 
 msgid "SHOW CONTROLLER NOTIFICATIONS"
-msgstr ""
+msgstr "HIỆN THÔNG BÁO TAY CẦM"
 
 msgid "SHOW CONTROLLER ACTIVITY"
 msgstr "HIỂN THỊ HOẠT ĐỘNG CỦA BỘ ĐIỀU KHIỂN"
@@ -2687,7 +2687,7 @@ msgid "WHITE"
 msgstr "TRẮNG"
 
 msgid "BORDER RATIO"
-msgstr ""
+msgstr "TỈ LỆ ĐƯỜNG VIỀN"
 
 msgid "CAMERA CONTRAST"
 msgstr "TƯƠNG PHẢN CAMERA"
@@ -3555,3 +3555,769 @@ msgstr ""
 
 #~ msgid "model"
 #~ msgstr "Model"
+
+
+msgid "ACHIEVEMENT EFFECT"
+msgstr "HIỆU ỨNG THÀNH TỰU"
+
+msgid "ADAPTIVE BRIGHTNESS"
+msgstr "ĐỘ SÁNG THÍCH ỨNG"
+
+msgid "ADDITIONAL SOFTWARE"
+msgstr "PHẦN MỀM BỔ SUNG"
+
+msgid "AGGRESSIVE BATTERY SAVER"
+msgstr "TIẾT KIỆM PIN MẠNH"
+
+msgid "AUTO-SCAN ON GAME EXIT"
+msgstr "TỰ QUÉT KHI THOÁT GAME"
+
+msgid "AUTOMATICALLY CREATE LOBBY"
+msgstr "TỰ ĐỘNG TẠO PHÒNG CHỜ"
+
+msgid "AUTOMATICALLY USE HOTSPOT FOR LOCAL NETPLAY"
+msgstr "TỰ ĐỘNG DÙNG HOTSPOT CHO NETPLAY CỤC BỘ"
+
+msgid "BATTERY CHARGE INDICATION"
+msgstr "BÁO SẠC PIN"
+
+msgid "BATTERY CHARGING INDICATION"
+msgstr "BÁO ĐANG SẠC PIN"
+
+msgid "BATTERY SAVING"
+msgstr "TIẾT KIỆM PIN"
+
+msgid "CALIBRATING GUN"
+msgstr "ĐANG HIỆU CHUẨN SÚNG"
+
+msgid "CHECKING YOUR DISK(S)"
+msgstr "ĐANG KIỂM TRA ĐĨA"
+
+msgid "COLOR PALETTE"
+msgstr "BẢNG MÀU"
+
+msgid "CONTINUE ANYWAY?"
+msgstr "VẪN TIẾP TỤC?"
+
+msgid "CONTROLLER ASSIGNMENT"
+msgstr "GÁN TAY CẦM"
+
+msgid "CPU CLOCK RATE"
+msgstr "XUNG NHỊP CPU"
+
+msgid "DATE AND TIME SETTINGS"
+msgstr "CÀI ĐẶT NGÀY VÀ GIỜ"
+
+msgid "DATE FORMAT"
+msgstr "ĐỊNH DẠNG NGÀY"
+
+msgid "DECEMBER"
+msgstr "THÁNG 12"
+
+msgid "FEBRUARY"
+msgstr "THÁNG 2"
+
+msgid "SEPTEMBER"
+msgstr "THÁNG 9"
+
+msgid "NOVEMBER"
+msgstr "THÁNG 11"
+
+msgid "DEVICE CUSTOMIZATION"
+msgstr "TUỲ CHỈNH THIẾT BỊ"
+
+msgid "DEVICE SETTINGS"
+msgstr "CÀI ĐẶT THIẾT BỊ"
+
+msgid "DISABLE BATTERY SAVING WHEN CHARGING"
+msgstr "TẮT TIẾT KIỆM PIN KHI SẠC"
+
+msgid "DISK CHECK"
+msgstr "KIỂM TRA ĐĨA"
+
+msgid "DISK CHECK IS ALREADY RUNNING."
+msgstr "KIỂM TRA ĐĨA ĐANG CHẠY."
+
+msgid "DISPLAY OFF"
+msgstr "TẮT MÀN HÌNH"
+
+msgid "TEMPERATURE"
+msgstr "NHIỆT ĐỘ"
+
+msgid "DUMP SRM SAVES WHILE IN GAME"
+msgstr "XUẤT LƯU SRM KHI ĐANG CHƠI"
+
+msgid "ENABLE RGB LED"
+msgstr "BẬT LED RGB"
+
+msgid "ENABLE STATISTICS"
+msgstr "BẬT THỐNG KÊ"
+
+msgid "EXTENDED IDLE TIME"
+msgstr "THỜI GIAN NGHỈ KÉO DÀI"
+
+msgid "EXTENDED MODE"
+msgstr "CHẾ ĐỘ MỞ RỘNG"
+
+msgid "FACTORY RESET"
+msgstr "KHÔI PHỤC CÀI ĐẶT GỐC"
+
+msgid "FACTORY SETTINGS"
+msgstr "CÀI ĐẶT GỐC"
+
+msgid "FAN CONTROL"
+msgstr "ĐIỀU KHIỂN QUẠT"
+
+msgid "FAN MODE"
+msgstr "CHẾ ĐỘ QUẠT"
+
+msgid "GAME DETECTION OPTIONS"
+msgstr "TUỲ CHỌN NHẬN DIỆN GAME"
+
+msgid "GRAPHICS API"
+msgstr "API ĐỒ HOẠ"
+
+msgid "HANDHELD AS PLAYER 1"
+msgstr "MÁY CẦM TAY LÀ NGƯỜI CHƠI 1"
+
+msgid "HOTKEY + NORTH"
+msgstr "PHÍM TẮT + BẮC"
+
+msgid "HOTKEY + START"
+msgstr "PHÍM TẮT + START"
+
+msgid "HOTKEY + WEST"
+msgstr "PHÍM TẮT + TÂY"
+
+msgid "IDLE TIME"
+msgstr "THỜI GIAN NGHỈ"
+
+msgid "INPUT P1"
+msgstr "ĐIỀU KHIỂN NGƯỜI CHƠI 1"
+
+msgid "INPUT P2"
+msgstr "ĐIỀU KHIỂN NGƯỜI CHƠI 2"
+
+msgid "INPUT P3"
+msgstr "ĐIỀU KHIỂN NGƯỜI CHƠI 3"
+
+msgid "INPUT P4"
+msgstr "ĐIỀU KHIỂN NGƯỜI CHƠI 4"
+
+msgid "INPUT P5"
+msgstr "ĐIỀU KHIỂN NGƯỜI CHƠI 5"
+
+msgid "INPUT P1NAME"
+msgstr "TÊN NGƯỜI CHƠI 1"
+
+msgid "INPUT P2NAME"
+msgstr "TÊN NGƯỜI CHƠI 2"
+
+msgid "INPUT P3NAME"
+msgstr "TÊN NGƯỜI CHƠI 3"
+
+msgid "INPUT P4NAME"
+msgstr "TÊN NGƯỜI CHƠI 4"
+
+msgid "INPUT P5NAME"
+msgstr "TÊN NGƯỜI CHƠI 5"
+
+msgid "INPUT P6NAME"
+msgstr "TÊN NGƯỜI CHƠI 6"
+
+msgid "INPUT P7NAME"
+msgstr "TÊN NGƯỜI CHƠI 7"
+
+msgid "INPUT P8NAME"
+msgstr "TÊN NGƯỜI CHƠI 8"
+
+msgid "INSTALL NATIVE PICO-8"
+msgstr "CÀI PICO-8 GỐC"
+
+msgid "INSTALL PORTMASTER"
+msgstr "CÀI PORTMASTER"
+
+msgid "INSTALLING PICO-8"
+msgstr "ĐANG CÀI PICO-8"
+
+msgid "INSTALLING PORTMASTER"
+msgstr "ĐANG CÀI PORTMASTER"
+
+msgid "INVERT COLORS (SECONDARY ZONE)"
+msgstr "ĐẢO MÀU (VÙNG PHỤ)"
+
+msgid "LAN GAMES"
+msgstr "GAME QUA LAN"
+
+msgid "LED MODE AND COLOR"
+msgstr "CHẾ ĐỘ VÀ MÀU LED"
+
+msgid "LID CLOSE MODE"
+msgstr "CHẾ ĐỘ KHI GẬP NẮP"
+
+msgid "LOW BATTERY INDICATION"
+msgstr "BÁO PIN YẾU"
+
+msgid "LOW BATTERY THRESHOLD"
+msgstr "NGƯỠNG BÁO PIN YẾU"
+
+msgid "MAX CPU FREQUENCY"
+msgstr "TẦN SỐ CPU TỐI ĐA"
+
+msgid "MAX INCREMENTAL SAVESTATES"
+msgstr "SỐ BẢN LƯU TRẠNG THÁI TỐI ĐA"
+
+msgid "MUTE AUDIO WHEN IDLE"
+msgstr "TẮT TIẾNG KHI NGHỈ"
+
+msgid "ONLINE GAMES"
+msgstr "GAME TRỰC TUYẾN"
+
+msgid "PALETTE MOD"
+msgstr "MOD BẢNG MÀU"
+
+msgid "PALETTE MODIFICATION"
+msgstr "CHỈNH SỬA BẢNG MÀU"
+
+msgid "PERFORMANCE"
+msgstr "HIỆU NĂNG"
+
+msgid "PLEASE WAIT. ANOTHER PROCESS IS ALREADY RUNNING."
+msgstr "VUI LÒNG CHỜ. ĐÃ CÓ TIẾN TRÌNH KHÁC ĐANG CHẠY."
+
+msgid "POWER LED"
+msgstr "LED NGUỒN"
+
+msgid "POWER MANAGEMENT"
+msgstr "QUẢN LÝ NGUỒN"
+
+msgid "POWER SAVING AND BATTERY LIFE"
+msgstr "TIẾT KIỆM ĐIỆN VÀ TUỔI THỌ PIN"
+
+msgid "PRIMARY COLOR"
+msgstr "MÀU CHÍNH"
+
+msgid "QUICK RESUME MODE"
+msgstr "CHẾ ĐỘ TIẾP TỤC NHANH"
+
+msgid "REINSTALL PORTMASTER"
+msgstr "CÀI LẠI PORTMASTER"
+
+msgid "RETRO ACHIEVEMENT INDICATION"
+msgstr "BÁO THÀNH TỰU RETRO"
+
+msgid "RGB LED SETTINGS"
+msgstr "CÀI ĐẶT LED RGB"
+
+msgid "RUN DISK CHECK NOW?"
+msgstr "CHẠY KIỂM TRA ĐĨA NGAY?"
+
+msgid "SEARCHING FOR HOTSPOTS"
+msgstr "ĐANG TÌM HOTSPOT"
+
+msgid "SECONDARY COLOR"
+msgstr "MÀU PHỤ"
+
+msgid "SHOW DATE TIME"
+msgstr "HIỆN NGÀY GIỜ"
+
+msgid "SHOW RELAY SERVER GAMES ONLY"
+msgstr "CHỈ HIỆN GAME MÁY CHỦ CHUYỂN TIẾP"
+
+msgid "SHUTDOWN"
+msgstr "TẮT MÁY"
+
+msgid "SYNCHRONIZATION ALREADY RUNNING."
+msgstr "ĐỒNG BỘ ĐANG CHẠY."
+
+msgid "SYNCHRONIZATION FAILED. PLEASE CHECK YOUR INTERNET CONNECTION."
+msgstr "ĐỒNG BỘ THẤT BẠI. VUI LÒNG KIỂM TRA KẾT NỐI INTERNET."
+
+msgid "SYNCHRONIZATION IS ALREADY RUNNING."
+msgstr "ĐỒNG BỘ ĐANG CHẠY."
+
+msgid "SYNCHRONIZE DATE AND TIME NOW?"
+msgstr "ĐỒNG BỘ NGÀY GIỜ NGAY?"
+
+msgid "SYNCHRONIZE NOW?"
+msgstr "ĐỒNG BỘ NGAY?"
+
+msgid "SYNCTHING CONFIGURATION RELOADED SUCCESSFULLY."
+msgstr "ĐÃ TẢI LẠI CẤU HÌNH SYNCTHING."
+
+msgid "FAILED TO RELOAD SYNCTHING CONFIGURATION."
+msgstr "TẢI LẠI CẤU HÌNH SYNCTHING THẤT BẠI."
+
+msgid "TELEMETRY"
+msgstr "ĐO LƯỜNG TỪ XA"
+
+msgid "THIS WILL DELETE THE ACTUAL GAME FILE(S)!"
+msgstr "THAO TÁC NÀY SẼ XOÁ (CÁC) FILE GAME THẬT!"
+
+msgid "TIME FORMAT"
+msgstr "ĐỊNH DẠNG GIỜ"
+
+msgid "TOGGLE SWITCH MODE"
+msgstr "CHẾ ĐỘ CÔNG TẮC GẠT"
+
+msgid "UPGRADING WILL REMOVE ANY PATCHES AND MODIFICATIONS."
+msgstr "NÂNG CẤP SẼ XOÁ MỌI BẢN VÁ VÀ CHỈNH SỬA."
+
+msgid "USB MODE"
+msgstr "CHẾ ĐỘ USB"
+
+msgid "WORK IN PROGRESS"
+msgstr "ĐANG PHÁT TRIỂN"
+
+msgid "YOU ARE CURRENTLY USING VERSION %s"
+msgstr "BẠN ĐANG DÙNG PHIÊN BẢN %s"
+
+msgid "YOUR SYSTEM HAS BEEN PATCHED OR MODIFIED."
+msgstr "HỆ THỐNG CỦA BẠN ĐÃ BỊ VÁ HOẶC CHỈNH SỬA."
+
+msgid "WE CAN'T FIND ANY SYSTEMS!"
+msgstr "KHÔNG TÌM THẤY HỆ MÁY NÀO!"
+
+msgid "VISIT EMULATIONSTATION.ORG FOR MORE INFORMATION."
+msgstr "TRUY CẬP EMULATIONSTATION.ORG ĐỂ BIẾT THÊM."
+
+msgid "SOME FILES YOU LINKED ARE LOCATED OUTSIDE THE GAMELIST PATH."
+msgstr "MỘT SỐ FILE BẠN LIÊN KẾT NẰM NGOÀI ĐƯỜNG DẪN GAMELIST."
+
+msgid "WARNING: THE SYSTEM HAS MISSING BIOS FILE(S) AND THE GAME MAY NOT WORK CORRECTLY."
+msgstr "CẢNH BÁO: HỆ THỐNG THIẾU (CÁC) FILE BIOS VÀ GAME CÓ THỂ KHÔNG CHẠY ĐÚNG."
+
+msgid "UNKNOWN GENRE : "
+msgstr "THỂ LOẠI KHÔNG XÁC ĐỊNH : "
+
+msgid "ARE YOU SURE YOU WANT TO RESET TO FACTORY SETTINGS? ALL YOUR SETTINGS WILL BE UNDONE!"
+msgstr "BẠN CÓ CHẮC MUỐN ĐẶT LẠI CÀI ĐẶT GỐC? MỌI CÀI ĐẶT CỦA BẠN SẼ BỊ XOÁ!"
+
+msgid "DO YOU WANT TO LAUNCH IT ANYWAY?"
+msgstr "VẪN MUỐN CHẠY NÓ?"
+
+msgid "DO YOU WANT TO UPDATE TO VERSION %s?"
+msgstr "BẠN CÓ MUỐN CẬP NHẬT LÊN PHIÊN BẢN %s?"
+
+msgid "DO YOU WANT TO USE A COPY OF THESE FILES RELATIVE TO THE GAMELIST ?"
+msgstr "BẠN CÓ MUỐN DÙNG BẢN SAO CỦA CÁC FILE NÀY THEO ĐƯỜNG DẪN TƯƠNG ĐỐI VỚI GAMELIST ?"
+
+msgid "Attempt to synchronize date and time via internet."
+msgstr "Đồng bộ ngày giờ qua internet."
+
+msgid "Attempt to synchronize your devices with Syncthing."
+msgstr "Đồng bộ thiết bị của bạn bằng Syncthing."
+
+msgid "Automatically adapts LED brightness to screen brightness. (Overrides the setting above.)"
+msgstr "Tự động chỉnh độ sáng LED theo độ sáng màn hình. (Ghi đè cài đặt ở trên.)"
+
+msgid "Automatically creates a Netplay lobby when starting a game."
+msgstr "Tự động tạo phòng Netplay khi bắt đầu game."
+
+msgid "Battery save mode is activated after idle time has passed without any input."
+msgstr "Chế độ tiết kiệm pin kích hoạt sau thời gian nghỉ không có thao tác."
+
+msgid "CAUTION: Hosting not supported on this device."
+msgstr "LƯU Ý: Thiết bị này không hỗ trợ làm máy chủ."
+
+msgid "CAUTION: This may drain battery faster."
+msgstr "LƯU Ý: Có thể hao pin nhanh hơn."
+
+msgid "Connects when a hotspot is available."
+msgstr "Kết nối khi có hotspot khả dụng."
+
+msgid "Creates a hotspot when hosting, or connects when joining."
+msgstr "Tạo hotspot khi làm chủ phòng, hoặc kết nối khi tham gia."
+
+msgid "Decide what to use the switch of your device for."
+msgstr "Chọn chức năng cho công tắc gạt của thiết bị."
+
+msgid "Enable or disable the RGB LED."
+msgstr "Bật hoặc tắt LED RGB."
+
+msgid "Honor your retro achievements with a LED effect."
+msgstr "Tôn vinh thành tựu retro của bạn bằng hiệu ứng LED."
+
+msgid "If you changed your Syncthing configuration recently, you can reload it here."
+msgstr "Nếu bạn vừa đổi cấu hình Syncthing, bạn có thể tải lại tại đây."
+
+msgid "Inverts color for secondary RGB LED zone."
+msgstr "Đảo màu cho vùng LED RGB phụ."
+
+msgid "Might slow down gamelist updates significantly!"
+msgstr "Có thể làm chậm đáng kể việc cập nhật danh sách game!"
+
+msgid "Mutes all audio output in battery save mode."
+msgstr "Tắt mọi âm thanh ở chế độ tiết kiệm pin."
+
+msgid "Optimizes battery life with extra power-saving measures during system idle."
+msgstr "Tối ưu thời lượng pin bằng các biện pháp tiết kiệm điện bổ sung khi máy nghỉ."
+
+msgid "Relay server games have a higher chance of successful entry."
+msgstr "Game qua máy chủ chuyển tiếp có tỉ lệ vào phòng thành công cao hơn."
+
+msgid "Scan for changed files after exiting a game."
+msgstr "Quét file thay đổi sau khi thoát game."
+
+msgid "Secondary timer which starts after initial idle time has passed without any input."
+msgstr "Bộ đếm phụ bắt đầu sau thời gian nghỉ ban đầu mà không có thao tác."
+
+msgid "Select a modification effect for the color palette."
+msgstr "Chọn hiệu ứng chỉnh sửa cho bảng màu."
+
+msgid "Select the color palette."
+msgstr "Chọn bảng màu."
+
+msgid "Select the primary color."
+msgstr "Chọn màu chính."
+
+msgid "Select the secondary color (for dual-color modes)."
+msgstr "Chọn màu phụ (cho chế độ hai màu)."
+
+msgid "Select the type of battery charging indication."
+msgstr "Chọn kiểu báo sạc pin."
+
+msgid "Select the type of low battery indication."
+msgstr "Chọn kiểu báo pin yếu."
+
+msgid "Select your local time zone."
+msgstr "Chọn múi giờ địa phương của bạn."
+
+msgid "Set the USB mode to access your device."
+msgstr "Đặt chế độ USB để truy cập thiết bị."
+
+msgid "Set the current day."
+msgstr "Đặt ngày hiện tại."
+
+msgid "Set the current hour."
+msgstr "Đặt giờ hiện tại."
+
+msgid "Set the current minute."
+msgstr "Đặt phút hiện tại."
+
+msgid "Set the current month."
+msgstr "Đặt tháng hiện tại."
+
+msgid "Set the current year."
+msgstr "Đặt năm hiện tại."
+
+msgid "Set the default LED animation"
+msgstr "Đặt hiệu ứng LED mặc định"
+
+msgid "Sets the maximum number of incremental savestates used."
+msgstr "Đặt số bản lưu trạng thái tăng dần tối đa."
+
+msgid "Show notifications when Syncthing is syncing."
+msgstr "Hiện thông báo khi Syncthing đang đồng bộ."
+
+msgid "Threshold for low battery indication."
+msgstr "Ngưỡng báo pin yếu."
+
+msgid "This will hide most menu options to prevent changes to the system."
+msgstr "Thao tác này sẽ ẩn hầu hết tuỳ chọn menu để ngăn thay đổi hệ thống."
+
+msgid "To unlock and return to the full user interface, enter this code:"
+msgstr "Để mở khoá và quay lại giao diện đầy đủ, nhập mã này:"
+
+msgid "Verify the integrity of your SD cards."
+msgstr "Kiểm tra tính toàn vẹn của thẻ SD."
+
+msgid "While the device is plugged to a power source, battery saving measures are disabled."
+msgstr "Khi thiết bị đang cắm nguồn, các biện pháp tiết kiệm pin bị tắt."
+
+msgid "You are changing the user interface to a restricted mode:"
+msgstr "Bạn đang chuyển giao diện sang chế độ hạn chế:"
+
+msgid "The selected UI mode has nothing to show,"
+msgstr "Chế độ giao diện đã chọn không có gì để hiển thị,"
+
+msgid "Force the UI mode to be Kid"
+msgstr "Ép chế độ giao diện Trẻ em"
+
+msgid "Force the UI mode to be Kiosk"
+msgstr "Ép chế độ giao diện Kiosk"
+
+msgid "Force the UI to ignore applied filters in gamelist"
+msgstr "Ép giao diện bỏ qua bộ lọc đã áp dụng trong danh sách game"
+
+msgid "This collection contains %i games, including:%s"
+msgstr "Bộ sưu tập này chứa %i game, gồm:%s"
+
+msgid "This folder contains %i games, including :%s"
+msgstr "Thư mục này chứa %i game, gồm :%s"
+
+msgid "All devices disconnected."
+msgstr "Đã ngắt mọi thiết bị."
+
+msgid "Already mapped!"
+msgstr "Đã gán rồi!"
+
+msgid "Attempting to launch game..."
+msgstr "Đang khởi chạy game..."
+
+msgid "Configured scraper is no longer available."
+msgstr "Nguồn quét đã cấu hình không còn khả dụng."
+
+msgid "File does not exist!"
+msgstr "File không tồn tại!"
+
+msgid "Installing Pico-8..."
+msgstr "Đang cài Pico-8..."
+
+msgid "Installing PortMaster..."
+msgstr "Đang cài PortMaster..."
+
+msgid "No connected devices available."
+msgstr "Không có thiết bị nào đang kết nối."
+
+msgid "Operation completed."
+msgstr "Thao tác hoàn tất."
+
+msgid "Operation failed."
+msgstr "Thao tác thất bại."
+
+msgid "Please change the scraping source in the settings."
+msgstr "Vui lòng đổi nguồn quét dữ liệu trong cài đặt."
+
+msgid "Please wait..."
+msgstr "Vui lòng chờ..."
+
+msgid "Removed from queue"
+msgstr "Đã xoá khỏi hàng đợi"
+
+msgid "Renderer failed to initialize!"
+msgstr "Khởi tạo bộ kết xuất thất bại!"
+
+msgid "Scanning all folders..."
+msgstr "Đang quét mọi thư mục..."
+
+msgid "Searching for any issues with your storage..."
+msgstr "Đang kiểm tra sự cố trên bộ nhớ của bạn..."
+
+msgid "Shutting system down"
+msgstr "Đang tắt hệ thống"
+
+msgid "Synchronization complete."
+msgstr "Đồng bộ hoàn tất."
+
+msgid "Synchronization is paused."
+msgstr "Đồng bộ đang tạm dừng."
+
+msgid "Synced with %s."
+msgstr "Đã đồng bộ với %s."
+
+msgid "Syncing with %s."
+msgstr "Đang đồng bộ với %s."
+
+msgid "Transfer in progress..."
+msgstr "Đang truyền dữ liệu..."
+
+msgid "Wii Gun calibrated"
+msgstr "Đã hiệu chuẩn súng Wii"
+
+msgid "Fire on targets to calibrate"
+msgstr "Bắn vào các mục tiêu để hiệu chuẩn"
+
+msgid "Window failed to initialize!"
+msgstr "Khởi tạo cửa sổ thất bại!"
+
+msgid "files have not been synced yet."
+msgstr "các file chưa được đồng bộ."
+
+msgid "total bytes transferred."
+msgstr "tổng số byte đã truyền."
+
+msgid "Another Arcade Emulator"
+msgstr "Một trình giả lập Arcade khác"
+
+msgid "Buffering %s (%d bytes)"
+msgstr "Đang đệm %s (%d byte)"
+
+msgid "Config directory could not be created!"
+msgstr "Không tạo được thư mục cấu hình!"
+
+msgid "Could not open %s"
+msgstr "Không mở được %s"
+
+msgid "Could not open file"
+msgstr "Không mở được file"
+
+msgid "Could not open playlist"
+msgstr "Không mở được danh sách phát"
+
+msgid "Could not parse Settings file!"
+msgstr "Không phân tích được file cài đặt!"
+
+msgid "Could not read %s"
+msgstr "Không đọc được %s"
+
+msgid "Couldn't find collection to save!"
+msgstr "Không tìm thấy bộ sưu tập để lưu!"
+
+msgid "Error - Failed to load image from memory!"
+msgstr "Lỗi - Không tải được ảnh từ bộ nhớ!"
+
+msgid "Error creating SDL window!"
+msgstr "Lỗi tạo cửa sổ SDL!"
+
+msgid "Error initializing FreeType!"
+msgstr "Lỗi khởi tạo FreeType!"
+
+msgid "Error initializing SDL audio!"
+msgstr "Lỗi khởi tạo âm thanh SDL!"
+
+msgid "Error initializing SDL!"
+msgstr "Lỗi khởi tạo SDL!"
+
+msgid "Error opening file"
+msgstr "Lỗi mở file"
+
+msgid "Error reading file"
+msgstr "Lỗi đọc file"
+
+msgid "Exit code : %d"
+msgstr "Mã thoát : %d"
+
+msgid "File stream error (disk full ?)"
+msgstr "Lỗi luồng file (đĩa đầy?)"
+
+msgid "IO ERROR (DISK FULL?)"
+msgstr "LỖI IO (ĐĨA ĐẦY?)"
+
+msgid "IO Error (disk is Readonly ?)"
+msgstr "Lỗi IO (đĩa chỉ đọc?)"
+
+msgid "Invalid value."
+msgstr "Giá trị không hợp lệ."
+
+msgid "Memory allocation failed"
+msgstr "Cấp phát bộ nhớ thất bại"
+
+msgid "No error."
+msgstr "Không có lỗi."
+
+msgid "Not enough data"
+msgstr "Không đủ dữ liệu"
+
+msgid "Package list is empty"
+msgstr "Danh sách gói trống"
+
+msgid "Timed out while waiting for resources"
+msgstr "Hết thời gian chờ tài nguyên"
+
+msgid "Unable to open file"
+msgstr "Không mở được file"
+
+msgid "Unable to parse packages"
+msgstr "Không phân tích được danh sách gói"
+
+msgid "Unable to parse response"
+msgstr "Không phân tích được phản hồi"
+
+msgid "Unknown Exception occured"
+msgstr "Đã xảy ra ngoại lệ không xác định"
+
+msgid "Unknown error occured while parsing system config file."
+msgstr "Đã xảy ra lỗi không xác định khi phân tích file cấu hình hệ thống."
+
+msgid "Unknown error."
+msgstr "Lỗi không xác định."
+
+msgid "Unknown file type"
+msgstr "Loại file không xác định"
+
+msgid "file not found"
+msgstr "không tìm thấy file"
+
+msgid "Found %d potential consoles for %s file extension"
+msgstr "Tìm thấy %d hệ máy tiềm năng cho đuôi file %s"
+
+msgid "201 Game added. System not updated"
+msgstr "201 Đã thêm game. Hệ thống chưa cập nhật"
+
+msgid "204 No game removed"
+msgstr "204 Không có game bị xoá"
+
+msgid "400 bad request - body is missing"
+msgstr "400 Yêu cầu sai - thiếu nội dung"
+
+msgid "400 missing content-type"
+msgstr "400 Thiếu content-type"
+
+msgid "403 - Forbidden"
+msgstr "403 - Bị cấm"
+
+msgid "404 System not found"
+msgstr "404 Không tìm thấy hệ thống"
+
+msgid "404 game not found"
+msgstr "404 Không tìm thấy game"
+
+msgid "404 media not found"
+msgstr "404 Không tìm thấy nội dung"
+
+msgid "404 not found"
+msgstr "404 Không tìm thấy"
+
+msgid "404 system not found"
+msgstr "404 Không tìm thấy hệ thống"
+
+msgid "Internal Server Error"
+msgstr "Lỗi máy chủ nội bộ"
+
+msgid "Method Not Allowed"
+msgstr "Phương thức không được phép"
+
+msgid "Network Authentication Required"
+msgstr "Mạng yêu cầu xác thực"
+
+msgid "Payload Too Large"
+msgstr "Dữ liệu quá lớn"
+
+msgid "Proxy Authentication Required"
+msgstr "Proxy yêu cầu xác thực"
+
+msgid "Range Not Satisfiable"
+msgstr "Khoảng yêu cầu không hợp lệ"
+
+msgid "Request Header Fields Too Large"
+msgstr "Tiêu đề yêu cầu quá lớn"
+
+msgid "Too Many Requests"
+msgstr "Quá nhiều yêu cầu"
+
+msgid "URI Too Long"
+msgstr "URI quá dài"
+
+msgid "Unavailable For Legal Reasons"
+msgstr "Không khả dụng vì lý do pháp lý"
+
+msgid "Unsupported Media Type"
+msgstr "Loại nội dung không được hỗ trợ"
+
+msgid "HTTP Version Not Supported"
+msgstr "Phiên bản HTTP không được hỗ trợ"
+
+msgid "Always use the built-in handheld controls for player 1, even if additional controllers are connected."
+msgstr "Luôn dùng điều khiển tích hợp trên máy cho người chơi 1, ngay cả khi có tay cầm khác đang kết nối."
+
+msgid "Dumps your ingame saves every 10 seconds while in game. Might wear out your SD card faster if enabled. Works only on libretro cores."
+msgstr "Tự xuất bản lưu trong game mỗi 10 giây khi đang chơi. Bật tính năng này có thể làm thẻ SD mau hỏng hơn. Chỉ hoạt động với core libretro."
+
+msgid "Help the Knulli project keep track of which devices and Knulli versions are currently in use. Enable telemetry and report your device model and your current Knulli version to our statistics server after boot. No other data will be transmitted!"
+msgstr "Giúp dự án Knulli thống kê thiết bị và phiên bản Knulli đang được sử dụng. Bật đo lường từ xa để gửi model thiết bị và phiên bản Knulli của bạn về máy chủ thống kê sau khi khởi động. Không có dữ liệu nào khác được gửi đi!"
+
+msgid "If shutdown during gameplay, boots directly into game on next startup. Works with Auto Save/Load on supported emulators."
+msgstr "Nếu tắt máy giữa lúc chơi, lần mở máy sau sẽ vào thẳng game. Hoạt động cùng Tự động lưu/nạp ở các giả lập được hỗ trợ."
+
+msgid "This will reset all your Knulli settings to factory defaults. Other user data (e.g., games, BIOS files, saves, etc.) will be left untouched."
+msgstr "Thao tác này sẽ đặt lại mọi cài đặt Knulli về mặc định gốc. Dữ liệu người dùng khác (game, file BIOS, bản lưu…) sẽ được giữ nguyên."
+
+msgid "No systems found! Does at least one system have a game present? (check that extensions match!)"
+msgstr "Không tìm thấy hệ máy nào! Có ít nhất một hệ máy chứa game chưa? (kiểm tra đuôi file có khớp không!)"
+
+msgid "Enable/disable the power LED."
+msgstr "Bật/tắt LED nguồn."
+
+msgid "WARNING: THE EMULATOR/CORE CURRENTLY SET DOES NOT SUPPORT THIS GAME'S FILE FORMAT."
+msgstr "CẢNH BÁO: GIẢ LẬP/CORE ĐANG ĐẶT KHÔNG HỖ TRỢ ĐỊNH DẠNG FILE CỦA GAME NÀY."
