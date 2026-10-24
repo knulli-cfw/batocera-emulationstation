@@ -71,6 +71,8 @@ ISimpleGameListView::~ISimpleGameListView()
 
 void ISimpleGameListView::onThemeChanged(const std::shared_ptr<ThemeData>& theme)
 {
+	invalidateArtworkResidency();
+
 	using namespace ThemeFlags;
 	mBackground.applyTheme(theme, getName(), "background", ALL);
 	mHeaderImage.applyTheme(theme, getName(), "logo", ALL);

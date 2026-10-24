@@ -13,6 +13,8 @@
 #include "ThemeData.h"
 #include <SDL_timer.h>
 #include "AudioManager.h"
+#include <thread>
+#include <vector>
 
 #ifdef WIN32
 #include <codecvt>
@@ -49,15 +51,14 @@ static void unlock(void *data, void* /*id*/, void *const* /*p_pixels*/)
 	c->mutexes[frame].unlock();
 }
 
-// VLC wants to display a video frame.
-static void display(void* data, void* id)
+// VLC has displayed a video frame.
+static void display(void* data, void* /*id*/)
 {
-	if (data == NULL)
+	if (data == nullptr)
 		return;
 
-	struct VideoContext *c = (struct VideoContext *)data;
-	if (c->component != nullptr && !c->component->isPlaying() && c->component->isWaitingForVideoToStart())
-		c->component->onVideoStarted();
+	auto* ctx = static_cast<VideoContext*>(data);
+	ctx->frameDisplayed.store(true, std::memory_order_release);
 }
 
 VideoVlcComponent::VideoVlcComponent(Window* window) : VideoComponent(window), 
@@ -86,13 +87,11 @@ static void mediaplayer_release_async(VideoContext* ctx, libvlc_media_player_t* 
 	if (p_mi == nullptr)
 		return;
 
-	ctx->component = nullptr;
-
 	std::thread([p_mi, ctx]()
-		{			
-			libvlc_media_player_release(p_mi);
-			if (ctx) delete ctx;
-		}).detach();
+	{
+		libvlc_media_player_release(p_mi);
+		delete ctx;
+	}).detach();
 }
 
 VideoVlcComponent::~VideoVlcComponent()
@@ -582,7 +581,6 @@ VideoContext* VideoVlcComponent::createContext()
 	ctx->surfaces[1] = new unsigned char[mVideoWidth * mVideoHeight * 4];
 	ctx->hasFrame[0] = false;
 	ctx->hasFrame[1] = false;
-	ctx->component = this;
 
 	resize();	
 
@@ -990,8 +988,13 @@ void VideoVlcComponent::update(int deltaTime)
 	{
 		mIsParsing = false;
 		onMediaParsed();
-	}		
-	
+	}
+
+	if (mContext && !mIsPlaying && mIsWaitingForVideoToStart && mContext->frameDisplayed.exchange(false, std::memory_order_acquire))
+	{
+		onVideoStarted();
+	}
+
 	VideoComponent::update(deltaTime);
 }
 

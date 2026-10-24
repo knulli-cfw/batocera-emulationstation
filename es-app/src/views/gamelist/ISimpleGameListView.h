@@ -4,6 +4,7 @@
 
 #include "components/ImageComponent.h"
 #include "components/TextComponent.h"
+#include "components/GridViewportState.h"
 #include "views/gamelist/IGameListView.h"
 #include <stack>
 #include <set>
@@ -45,10 +46,11 @@ public:
 		std::string cursorPath;
 		int cursorIndex = 0;
 		bool syntheticCursor = false;
+		GridViewportState gridViewport;
 	};
 
-	NavigationState saveNavigationState();
-	void restoreNavigationState(const NavigationState& state);
+	virtual NavigationState saveNavigationState();
+	virtual void restoreNavigationState(const NavigationState& state);
 
 	void	moveToFolder(FolderData* folder);
 	FolderData*		getCurrentFolder();

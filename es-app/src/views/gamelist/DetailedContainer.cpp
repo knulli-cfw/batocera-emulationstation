@@ -12,6 +12,7 @@
 #include "components/ComponentGrid.h"
 #include <set>
 #include "BindingManager.h"
+#include <memory>
 
 #ifdef _RPI_
 #include "Settings.h"
@@ -1404,16 +1405,20 @@ void DetailedContainerHost::update(int deltaTime)
 
 		if (!dc->anyComponentHasStoryBoardRunning() || index > 4)
 		{
+			auto retired = std::shared_ptr<DetailedContainer>(dc);
 			it = mContainers.erase(it);
 
-			for (auto cp : dc->getComponents())
+			for (auto cp : retired->getComponents())
 			{
 				cp->setVisible(false);
 				cp->onHide();
 			}
 
-			mWindow->postToUiThread([dc]() { delete dc; }, this);
-			// break;
+			// Keep the container alive until the callback runs or is cancelled.
+			mWindow->postToUiThread([retired]() mutable
+			{
+				retired.reset();
+			}, this);
 		}
 		else
 			++it;

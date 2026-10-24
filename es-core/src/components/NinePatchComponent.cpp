@@ -146,6 +146,9 @@ void NinePatchComponent::buildVertices()
 
 void NinePatchComponent::render(const Transform4x4f& parentTrans)
 {
+	if (mVisible && !mTexture && !mPath.empty())
+		setImagePath(mPath);
+
 	if (!mVisible || mTexture == nullptr)
 		return;
 
@@ -314,7 +317,7 @@ void NinePatchComponent::fitTo(Vector2f size, Vector3f position, Vector2f paddin
 
 void NinePatchComponent::setImagePath(const std::string& path, bool asyncLoading)
 {
-	if (mPath == path)
+	if (mPath == path && (mTexture || path.empty()))
 		return;
 
 	mPath = path;
@@ -404,6 +407,8 @@ void NinePatchComponent::onShow()
 {
 	GuiComponent::onShow();
 
+	preloadArtwork(true);
+
 	if (mTexture != nullptr)
 		mTexture->setRequired(true, this);
 }
@@ -414,6 +419,42 @@ void NinePatchComponent::onHide()
 
 	if (mTexture != nullptr)
 		mTexture->setRequired(false, this);
+}
+
+void NinePatchComponent::preloadArtwork(bool prioritize)
+{
+	if (!mTexture && !mPath.empty())
+		setImagePath(mPath);
+
+	if (mTexture)
+	{
+		mTexture->reload(prioritize ? TextureLoadMode::STANDARD : TextureLoadMode::LOADNOMOVETOTOP);
+	}
+
+	GuiComponent::preloadArtwork(prioritize);
+}
+
+void NinePatchComponent::releaseArtwork()
+{
+	GuiComponent::releaseArtwork();
+
+	if (isShowing())
+		return;
+
+	if (mTexture)
+		mTexture->setRequired(false, this);
+
+	mTexture.reset();
+	mTextureLoaded = false;
+
+	delete[] mVertices;
+	mVertices = nullptr;
+
+	if (mPostProcessTextureId != (unsigned int)-1)
+	{
+		Renderer::destroyTexture(mPostProcessTextureId);
+		mPostProcessTextureId = (unsigned int)-1;
+	}
 }
 
 ThemeData::ThemeElement::Property NinePatchComponent::getProperty(const std::string name)

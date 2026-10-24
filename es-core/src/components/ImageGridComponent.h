@@ -16,6 +16,11 @@
 #include "InputManager.h"
 #include "utils/Delegate.h"
 #include "BindingManager.h"
+#include "components/ArtworkResidencyTracker.h"
+#include "components/GridViewportState.h"
+#include <tuple>
+#include <unordered_set>
+#include <vector>
 
 #define EXTRAITEMS 2
 #define ALLOWANIMATIONS (Settings::PowerSaverMode() != "instant" && Settings::TransitionStyle() != "instant")
@@ -53,6 +58,7 @@ struct ImageGridData
 {
 	std::shared_ptr<GridTileComponent> tile;
 	std::string texturePath;
+	bool artworkResident = false;
 };
 
 // Type trait to check if a type derives from IBindable
@@ -119,7 +125,16 @@ public:
 	void resetLastCursor() { mLastCursor = -1; mLastCursorState = CursorState::CURSOR_STOPPED; }
 	int getLastCursor() { return mLastCursor; }
 
-	Vector2i getVisibleRange();
+	Vector2i getVisibleRange(bool includeWarm = true);
+	bool setHiddenCursor(const T& object);
+
+	GridViewportState saveViewportState();
+	void restoreViewportState(const GridViewportState& state);
+
+	bool visitArtworkChildren(const std::function<bool(GuiComponent*)>& visitor) override;
+	bool prepareHiddenArtwork();
+	void releaseHiddenArtwork();
+	void releaseArtwork() override;
 
 	virtual bool onMouseClick(int button, bool pressed, int x, int y) override;
 	virtual void onMouseMove(int x, int y) override;
@@ -136,23 +151,28 @@ public:
 
 	Delegate<ILongMouseClickEvent> longMouseClick;
 
-	void		preloadTiles();
-
 protected:
 	virtual void onCursorChanged(const CursorState& state) override;
 	virtual void onScroll(int /*amt*/) { if (!mScrollSound.empty()) Sound::get(mScrollSound)->play(); }
 
 private:
 	void		resetGrid();
+	void		updateStartPosition(int previousCursor);
 	void		calcGridDimension();
 	
-	void		ensureVisibleTileExist();
+	void		ensureVisibleTileExist(bool prepareHidden = false);
+	bool		releaseDistantTileArtwork();
+	std::vector<int>	mPendingTileReleases;
 	void		loadTile(std::shared_ptr<GridTileComponent> tile, typename IList<ImageGridData, T>::Entry& entry);
 	std::shared_ptr<GridTileComponent> createTile(int i, int dimOpposite, Vector2f tileDistance, Vector2f startPosition);
+	void positionTile(GridTileComponent& tile, int index, int dimOpposite, Vector2f tileDistance, Vector2f startPosition);
 
 	inline bool isVertical() { return mScrollDirection == SCROLL_VERTICALLY; };
 
-	bool mEntriesDirty;
+	using TileResidencyKey = std::tuple<int, int, int, int, bool, bool, bool>;
+	using TileTracker = ArtworkResidencyTracker<TileResidencyKey>;
+
+	TileTracker mTileResidency;
 
 	int mLastCursor;
 	CursorState mLastCursorState;
@@ -226,44 +246,169 @@ private:
 	}
 };
 
-
-
 template<typename T>
-Vector2i ImageGridComponent<T>::getVisibleRange()
+Vector2i ImageGridComponent<T>::getVisibleRange(bool includeWarm)
 {
-	int dimExt = isVertical() ? mGridDimension.y() : mGridDimension.x();
-	int dimOpposite = Math::max(1, isVertical() ? mGridDimension.x() : mGridDimension.y());
+	const int dimExt = isVertical() ? mGridDimension.y() : mGridDimension.x();
+	const int dimOpposite = Math::max(1, isVertical() ? mGridDimension.x() : mGridDimension.y());
 
-	Vector2f tileDistance = mTileSize + mMargin;
+	const Vector2f tileDistance = mTileSize + mMargin;
+	const float spacing = isVertical() ? tileDistance.y() : tileDistance.x();
 
-	int position = mCameraOffset / (isVertical() ? tileDistance.y() : tileDistance.x()) * dimOpposite;
+	if (dimExt <= 2 * EXTRAITEMS || spacing <= 0)
+		return Vector2i(0, -1);
 
-	int startIndex = position - EXTRAITEMS * dimOpposite;
-	int endIndex = startIndex + dimExt * dimOpposite;
+	const int position = mCameraOffset / spacing * dimOpposite;
+
+	if (!includeWarm)
+	{
+		const int visibleCount = (dimExt - 2 * EXTRAITEMS) * dimOpposite;
+		return Vector2i(position, position + visibleCount - 1);
+	}
+
+	const int startIndex = position - EXTRAITEMS * dimOpposite;
+	const int endIndex = startIndex + dimExt * dimOpposite;
 
 	return Vector2i(startIndex, endIndex);
 }
 
 template<typename T>
-std::shared_ptr<GridTileComponent> ImageGridComponent<T>::createTile(int i, int dimOpposite, Vector2f tileDistance, Vector2f startPosition)
+GridViewportState ImageGridComponent<T>::saveViewportState()
 {
-	// Create tiles
-	auto tile = std::make_shared<GridTileComponent>(mWindow);
+	GridViewportState state;
+	state.dimensions = mGridDimension;
+	state.entryCount = static_cast<int>(mEntries.size());
+	state.cursorIndex = mCursor;
+	state.startPosition = mStartPosition;
+	state.centerSelection = static_cast<int>(mCenterSelection);
+	state.vertical = isVertical();
+	state.scrollLoop = mScrollLoop;
+	return state;
+}
 
-	int X = i % (int)dimOpposite;
-	int Y = i / (int)dimOpposite;
-
-	if (i < 0)
+template<typename T>
+void ImageGridComponent<T>::restoreViewportState(
+	const GridViewportState& state)
+{
+	if (mShowing || mEntries.empty() ||
+		state.entryCount != static_cast<int>(mEntries.size()) ||
+		state.cursorIndex != mCursor ||
+		state.dimensions != mGridDimension ||
+		state.centerSelection != static_cast<int>(mCenterSelection) ||
+		state.vertical != isVertical() ||
+		state.scrollLoop != mScrollLoop)
 	{
-		X = (i + mEntries.size() - 1) % (int)dimOpposite;
-		Y = ((i + mEntries.size() - 1) / (int)dimOpposite) - ((mEntries.size() - 1) / (int)dimOpposite);
+		return;
+	}
+
+	const int dimOpposite = isVertical()
+		? mGridDimension.x() : mGridDimension.y();
+	const int dimScrollable = (isVertical()
+		? mGridDimension.y() : mGridDimension.x()) - 2 * EXTRAITEMS;
+
+	const Vector2f tileDistance = mTileSize + mMargin;
+	const float spacing = isVertical()
+		? tileDistance.y() : tileDistance.x();
+
+	if (dimOpposite <= 0 || dimScrollable <= 0 || spacing <= 0)
+		return;
+
+	const int cursorRow = mCursor / dimOpposite;
+	const int firstRow = state.startPosition / dimOpposite;
+
+	if (state.startPosition % dimOpposite != 0 ||
+		cursorRow < firstRow ||
+		cursorRow - firstRow >= dimScrollable)
+	{
+		return;
+	}
+
+	this->cancelAnimation(2);
+
+	mStartPosition = state.startPosition;
+	mCameraOffset = spacing * firstRow;
+
+	mTileResidency.invalidate();
+}
+
+template<typename T>
+bool ImageGridComponent<T>::setHiddenCursor(const T& object)
+{
+	if (mShowing || mEntries.empty())
+		return false;
+
+	const auto entry = this->findEntry(object);
+	if (entry == mEntries.end())
+		return false;
+
+	const int dimScrollable = isVertical()
+		? mGridDimension.y() - 2 * EXTRAITEMS
+		: mGridDimension.x() - 2 * EXTRAITEMS;
+
+	const Vector2f tileDistance = mTileSize + mMargin;
+	const float spacing = isVertical() ? tileDistance.y() : tileDistance.x();
+
+	if (dimScrollable <= 0 || spacing <= 0)
+		return false;
+
+	this->cancelAnimation(2);
+
+	// Reset scrolling without triggering a selection change.
+	this->mScrollVelocity = 0;
+	listInput(0);
+	this->mTitleOverlayOpacity = 0;
+
+	const int previousCursor = mCursor;
+	mCursor = static_cast<int>(entry - mEntries.begin());
+
+	updateStartPosition(previousCursor);
+
+	const int dimOpposite = Math::max(1,
+		isVertical() ? mGridDimension.x() : mGridDimension.y());
+
+	mCameraOffset = spacing * (mStartPosition / static_cast<float>(dimOpposite));
+
+	mLastCursor = mCursor;
+	mLastCursorState = CURSOR_STOPPED;
+	mPressedCursor = -1;
+	mIsDragging = false;
+	mTimeHoldingButton = -1;
+
+	mTileResidency.invalidate();
+
+	return true;
+}
+
+template<typename T>
+void ImageGridComponent<T>::positionTile(
+	GridTileComponent& tile, int index, int dimOpposite,
+	Vector2f tileDistance, Vector2f startPosition)
+{
+	const int count = static_cast<int>(mEntries.size());
+
+	int x = index % dimOpposite;
+	int y = index / dimOpposite;
+
+	if (index < 0)
+	{
+		x = (index + count - 1) % dimOpposite;
+		y = ((index + count - 1) / dimOpposite) - ((count - 1) / dimOpposite);
 	}
 
 	if (!isVertical())
-		std::swap(X, Y);
+		std::swap(x, y);
+
+	tile.setPosition(x * tileDistance.x() + startPosition.x(), y * tileDistance.y() + startPosition.y());
+}
+
+template<typename T>
+std::shared_ptr<GridTileComponent> ImageGridComponent<T>::createTile(
+	int i, int dimOpposite, Vector2f tileDistance, Vector2f startPosition)
+{
+	auto tile = std::make_shared<GridTileComponent>(mWindow);
 
 	tile->setOrigin(0.5f, 0.5f);
-	tile->setPosition(X * tileDistance.x() + startPosition.x(), Y * tileDistance.y() + startPosition.y());
+	positionTile(*tile, i, dimOpposite, tileDistance, startPosition);
 	tile->setSize(mTileSize);
 
 	if (mTheme)
@@ -276,94 +421,214 @@ std::shared_ptr<GridTileComponent> ImageGridComponent<T>::createTile(int i, int 
 }
 
 template<typename T>
-void ImageGridComponent<T>::preloadTiles()
+bool ImageGridComponent<T>::prepareHiddenArtwork()
 {
-	int dimOpposite = Math::max(1, isVertical() ? mGridDimension.x() : mGridDimension.y());
+	if (mShowing)
+		return false;
 
-	Vector2f startPosition = mTileSize / 2;
-	startPosition += Vector2f(mPadding.x(), mPadding.y());
+	if (mEntries.empty())
+		return true;
 
-	Vector2f tileDistance = mTileSize + mMargin;
-
-	for (int i = 0; i < mEntries.size(); i++)
+	// Set the final position without running the hidden animation.
+	if (this->isAnimationPlaying(2))
 	{
-		typename IList<ImageGridData, T>::Entry& entry = mEntries[i];
-		if (entry.data.tile != nullptr)
-			continue;
-
-		auto tile = createTile(i, dimOpposite, tileDistance, startPosition);
-		tile->setVisible(false);
-
-		loadTile(tile, entry);
-		
-		entry.data.tile = tile;
+		if (!setHiddenCursor(mEntries[mCursor].object))
+			return false;
 	}
+
+	const auto range = getVisibleRange(false);
+	if (range.y() < range.x())
+		return false;
+
+	ensureVisibleTileExist(true);
+	return true;
 }
 
 template<typename T>
-void ImageGridComponent<T>::ensureVisibleTileExist()
+bool ImageGridComponent<T>::visitArtworkChildren(
+	const std::function<bool(GuiComponent*)>& visitor)
 {
-	if (mEntries.size() == 0 || mGridDimension.y() == 0 || mGridDimension.x() == 0)
+	if (!GuiComponent::visitArtworkChildren(visitor))
+		return false;
+
+	if (!visitor(&mScrollbar))
+		return false;
+
+	for (const auto& entry : mEntries)
+	{
+		if (entry.data.tile && !visitor(entry.data.tile.get()))
+			return false;
+	}
+
+	for (const auto& item : mScrollLoopTiles)
+	{
+		if (!visitor(item.second.get()))
+			return false;
+	}
+
+	return true;
+}
+
+template<typename T>
+void ImageGridComponent<T>::releaseArtwork()
+{
+	if (mShowing)
 		return;
 
-	int dimOpposite = Math::max(1, isVertical() ? mGridDimension.x() : mGridDimension.y());
+	GuiComponent::releaseArtwork();
 
-	Vector2f tileDistance = mTileSize + mMargin;
+	for (auto& entry : mEntries)
+		entry.data.artworkResident = false;
 
-	auto range = getVisibleRange();
-	int startIndex = range.x(); // position - EXTRAITEMS * dimOpposite;
-	int endIndex = range.y(); // startIndex + dimExt * dimOpposite;
+	mPendingTileReleases.clear();
+	mTileResidency.invalidate();
+}
 
-	if (startIndex < 0)
-		startIndex = 0;
+template<typename T>
+void ImageGridComponent<T>::releaseHiddenArtwork()
+{
+	releaseArtwork();
+}
 
-	if (endIndex > mEntries.size() - 1)
-		endIndex = mEntries.size() - 1;
+template<typename T>
+bool ImageGridComponent<T>::releaseDistantTileArtwork()
+{
+	if (mPendingTileReleases.empty())
+		return false;
 
-	int totalCols = Math::max(0, mEntries.size() - 1) / dimOpposite;
-	mTotalHeight = Math::max(0.0f, (float) (isVertical() ? tileDistance.y() : tileDistance.x()) * (totalCols - 1));
+	if (this->isAnimationPlaying(2) || this->getScrollingVelocity() != 0 || TextureResource::getQueueSize() != 0)
+	{
+		return true;
+	}
+
+	while (!mPendingTileReleases.empty())
+	{
+		const int index = mPendingTileReleases.back();
+		auto& data = mEntries[index].data;
+
+		if (!data.tile || !data.artworkResident)
+		{
+			mPendingTileReleases.pop_back();
+			continue;
+		}
+
+		// Hide the tile before releasing its artwork.
+		if (data.tile->isShowing())
+			return true;
+
+		data.tile->releaseArtwork();
+		data.artworkResident = false;
+		mPendingTileReleases.pop_back();
+
+		break;
+	}
+
+	return !mPendingTileReleases.empty();
+}
+
+template<typename T>
+void ImageGridComponent<T>::ensureVisibleTileExist(bool prepareHidden)
+{
+	if (mEntries.empty() ||
+		mGridDimension.x() == 0 || mGridDimension.y() == 0)
+	{
+		mPendingTileReleases.clear();
+		mTileResidency.invalidate();
+		return;
+	}
+
+	const int count = static_cast<int>(mEntries.size());
+	const int dimOpposite = Math::max(1, isVertical() ? mGridDimension.x() : mGridDimension.y());
+
+	const Vector2f tileDistance = mTileSize + mMargin;
+	const auto range = getVisibleRange(!prepareHidden);
+
+	if (range.y() < range.x())
+	{
+		mPendingTileReleases.clear();
+		mTileResidency.invalidate();
+		return;
+	}
+
+	const TileResidencyKey key = std::make_tuple(range.x(), range.y(), count, mCursor, mShowing, mScrollLoop, prepareHidden);
+
+	const auto work = mTileResidency.workFor(key);
+
+	if (work == TileTracker::Work::None)
+		return;
+
+	if (work == TileTracker::Work::Cleanup)
+	{
+		mTileResidency.complete(key, releaseDistantTileArtwork());
+		return;
+	}
+
+	// Restart cleanup when the range changes.
+	mPendingTileReleases.clear();
+
+	if (prepareHidden)
+	{
+		for (int index = 0; index < count; ++index)
+		{
+			auto& tile = mEntries[index].data.tile;
+
+			if (tile && index != mCursor && tile->isSelected())
+				tile->setSelected(false, false, nullptr, true, false);
+		}
+	}
+
+	const int startIndex = std::max(range.x(), 0);
+	const int endIndex = std::min(range.y(), count - 1);
+
+	const int totalCols = (count - 1) / dimOpposite;
+	mTotalHeight = Math::max(0.0f, (isVertical() ? tileDistance.y() : tileDistance.x()) * (totalCols - 1));
 
 	Vector2f startPosition = mTileSize / 2;
 	startPosition += Vector2f(mPadding.x(), mPadding.y());
 
-	auto oldScrollLoopTiles = mScrollLoopTiles;	
-	mScrollLoopTiles.clear();
+	// Keep wrapping consistent for partial rows too.
+	const int wrapMinimum = dimOpposite == 1 ? 0 : (count % dimOpposite) - dimOpposite;
+	const int wrapPeriod = count - wrapMinimum;
 
-	int from = mScrollLoop ? Math::min(range.x(), 0) : 0;
-	int to = mScrollLoop ? Math::max(range.y(), mEntries.size()) : mEntries.size();
-
-	for (int idx = from; idx < to; idx++)
+	auto entryIndex = [&](int position) -> int
 	{
-		int i = idx;
-
 		if (mScrollLoop)
 		{
-			int min = dimOpposite == 1 ? 0 : (mEntries.size() % dimOpposite) - dimOpposite;
-			int max = mEntries.size() - min;
-
-			if (i < min)
+			if (position < wrapMinimum)
 			{
-				while (i < min)
-					i += max;
+				while (position < wrapMinimum)
+					position += wrapPeriod;
 			}
-			else if (i >= max)
+			else if (position >= wrapPeriod)
 			{
-				while (i >= max)
-					i -= max;
+				while (position >= wrapPeriod)
+					position -= wrapPeriod;
 			}
-
-			if (i < 0 || i >= mEntries.size())
-				continue;
 		}
 
-		typename IList<ImageGridData, T>::Entry& entry = mEntries[i];
+		return position >= 0 && position < count ? position : -1;
+	};
 
-		if ((mScrollLoop && idx >= range.x() && idx <= range.y()) || (!mScrollLoop && i >= startIndex && i <= endIndex))
+	decltype(mScrollLoopTiles) oldScrollLoopTiles;
+	oldScrollLoopTiles.swap(mScrollLoopTiles);
+
+	std::unordered_set<int> activeEntries;
+
+	for (int position = range.x(); position <= range.y(); ++position)
+	{
+		const int index = entryIndex(position);
+		if (index < 0)
+			continue;
+
+		auto& entry = mEntries[index];
+
+		// Wrapping can include the same entry more than once.
+		if (activeEntries.insert(index).second)
 		{
-			if (entry.data.tile == nullptr)
+			if (!entry.data.tile)
 			{
-				// Create tiles
-				auto tile = createTile(i, dimOpposite, tileDistance, startPosition);
+				auto tile = createTile(
+					index, dimOpposite, tileDistance, startPosition);
 				loadTile(tile, entry);
 
 				entry.data.tile = tile;
@@ -371,58 +636,99 @@ void ImageGridComponent<T>::ensureVisibleTileExist()
 				if (tile->isVisible())
 					mVisibleTiles.push_back(tile);
 
-				if (mCursor == i)
+				if (mCursor == index)
 				{
-					auto curTile = getSelectedTile();
-					while (curTile != nullptr)
+					auto selected = getSelectedTile();
+					while (selected)
 					{
-						curTile->setSelected(false, false, nullptr, true);
-						curTile = getSelectedTile();
+						selected->setSelected(false, false, nullptr, true);
+						selected = getSelectedTile();
 					}
 
 					mLastCursor = mCursor;
 					tile->setSelected(true, true, nullptr, true);
 				}
-
-				if (mShowing)
-					tile->onShow();
 			}
 			else if (!entry.data.tile->isVisible())
 			{
 				loadTile(entry.data.tile, entry);
 				entry.data.tile->setVisible(true);
-
 				mVisibleTiles.push_back(entry.data.tile);
-
-				if (mShowing)
-					entry.data.tile->onShow();
 			}
 
-			if (mScrollLoop && i < startIndex || i > endIndex)
+			auto& tile = entry.data.tile;
+
+			if (prepareHidden && index == mCursor && !tile->isSelected())
 			{
-				auto tile = createTile(idx, dimOpposite, tileDistance, startPosition);
-				loadTile(tile, entry);
-				mScrollLoopTiles[idx] = tile;
+				tile->setSelected(true, false, nullptr, true, false);
 			}
+
+			if (mShowing && !tile->isShowing())
+				tile->onShow();
+
+			tile->preloadArtwork(mShowing);
+			entry.data.artworkResident = true;
 		}
-		else if (entry.data.tile != nullptr)
+
+		if (mScrollLoop && (index < startIndex || index > endIndex))
 		{
-			if (entry.data.tile->isVisible())
-				entry.data.tile->setVisible(false);
+			auto existing = oldScrollLoopTiles.find(position);
+			std::shared_ptr<GridTileComponent> tile;
 
-			auto it = std::find(mVisibleTiles.cbegin(), mVisibleTiles.cend(), entry.data.tile);
-			if (it != mVisibleTiles.cend())
-				mVisibleTiles.erase(it);
-
-			if (!mShowing)
-			{				
-				entry.data.tile->resetImages();
-				entry.data.tile = nullptr;
+			if (existing != oldScrollLoopTiles.end())
+			{
+				tile = existing->second;
+				positionTile(*tile, position, dimOpposite, tileDistance, startPosition);
 			}
-			else if (entry.data.tile->isShowing())
-				entry.data.tile->onHide();
+			else
+			{
+				tile = createTile(position, dimOpposite, tileDistance, startPosition);
+			}
+
+			loadTile(tile, entry);
+			tile->preloadArtwork(mShowing);
+			mScrollLoopTiles.emplace(position, tile);
 		}
 	}
+
+	// Retain four rows or columns around the visible range.
+	const auto warmRange = getVisibleRange(true);
+	const int retainPadding = EXTRAITEMS * dimOpposite;
+
+	std::unordered_set<int> retainedEntries;
+
+	for (int position = warmRange.x() - retainPadding; position <= warmRange.y() + retainPadding; ++position)
+	{
+		const int index = entryIndex(position);
+		if (index >= 0)
+			retainedEntries.insert(index);
+	}
+
+	for (int index = 0; index < count; ++index)
+	{
+		auto& data = mEntries[index].data;
+		auto& tile = data.tile;
+
+		if (!tile || activeEntries.count(index) != 0)
+			continue;
+
+		tile->setVisible(false);
+
+		auto visible = std::find(mVisibleTiles.begin(), mVisibleTiles.end(), tile);
+
+		if (visible != mVisibleTiles.end())
+			mVisibleTiles.erase(visible);
+
+		if (tile->isShowing())
+			tile->onHide();
+
+		if (data.artworkResident && retainedEntries.count(index) == 0)
+		{
+			mPendingTileReleases.push_back(index);
+		}
+	}
+
+	mTileResidency.complete(key, releaseDistantTileArtwork());
 }
 
 template<typename T>
@@ -446,7 +752,6 @@ ImageGridComponent<T>::ImageGridComponent(Window* window) : IList<ImageGridData,
 	mAllowVideo = false;
 	mName = "grid";
 	mStartPosition = 0;
-	mEntriesDirty = true;
 
 	mLastCursor = -1;
 	mLastCursorState = CursorState::CURSOR_STOPPED;
@@ -480,7 +785,7 @@ void ImageGridComponent<T>::add(const std::string& name, const std::string& imag
 
 	static_cast<IList< ImageGridData, T >*>(this)->add(entry);
 
-	mEntriesDirty = true;
+	mTileResidency.invalidate();
 }
 
 template<typename T>
@@ -504,15 +809,28 @@ std::string ImageGridComponent<T>::getImage(const T& obj)
 template<typename T>
 void ImageGridComponent<T>::setImage(const std::string& imagePath, const T& obj)
 {
-	IList<ImageGridData, T>* list = static_cast<IList< ImageGridData, T >*>(this);
+	IList<ImageGridData, T>* list = this;
 	auto entry = list->findEntry(obj);
-	if (entry != list->end() && (*entry).data.texturePath != imagePath)
-	{
-		(*entry).data.texturePath = imagePath;
-		(*entry).data.tile = nullptr;
 
-		mEntriesDirty = true;
+	if (entry == list->end() || entry->data.texturePath == imagePath)
+		return;
+
+	auto& data = entry->data;
+
+	if (data.tile)
+	{
+		if (data.tile->isShowing())
+			data.tile->onHide();
+
+		mVisibleTiles.erase(std::remove(mVisibleTiles.begin(), mVisibleTiles.end(), data.tile), mVisibleTiles.end());
+
+		data.tile.reset();
 	}
+
+	data.texturePath = imagePath;
+	data.artworkResident = false;
+
+	mTileResidency.invalidate();
 }
 
 template<typename T>
@@ -594,10 +912,9 @@ void ImageGridComponent<T>::update(int deltaTime)
 
 	listUpdate(deltaTime);
 
-	if (mEntriesDirty)
+	if (mShowing)
 	{
 		ensureVisibleTileExist();
-		mEntriesDirty = false;
 	}
 
 	for (auto tile : mVisibleTiles)
@@ -634,9 +951,8 @@ void ImageGridComponent<T>::onShow()
 {
 	GuiComponent::onShow();
 
-	for (auto entry : mEntries)
-		if (entry.data.tile != nullptr)
-			entry.data.tile->onShow();
+	mTileResidency.invalidate();
+	ensureVisibleTileExist();
 }
 
 template<typename T>
@@ -644,12 +960,13 @@ void ImageGridComponent<T>::onHide()
 {
 	GuiComponent::onHide();
 
-	for (auto entry : mEntries)
-		if (entry.data.tile != nullptr)
+	for (const auto& entry : mEntries)
+	{
+		if (entry.data.tile)
 			entry.data.tile->onHide();
+	}
 
-	ensureVisibleTileExist();
-	mEntriesDirty = false;
+	mTileResidency.invalidate();
 }
 
 template<typename T>
@@ -1036,11 +1353,64 @@ void ImageGridComponent<T>::onSizeChanged()
 {
 	IList<ImageGridData, T>::onSizeChanged();
 
+	mScrollLoopTiles.clear();
+	mTileResidency.invalidate();
+
 	if (mTheme == nullptr || mSize.x() <= 0 || mSize.y() <= 0)
 		return;
 
 	calcGridDimension();
-	mEntriesDirty = true;
+}
+
+template<typename T>
+void ImageGridComponent<T>::updateStartPosition(int previousCursor)
+{
+	const float dimScrollable = isVertical() ? mGridDimension.y() - 2 * EXTRAITEMS : mGridDimension.x() - 2 * EXTRAITEMS;
+	const float dimOpposite = Math::max(1, isVertical() ? mGridDimension.x() : mGridDimension.y());
+
+	const int centralCol = static_cast<int>(dimScrollable - 0.5f) / 2;
+	const int maxCentralCol = static_cast<int>(dimScrollable) / 2;
+	const int oldCol = previousCursor / dimOpposite;
+	const int col = mCursor / dimOpposite;
+	const int firstVisibleCol = mStartPosition / dimOpposite;
+	const int lastCol = (mEntries.size() - 1) / dimOpposite;
+	const int lastScroll = std::max(0, static_cast<int>(lastCol + 1 - dimScrollable));
+
+	if (mCenterSelection == CenterSelection::NEVER)
+	{
+		if (col == 0)
+			mStartPosition = 0;
+
+		if (col < firstVisibleCol)
+			mStartPosition = col * dimOpposite;
+		else if (col >= firstVisibleCol + dimScrollable)
+			mStartPosition = (col - dimScrollable + 1) * dimOpposite;
+	}
+	else
+	{
+		if ((col < centralCol || (col == 0 && col == centralCol)) && mCenterSelection == CenterSelection::PARTIAL)
+		{
+			mStartPosition = 0;
+		}
+		else if ((col - centralCol) > lastScroll && mCenterSelection == CenterSelection::PARTIAL && !mScrollLoop)
+		{
+			mStartPosition = lastScroll * dimOpposite;
+		}
+		else if ((maxCentralCol != centralCol && col == firstVisibleCol + maxCentralCol) || col == firstVisibleCol + centralCol)
+		{
+			if (col == firstVisibleCol + maxCentralCol)
+				mStartPosition = (col - maxCentralCol) * dimOpposite;
+			else
+				mStartPosition = (col - centralCol) * dimOpposite;
+		}
+		else
+		{
+			if (oldCol == firstVisibleCol + maxCentralCol)
+				mStartPosition = (col - maxCentralCol) * dimOpposite;
+			else
+				mStartPosition = (col - centralCol) * dimOpposite;
+		}
+	}
 }
 
 template<typename T>
@@ -1077,20 +1447,7 @@ void ImageGridComponent<T>::onCursorChanged(const CursorState& state)
 		}
 	}
 
-	int oldStart = mStartPosition;
-
-	float dimScrollable = isVertical() ? mGridDimension.y() - 2 * EXTRAITEMS : mGridDimension.x() - 2 * EXTRAITEMS;
-	float dimOpposite = Math::max(1, isVertical() ? mGridDimension.x() : mGridDimension.y());
-	
-	int centralCol = (int)(dimScrollable - 0.5) / 2;
-	int maxCentralCol = (int)(dimScrollable) / 2;
-
-	int oldCol = (mLastCursor / dimOpposite);
-	int col = (mCursor / dimOpposite);
-
-	int lastCol = ((mEntries.size() - 1) / dimOpposite);
-
-	int lastScroll = std::max(0, (int)(lastCol + 1 - dimScrollable));
+	const float dimOpposite = Math::max(1, isVertical() ? mGridDimension.x() : mGridDimension.y());
 
 	float startPos = 0;
 	float endPos = 1;
@@ -1130,44 +1487,12 @@ void ImageGridComponent<T>::onCursorChanged(const CursorState& state)
 					if (tile->hasItemTemplate())
 						tile->setSelected(false);
 		}
-		else if (mLastCursor = -9999)
+		else if (mLastCursor == -9999)
 			mEntries[mCursor].data.tile->startVideo();
 	}
 
-	int firstVisibleCol = mStartPosition / dimOpposite;
-
-	auto oldStartPosition = mStartPosition;
-
-	if (mCenterSelection == CenterSelection::NEVER)
-	{
-		if (col == 0)
-			mStartPosition = 0;
-		if (col < firstVisibleCol)
-			mStartPosition = col * dimOpposite;
-		else if (col >= firstVisibleCol + dimScrollable)
-			mStartPosition = (col - dimScrollable + 1) * dimOpposite;
-	}
-	else
-	{
-		if ((col < centralCol || (col == 0 && col == centralCol)) && mCenterSelection == CenterSelection::PARTIAL)
-			mStartPosition = 0;
-		else if ((col - centralCol) > lastScroll && mCenterSelection == CenterSelection::PARTIAL && !mScrollLoop)
-			mStartPosition = lastScroll * dimOpposite;
-		else if (maxCentralCol != centralCol && col == firstVisibleCol + maxCentralCol || col == firstVisibleCol + centralCol)
-		{
-			if (col == firstVisibleCol + maxCentralCol)
-				mStartPosition = (col - maxCentralCol) * dimOpposite;
-			else
-				mStartPosition = (col - centralCol) * dimOpposite;
-		}
-		else
-		{
-			if (oldCol == firstVisibleCol + maxCentralCol)
-				mStartPosition = (col - maxCentralCol) * dimOpposite;
-			else
-				mStartPosition = (col - centralCol) * dimOpposite;
-		}
-	}
+	const int oldStartPosition = mStartPosition;
+	updateStartPosition(mLastCursor);
 
 	float newCameraOffset = mCameraOffset;
 
@@ -1182,7 +1507,6 @@ void ImageGridComponent<T>::onCursorChanged(const CursorState& state)
 	if (lastCursor != -9999 && (lastCursor < 0 || !ALLOWANIMATIONS))
 	{
 		mCameraOffset = newCameraOffset;
-		mEntriesDirty = true;
 
 		if (mCursorChangedCallback)
 			mCursorChangedCallback(state);
@@ -1208,8 +1532,6 @@ void ImageGridComponent<T>::onCursorChanged(const CursorState& state)
 			mCameraOffset -= totalSize;
 		else
 			mCameraOffset += totalSize;
-
-		mEntriesDirty = true;
 	}
 
 	mLastCursor = mCursor;
@@ -1226,18 +1548,15 @@ void ImageGridComponent<T>::onCursorChanged(const CursorState& state)
 				float pct = Math::lerp(0, 1, t*t*t + 1);
 
 				mCameraOffset = newCameraOffset * pct + oldCameraoffset * (1.0 - pct);
-				mEntriesDirty = true;
 			};
 
 			((GuiComponent*)this)->setAnimation(new LambdaAnimation(func, 250), 0, [this, newCameraOffset] {
 				mCameraOffset = newCameraOffset;
-				mEntriesDirty = true;
 			}, false, 2);
 		}
 		else
 		{
 			mCameraOffset = newCameraOffset;
-			mEntriesDirty = true;
 		}
 	}
 }
@@ -1362,7 +1681,10 @@ void ImageGridComponent<T>::loadTile(std::shared_ptr<GridTileComponent> tile, ty
 template<typename T>
 void ImageGridComponent<T>::resetGrid()
 {
+	mPendingTileReleases.clear();
+	mTileResidency.invalidate();
 	mVisibleTiles.clear();
+	mScrollLoopTiles.clear();
 
 	if (mGridSizeOverride.x() != 0 && mGridSizeOverride.y() != 0)
 		mAutoLayout = mGridSizeOverride;
@@ -1409,7 +1731,6 @@ void ImageGridComponent<T>::resetGrid()
 	
 	auto tileDistance = mTileSize + mMargin;
 	mCameraOffset = (isVertical() ? tileDistance.y() : tileDistance.x()) * (mStartPosition / dimOpposite);
-	mEntriesDirty = true;
 
 	mLastCursor = -1;
 	mLastCursorState = CursorState::CURSOR_STOPPED;
@@ -1678,8 +1999,6 @@ void ImageGridComponent<T>::onMouseMove(int x, int y)
 			}
 		}
 
-
-		mEntriesDirty = true;
 		mPressedPoint = Vector2i(x, y);
 	}
 }

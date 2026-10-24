@@ -34,7 +34,9 @@
 #include "Gamelist.h"
 #include "components/ImageComponent.h"
 #include "components/VideoComponent.h"
+#include "resources/TextureResource.h"
 #include <set>
+#include <atomic>
 
 namespace
 {
@@ -48,11 +50,10 @@ namespace
 			if (video->getPlaylist() != nullptr)
 				return true;
 
-		for (unsigned int i = 0; i < component->getChildCount(); ++i)
-			if (hasPlaylistInTree(component->getChild(i)))
-				return true;
-
-		return false;
+		return !component->visitArtworkChildren([](GuiComponent* child)
+		{
+			return !hasPlaylistInTree(child);
+		});
 	}
 }
 
@@ -498,6 +499,8 @@ bool ViewController::doLaunchGame(FileData* game, LaunchGameOptions options)
 	if (mCurrentView)
 		mCurrentView->onHide();
 
+	TextureResource::suspendLoading();
+
 	if (mSystemListView)
 		mSystemListView->releaseExtrasForGameLaunch();
 
@@ -508,9 +511,13 @@ bool ViewController::doLaunchGame(FileData* game, LaunchGameOptions options)
 	// Silence TTS when launching a game.
 	TextToSpeech::getInstance()->say(" ");
 
-	if (game->launchGame(mWindow, options))
-		if (game->getSourceFileData()->getSystemName() == "windows_installers")
-			return true;
+	const bool launched = game->launchGame(mWindow, options);
+
+	// Resume loading here too in case launchGame returns early.
+	TextureResource::resumeLoading();
+
+	if (launched && game->getSourceFileData()->getSystemName() == "windows_installers")
+		return true;
 
 	// Refresh retained views before rebuilding the released view.
 	onFileChanged(game, FILE_METADATA_CHANGED);
@@ -693,7 +700,6 @@ void ViewController::launch(FileData* game, LaunchGameOptions options, Vector3f 
 			else
 			{
 				setAnimation(new LambdaAnimation(fadeFunc, 800), 0, [this] { GuiComponent::isLaunchTransitionRunning = false; mLockInput = false; mWindow->closeSplashScreen(); }, true, 3);
-				this->onFileChanged(game, FILE_METADATA_CHANGED);
 			}
 		});
 	}
@@ -719,7 +725,6 @@ void ViewController::launch(FileData* game, LaunchGameOptions options, Vector3f 
 			else
 			{
 				setAnimation(new LaunchAnimation(mCamera, origCamera, mFadeOpacity, center, 600, zoom), RETURN_HOLD, [this] { GuiComponent::isLaunchTransitionRunning = false; mLockInput = false; mWindow->closeSplashScreen(); }, true, 3);
-				this->onFileChanged(game, FILE_METADATA_CHANGED);
 			}
 		});
 	}
@@ -743,7 +748,6 @@ void ViewController::launch(FileData* game, LaunchGameOptions options, Vector3f 
 			else
 			{
 				setAnimation(new LaunchAnimation(mCamera, origCamera, mFadeOpacity, center, 10, zoom), 0, [this] { GuiComponent::isLaunchTransitionRunning = false; mLockInput = false; mWindow->closeSplashScreen(); }, true, 3);
-				this->onFileChanged(game, FILE_METADATA_CHANGED);
 			}
 		});
 	}
@@ -1058,11 +1062,28 @@ void ViewController::releaseInactiveGameListView(bool forGameLaunch)
 			continue;
 		}
 
-		auto simple = dynamic_cast<ISimpleGameListView*>(view.get());
-		// Keep gamelists with playlists until we can restore them.
-		if (simple == nullptr || hasPlaylistInTree(view.get()))
+		if (view->isArtworkReleased())
 		{
 			++it;
+			continue;
+		}
+
+		auto simple = dynamic_cast<ISimpleGameListView*>(view.get());
+		if (simple == nullptr)
+		{
+			++it;
+			continue;
+		}
+
+		if (hasPlaylistInTree(view.get()))
+		{
+			// Keep playlist state, but release hidden artwork.
+			view->releaseArtwork();
+
+			++it;
+			if (!forGameLaunch)
+				break;
+
 			continue;
 		}
 
@@ -1099,10 +1120,13 @@ void ViewController::update(int deltaTime)
 		playViewTransition(false);
 	}
 
-	// Release hidden system extras after the view transition has finished.
+	// Prepare the hidden system view once the gamelist transition has finished.
 	if (mSystemListView && mCurrentView && mCurrentView != mSystemListView && !mLockInput && !isAnimationPlaying(0))
 	{
-		mSystemListView->releaseHiddenExtras();
+		if (mState.viewing == GAME_LIST)
+			mSystemListView->prepareHiddenSystem(mState.system);
+		else
+			mSystemListView->releaseHiddenExtras();
 	}
 
 	releaseInactiveGameListView();
@@ -1277,7 +1301,7 @@ void ViewController::reloadAll(Window* window, bool reloadTheme)
 		mSystemListView.reset();
 		TextureResource::cleanupTextureResourceCache();
 
-		int processedSystem = 0;
+		std::atomic<int> processedSystem{0};
 		int systemCount = systemsToReload.size();
 
 		Utils::ThreadPool pool;
@@ -1286,7 +1310,7 @@ void ViewController::reloadAll(Window* window, bool reloadTheme)
 		{
 			if (pooledSystem->getTheme() == nullptr) // Ignore hidden systems
 			{
-				processedSystem++;
+				processedSystem.fetch_add(1, std::memory_order_relaxed);
 				continue;
 			}
 
@@ -1294,7 +1318,7 @@ void ViewController::reloadAll(Window* window, bool reloadTheme)
 			{
 				pooledSystem->loadTheme();
 				pooledSystem->resetFilters();
-				processedSystem++;
+				processedSystem.fetch_add(1, std::memory_order_relaxed);
 			});
 		}
 
@@ -1302,7 +1326,7 @@ void ViewController::reloadAll(Window* window, bool reloadTheme)
 		{
 			pool.wait([window, &processedSystem, systemCount]
 			{
-				int px = processedSystem;
+				const int px = processedSystem.load(std::memory_order_relaxed);
 				if (px >= 0 && px < systemCount)
 					window->renderSplashScreen(_("Loading theme"), (float)px / (float)systemCount);
 			}, 5);
@@ -1434,7 +1458,7 @@ void ViewController::reloadAllGames(Window* window, bool deleteCurrentGui, bool 
 		Settings::setParseGamelistOnly(false);
 		Settings::setIgnoreGamelist(false);
 		Settings::setRemoveMultiDiskContent(true);
-		
+
 		Settings::setPackGamelists(parseGamelistOnly);
 		Settings::setBuildMultiDiskContentCache(true);
 	}
@@ -1484,7 +1508,7 @@ void ViewController::reloadAllGames(Window* window, bool deleteCurrentGui, bool 
 	{
 		Settings::setParseGamelistOnly(parseGamelistOnly);
 		Settings::setIgnoreGamelist(ignoreGamelist);
-		Settings::setRemoveMultiDiskContent(removeMultiDiskContent);		
+		Settings::setRemoveMultiDiskContent(removeMultiDiskContent);
 		Settings::setPackGamelists(false);
 		Settings::setBuildMultiDiskContentCache(false);
 	}

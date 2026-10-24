@@ -530,6 +530,32 @@ void VideoComponent::onHide()
 	manageState();
 }
 
+bool VideoComponent::visitArtworkChildren(
+	const std::function<bool(GuiComponent*)>& visitor)
+{
+	if (!GuiComponent::visitArtworkChildren(visitor))
+		return false;
+
+	return visitor(&mStaticImage);
+}
+
+void VideoComponent::preloadArtwork(bool prioritize)
+{
+	mStaticImage.preloadArtwork(prioritize);
+	GuiComponent::preloadArtwork(prioritize);
+}
+
+void VideoComponent::releaseArtwork()
+{
+	if (!isShowing())
+	{
+		stopVideo();
+		mTexture.reset();
+	}
+
+	GuiComponent::releaseArtwork();
+}
+
 void VideoComponent::onScreenSaverActivate()
 {
 	mScreensaverActive = true;

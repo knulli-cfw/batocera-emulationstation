@@ -206,6 +206,12 @@ public:
 	virtual void	onFocusLost() { };
 	virtual void	onShow();
 	virtual void	onHide();
+	// Also visits artwork components that aren't in mChildren.
+	// Return false from the visitor to stop.
+	virtual bool visitArtworkChildren(const std::function<bool(GuiComponent*)>& visitor);
+	// Prepare artwork without showing components or starting playback.
+	virtual void	preloadArtwork(bool prioritize = false);
+	virtual void	releaseArtwork();
 	virtual void	onScreenSaverActivate();
 	virtual void	onScreenSaverDeactivate();
 	virtual void	onMouseLeave();

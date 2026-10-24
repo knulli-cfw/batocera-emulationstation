@@ -50,7 +50,7 @@ void TextureData::initFromPath(const std::string& path)
 bool TextureData::initSVGFromMemory(const unsigned char* fileData, size_t length)
 {
 	// Prevent duplicate SVG loads without blocking VRAM cleanup.
-	std::unique_lock<std::mutex> svgLoadLock(mSVGLoadMutex);
+	std::unique_lock<std::mutex> imageLoadLock(mImageLoadMutex);
 
 	{
 		std::unique_lock<std::mutex> lock(mMutex);
@@ -210,36 +210,78 @@ bool TextureData::initSVGFromMemory(const unsigned char* fileData, size_t length
 
 bool TextureData::initImageFromMemory(const unsigned char* fileData, size_t length, int subImageIndex)
 {
-	if (length == 0)
+	if (fileData == nullptr || length == 0)
 		return false;
 
-	// If already initialised then don't read again
-	if (isLoaded())
-		return true;
+	std::unique_lock<std::mutex> imageLoadLock(mImageLoadMutex);
 
-	// Don't load images greater than screen resolution
-	MaxSizeInfo maxSize(Renderer::getScreenWidth(), Renderer::getScreenHeight(), false);
-	if (OPTIMIZEVRAM && !mMaxSize.empty() && mMaxSize.x() < maxSize.x() && mMaxSize.y() < maxSize.y())
-		maxSize = mMaxSize;
-		
-	auto oldSize = mSize;
+	const bool optimizeVRAM = OPTIMIZEVRAM;
+	const MaxSizeInfo screenSize(Renderer::getScreenWidth(), Renderer::getScreenHeight(), false);
 
-	size_t width, height;
-	Vector2i size;
-	Vector2i physicalSize;
-	unsigned char* imageRGBA = ImageIO::loadFromMemoryRGBA32((const unsigned char*)(fileData), length, width, height, &maxSize, &physicalSize, &size, subImageIndex);
-	
-	mPhysicalSize = Vector2f(physicalSize.x(), physicalSize.y());
-	mSize = size.empty() ? physicalSize : size;
-	setScalable(false);
-
-	if (imageRGBA == nullptr)
+	// Caller must hold mMutex.
+	auto getDecodeSize = [&]() -> MaxSizeInfo
 	{
-		LOG(LogError) << "Could not initialize texture from memory, invalid data!  (file path: " << mPath << ", data ptr: " << (size_t)fileData << ", reported size: " << length << ")";
-		return false;
-	}
+		if (optimizeVRAM && !mMaxSize.empty() && mMaxSize.x() < screenSize.x() && mMaxSize.y() < screenSize.y())
+		{
+			return mMaxSize;
+		}
 
-	return initFromRGBA(imageRGBA, width, height, false);
+		return screenSize;
+	};
+
+	// Try again if the requested size changed while loading.
+	for (;;)
+	{
+		MaxSizeInfo maxSize = MaxSizeInfo::Empty;
+
+		{
+			std::unique_lock<std::mutex> lock(mMutex);
+
+			if (mDataRGBA || mTextureID != 0)
+				return true;
+
+			maxSize = getDecodeSize();
+		}
+
+		size_t width = 0;
+		size_t height = 0;
+		Vector2i physicalSize = Vector2i::Zero();
+
+		std::unique_ptr<unsigned char[]> imageRGBA(
+			ImageIO::loadFromMemoryRGBA32(
+				fileData, length, width, height,
+				&maxSize, &physicalSize, nullptr, subImageIndex));
+
+		if (!imageRGBA)
+		{
+			LOG(LogError) << "Could not initialize texture from memory: "
+				<< mPath;
+			return false;
+		}
+
+		std::unique_lock<std::mutex> lock(mMutex);
+
+		if (mDataRGBA || mTextureID != 0)
+			return true;
+
+		const MaxSizeInfo currentSize = getDecodeSize();
+
+		if (currentSize.x() != maxSize.x() ||
+			currentSize.y() != maxSize.y() ||
+			currentSize.externalZoom() != maxSize.externalZoom())
+		{
+			continue;
+		}
+
+		// Update the pixels and dimensions together.
+		mPhysicalSize = Vector2f(physicalSize.x(), physicalSize.y());
+		mSize = Vector2i(width, height);
+		mScalable = false;
+		mIsExternalDataRGBA = false;
+		mDataRGBA = imageRGBA.release();
+
+		return true;
+	}
 }
 
 bool TextureData::initFromRGBA(unsigned char* dataRGBA, size_t width, size_t height, bool copyData)

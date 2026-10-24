@@ -6,6 +6,7 @@
 #include "ThemeData.h"
 #include "renderers/Renderer.h"
 #include <mutex>
+#include <atomic>
 
 struct libvlc_instance_t;
 struct libvlc_media_t;
@@ -17,7 +18,6 @@ struct VideoContext
 	{
 		surfaces[0] = nullptr;
 		surfaces[1] = nullptr;
-		component = nullptr;		
 		hasFrame[0] = false;
 		hasFrame[1] = false;
 		surfaceId = 0;
@@ -40,7 +40,7 @@ struct VideoContext
 	std::mutex			mutexes[2];
 	bool				hasFrame[2];
 
-	VideoComponent*		component;	
+	std::atomic<bool>	frameDisplayed{false};
 };
 
 

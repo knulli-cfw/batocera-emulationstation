@@ -67,6 +67,8 @@ void CarouselGameListView::onFileChanged(FileData* file, FileChangeType change)
 
 void CarouselGameListView::populateList(const std::vector<FileData*>& files)
 {
+	invalidateArtworkResidency();
+
 	updateHeaderLogoAndText();
 
 	mList.clear();

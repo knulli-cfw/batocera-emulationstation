@@ -42,6 +42,38 @@ GridGameListView::GridGameListView(Window* window, FolderData* root, const std::
 	updateInfoPanel();
 }
 
+ISimpleGameListView::NavigationState
+GridGameListView::saveNavigationState()
+{
+	auto state = ISimpleGameListView::saveNavigationState();
+	state.gridViewport = mGrid.saveViewportState();
+	return state;
+}
+
+void GridGameListView::restoreNavigationState(
+	const NavigationState& state)
+{
+	ISimpleGameListView::restoreNavigationState(state);
+
+	auto cursor = getCursor();
+	if (cursor == nullptr)
+		return;
+
+	if (!state.cursorPath.empty())
+	{
+		if (cursor->isPlaceHolder() || cursor->getPath() != state.cursorPath)
+		{
+			return;
+		}
+	}
+	else if (!state.syntheticCursor)
+	{
+		return;
+	}
+
+	mGrid.restoreViewportState(state.gridViewport);
+}
+
 void GridGameListView::onShow()
 {
 	ISimpleGameListView::onShow();
@@ -141,6 +173,8 @@ const std::string GridGameListView::getImagePath(FileData* file)
 
 void GridGameListView::populateList(const std::vector<FileData*>& files)
 {
+	invalidateArtworkResidency();
+
 	updateHeaderLogoAndText();
 
 	mGrid.resetLastCursor();

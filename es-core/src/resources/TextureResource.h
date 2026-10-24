@@ -22,8 +22,9 @@ public:
 	static void cancelAsync(std::shared_ptr<TextureResource> texture);
 
 	static std::shared_ptr<TextureResource> get(const std::string& path, bool tile = false, bool linear = false, bool forceLoad = false, bool dynamic = true, bool asReloadable = true, const MaxSizeInfo* maxSize = nullptr, const std::string& shareId = "");
-	static void cleanupTextureResourceCache();
-	
+	// Check up to maxEntries, or the whole cache if zero.
+	static void cleanupTextureResourceCache(size_t maxEntries = 0);
+
 	void initFromPixels(unsigned char* dataRGBA, size_t width, size_t height);
 	void updateFromExternalPixels(unsigned char* dataRGBA, size_t width, size_t height);
 	void initFromMemory(const char* file, size_t length);
@@ -52,7 +53,9 @@ public:
 
 	void reload(TextureLoadMode mode);
 
-	static void clearQueue();
+	static void suspendLoading();
+	static void resumeLoading();
+
 	static int getQueueSize();
 
 	static void cleanupVRAM();
@@ -67,7 +70,10 @@ private:
 	bool							mForceLoad;
 
 	typedef std::tuple<std::string, bool, bool, std::string> TextureKeyType;
-	static std::map< TextureKeyType, std::weak_ptr<TextureResource> > sTextureMap; // map of textures, used to prevent duplicate textures
+	using TextureCache = std::map<TextureKeyType, std::weak_ptr<TextureResource>>; // map of textures, used to prevent duplicate textures
+
+	static TextureCache sTextureMap;
+	static TextureCache::iterator sTextureCleanupPosition;
 	static std::set<TextureResource*> 	sNonDynamicTextureResources;
 };
 

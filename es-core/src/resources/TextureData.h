@@ -127,7 +127,7 @@ private:
 	std::unordered_set<const void*> mRequiredOwners;
 
 	mutable std::mutex	mMutex;
-	std::mutex		mSVGLoadMutex;
+	std::mutex		mImageLoadMutex;
 	bool			mTile;
 	bool			mLinear;
 	std::string		mPath;

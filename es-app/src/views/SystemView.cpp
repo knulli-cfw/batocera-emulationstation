@@ -14,7 +14,6 @@
 #include "SystemConf.h"
 #include "guis/GuiMenu.h"
 #include "AudioManager.h"
-#include "Log.h"
 #include "components/VideoComponent.h"
 #include "components/VideoVlcComponent.h"
 #include "guis/GuiNetPlay.h"
@@ -22,12 +21,14 @@
 #include "playlists/M3uPlaylist.h"
 #include "CollectionSystemManager.h"
 #include "resources/TextureDataManager.h"
+#include "resources/TextureResource.h"
 #include "guis/GuiTextEditPopup.h"
 #include "guis/GuiTextEditPopupKeyboard.h"
 #include "TextToSpeech.h"
 #include "BindingManager.h"
 #include "guis/GuiRetroAchievements.h"
 #include "components/CarouselComponent.h"
+#include <cmath>
 
 namespace
 {
@@ -149,6 +150,8 @@ SystemView::~SystemView()
 
 void SystemView::clearEntries()
 {
+	mExtraResidency.invalidate();
+
 	for (auto& entry : mEntries)
 	{
 		setExtraRequired(entry, false);
@@ -165,6 +168,8 @@ void SystemView::clearEntries()
 
 void SystemView::reloadTheme(SystemData* system)
 {
+	mExtraResidency.invalidate();
+
 	auto carousel = mCarousel.asCarousel();
 	if (carousel == nullptr)
 	{
@@ -241,7 +246,7 @@ void SystemView::saveExtraPlaylists(SystemViewData& entry)
 
 void SystemView::ensureExtras(int index)
 {
-	if (index < 0 || index >= (int)mEntries.size())
+	if (index < 0 || index >= static_cast<int>(mEntries.size()))
 		return;
 
 	if (mEntries[index].extrasLoaded)
@@ -252,14 +257,24 @@ void SystemView::ensureExtras(int index)
 	loadExtras(system, true);
 
 	for (auto extra : mEntries[index].backgroundExtras)
-	{
 		BindingManager::updateBindings(extra, system);
-		ensureTexture(extra, TextureLoadMode::STANDARD);
-	}
+}
+
+void SystemView::prepareExtras(int index, bool prioritize)
+{
+	if (index < 0 || index >= static_cast<int>(mEntries.size()))
+		return;
+
+	ensureExtras(index);
+
+	for (auto extra : mEntries[index].backgroundExtras)
+		extra->preloadArtwork(prioritize);
 }
 
 void SystemView::loadExtras(SystemData* system, bool preservePlaylists)
 {
+	mExtraResidency.invalidate();
+
 	auto it = std::find_if(mEntries.begin(), mEntries.end(), [system](const SystemViewData& ss) { return ss.object == system; });
 	if (it != mEntries.cend())
 	{
@@ -384,15 +399,7 @@ void SystemView::populate()
 			entry.object = system;
 			mEntries.push_back(std::move(entry));
 
-			mCarousel.add(system->getName(), system, true);
-
-			auto carousel = mCarousel.asCarousel();
-			if (carousel)
-			{
-				auto logo = carousel->getLogo(mCarousel.size() - 1);
-				if (logo)
-					ensureTexture(logo.get(), TextureLoadMode::STANDARD);
-			}
+			mCarousel.add(system->getName(), system, false);
 		}
 	}
 
@@ -418,10 +425,50 @@ void SystemView::populate()
 
 		return;
 	}
+}
 
-	auto grid = mCarousel.asGrid();
-	if (grid)
-		grid->preloadTiles();
+void SystemView::prepareHiddenSystem(SystemData* system)
+{
+	if (isShowing() || system == nullptr || mEntries.empty())
+		return;
+
+	if (!mCarousel.supportsHiddenArtwork())
+	{
+		releaseHiddenExtras();
+		return;
+	}
+
+	if (getSelected() != system || mCarousel.getScrollingVelocity() != 0)
+	{
+		if (!mCarousel.setHiddenCursor(system))
+			return;
+	}
+
+	if (!mCarousel.prepareHiddenArtwork())
+		return;
+
+	const int cursor = mCarousel.getCursorIndex();
+
+	mLastCursor = cursor;
+	mCamOffset = static_cast<float>(cursor);
+	mExtrasCamOffset = static_cast<float>(cursor);
+	mExtrasFadeOpacity = 0.0f;
+	mExtrasFadeMove = 0.0f;
+	mExtrasFadeOldCursor = -1;
+
+	updateExtraResidency(ExtraResidencyMode::HiddenPrepared, true);
+}
+
+void SystemView::releaseExtrasForGameLaunch()
+{
+	mExtraResidency.invalidate();
+
+	if (isShowing())
+		return;
+
+	mCarousel.releaseHiddenArtwork();
+
+	updateExtraResidency(ExtraResidencyMode::GameLaunch);
 }
 
 void SystemView::goToSystem(SystemData* system, bool animate)
@@ -836,15 +883,21 @@ void SystemView::ensureWarmExtras()
 	std::unordered_set<int> entries;
 	collectExtraResidencyEntries(entries, EXTRA_LOAD_PADDING);
 
-	// Load the selected system first.
-	ensureExtras(mCarousel.getCursorIndex());
+	const int cursor = mCarousel.getCursorIndex();
+
+	// Request selected artwork before its neighbors.
+	prepareExtras(cursor, true);
 
 	for (int index : entries)
-		ensureExtras(index);
+	{
+		if (index != cursor)
+			prepareExtras(index, false);
+	}
 }
 
 void SystemView::releaseExtras(SystemViewData& entry)
 {
+	mExtraResidency.invalidate();
 	saveExtraPlaylists(entry);
 	setExtraRequired(entry, false);
 
@@ -855,41 +908,84 @@ void SystemView::releaseExtras(SystemViewData& entry)
 	entry.extrasLoaded = false;
 }
 
-void SystemView::updateExtraResidency(ExtraResidencyMode mode)
+bool SystemView::updateExtraResidency(ExtraResidencyMode mode, bool allowRelease)
 {
 	if (mEntries.empty())
-		return;
+	{
+		mExtraResidency.invalidate();
+		return true;
+	}
 
 	if (mode != ExtraResidencyMode::Navigation)
 	{
-		// Never release a Systemview that is still showing.
+		// Don't release artwork while the view is still showing.
 		if (isShowing())
-			return;
+			return false;
 	}
 	else if (!isShowing() || mScreensaverActive || mDisable || mLockExtraChanges || mLockCamOffsetChanges)
-		return;
+	{
+		return false;
+	}
+
+	const bool maintainRange =
+		mode == ExtraResidencyMode::Navigation ||
+		mode == ExtraResidencyMode::HiddenPrepared;
+
+	const auto key = std::make_tuple(
+		static_cast<int>(mEntries.size()),
+		mCarousel.getCursorIndex(),
+		static_cast<int>(mExtrasCamOffset),
+		static_cast<int>(mExtrasCamOffset + 0.99999f),
+		mExtrasFadeOldCursor,
+		mode);
 
 	std::unordered_set<int> retainEntries;
 
-	if (mode == ExtraResidencyMode::Navigation)
+	if (maintainRange)
 	{
-		ensureWarmExtras();
+		const auto work = mExtraResidency.workFor(key);
 
-		// Keep teardown work out of the system transition.
-		if (isAnimationPlaying(0))
-			return;
+		if (work == ExtraTracker::Work::None)
+			return true;
+
+		if (work == ExtraTracker::Work::Prepare)
+		{
+			if (mode == ExtraResidencyMode::Navigation)
+				ensureWarmExtras();
+			else
+				prepareExtras(mCarousel.getCursorIndex(), false);
+
+			// Prepare artwork now; wait for cleanup if needed.
+			mExtraResidency.complete(key, true);
+		}
+
+		if (!allowRelease ||
+			isAnimationPlaying(0) ||
+			mCarousel.getScrollingVelocity() != 0 ||
+			TextureResource::getQueueSize() != 0)
+		{
+			return false;
+		}
 
 		collectExtraResidencyEntries(retainEntries, EXTRA_RETAIN_PADDING);
 	}
+	else
+	{
+		// Force a fresh cleanup even if the browsing state hasn't changed.
+		mExtraResidency.invalidate();
+	}
 
-	for (int index = 0; index < (int)mEntries.size(); index++)
+	for (int index = 0; index < static_cast<int>(mEntries.size()); ++index)
 	{
 		auto& entry = mEntries[index];
 
-		if (!entry.extrasLoaded || entry.backgroundExtras.empty() || retainEntries.count(index) != 0)
+		if (!entry.extrasLoaded || entry.backgroundExtras.empty() ||
+			retainEntries.count(index) != 0)
+		{
 			continue;
+		}
 
-		// Release only hidden trees whose playlist state is preserved.
+		// Only release hidden views if their playlist state can be restored.
 		bool canRelease = true;
 		for (auto extra : entry.backgroundExtras)
 		{
@@ -907,8 +1003,18 @@ void SystemView::updateExtraResidency(ExtraResidencyMode mode)
 
 		// Release one per update, or all eligible extras at game launch.
 		if (mode != ExtraResidencyMode::GameLaunch)
-			break;
+		{
+			if (maintainRange)
+				mExtraResidency.complete(key, true);
+
+			return false;
+		}
 	}
+
+	if (maintainRange)
+		mExtraResidency.complete(key, false);
+
+	return true;
 }
 
 void SystemView::update(int deltaTime)
@@ -1159,6 +1265,9 @@ void SystemView::onCursorChanged(const CursorState& state)
 		activateExtras(mCursor);
 	}
 
+	stopAnimation(0);
+	mWindow->normalizeNextUpdate();
+
 	setAnimation(anim, 0, [this, mCursor, lockExtraChanges]
 		{
 			if (!lockExtraChanges)
@@ -1187,6 +1296,8 @@ void SystemView::render(const Transform4x4f& parentTrans)
 	if (!Renderer::isVisibleOnScreen(rect))
 		return;
 
+	const bool loaderWasIdle = TextureResource::getQueueSize() == 0;
+
 	auto carouselZindex = mCarousel.getZIndex();
 	auto systemInfoZIndex = mSystemInfo.getZIndex();
 	auto minMax = std::minmax(carouselZindex, systemInfoZIndex);
@@ -1209,6 +1320,8 @@ void SystemView::render(const Transform4x4f& parentTrans)
 		renderInfoBar(trans);
 
 	renderExtras(trans, minMax.second, INT16_MAX);
+
+	updateExtraResidency(ExtraResidencyMode::Navigation, loaderWasIdle);
 }
 
 std::vector<HelpPrompt> SystemView::getHelpPrompts()
@@ -1398,62 +1511,6 @@ void SystemView::setExtraRequired(SystemViewData& data, bool required)
 
 		if (texture != nullptr)
 			texture->setRequired(required, image);
-	}
-}
-
-void SystemView::ensureTexture(GuiComponent* extra, TextureLoadMode mode)
-{
-	if (extra == nullptr)
-		return;
-
-	ImageComponent* image = dynamic_cast<ImageComponent*>(extra);
-	if (image != nullptr)
-	{
-		auto tex = image->getTexture();
-		if (tex != nullptr && !tex->isLoaded())
-			tex->reload(mode);
-	}
-
-	for (auto child : extra->enumerateExtraChildrens())
-	{
-		image = dynamic_cast<ImageComponent*>(child);
-		if (image != nullptr)
-		{
-			auto tex = image->getTexture();
-			if (tex == nullptr)
-				continue;
-
-			tex->reload(mode);
-		}
-	}
-}
-
-void SystemView::preloadExtraNeighbours(int cursor)
-{
-	// Make sure near textures are in at top position & will be released last if VRAM is required
-	int distances[] = { -2, 2, -1, 1, 0 };
-
-	for (int dx = 0; dx < 5; dx++)
-	{
-		int i = cursor + distances[dx];
-		int index = i % (int)mEntries.size();
-		if (index < 0)
-			index += (int)mEntries.size();
-
-		TextureLoadMode loadMode = abs(distances[dx]) <= 1 ? TextureLoadMode::STANDARD : TextureLoadMode::LOADNOMOVETOTOP;
-
-		auto carousel = mCarousel.asCarousel();
-		if (carousel)
-		{
-			auto logo = carousel->getLogo(index);
-			if (logo)
-				ensureTexture(logo.get(), loadMode);
-		}
-
-		ensureExtras(index);
-		SystemViewData& entry = mEntries.at(index);
-		for (auto extra : entry.backgroundExtras)
-			ensureTexture(extra, loadMode);
 	}
 }
 
@@ -1749,12 +1806,13 @@ void SystemView::getCarouselFromTheme(const ThemeData::ThemeElement* elem)
 
 void SystemView::onShow()
 {
-	GuiComponent::onShow();
+	mExtraResidency.invalidate();
 
-	ensureWarmExtras();
+	GuiComponent::onShow();
 	mCarousel.onShow();
 
 	activateExtras(mCarousel.getCursorIndex());
+	updateExtraResidency(ExtraResidencyMode::Navigation, false);
 
 	for (auto sb : mStaticBackgrounds)
 		sb->onShow();
@@ -1765,6 +1823,12 @@ void SystemView::onShow()
 
 void SystemView::onHide()
 {
+	mExtraResidency.invalidate();
+
+	finishAnimation(0);
+	cancelAnimation(1);
+	cancelAnimation(2);
+
 	GuiComponent::onHide();
 
 	mCarousel.onHide();
@@ -1819,9 +1883,6 @@ void SystemView::activateExtras(int cursor, bool activate)
 
 	bool show = activate && isShowing() && !mScreensaverActive && !mDisable;
 
-	if (show)
-		preloadExtraNeighbours(cursor);
-
 	SystemViewData& data = mEntries.at(cursor);
 	for (unsigned int j = 0; j < data.backgroundExtras.size(); j++)
 	{
@@ -1829,7 +1890,6 @@ void SystemView::activateExtras(int cursor, bool activate)
 
 		if (show && activate)
 		{
-			ensureTexture(extra, TextureLoadMode::STANDARD);
 			extra->onShow();
 		}
 		else

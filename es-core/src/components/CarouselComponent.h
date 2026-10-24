@@ -4,10 +4,13 @@
 
 #include "components/IList.h"
 #include "components/TextComponent.h"
+#include "components/ArtworkResidencyTracker.h"
 #include "resources/Font.h"
 #include "GuiComponent.h"
 #include <memory>
 #include <functional>
+#include <set>
+#include <tuple>
 
 class ThemeData;
 class IBindable;
@@ -98,6 +101,13 @@ public:
 
 	int getLastCursor() { return mLastCursor; }
 	void getActiveRange(int& first, int& last);
+
+	bool visitArtworkChildren(const std::function<bool(GuiComponent*)>& visitor) override;
+	bool prepareHiddenArtwork();
+	void releaseHiddenArtwork();
+	void releaseArtwork() override;
+
+	bool setHiddenCursor(IBindable* object);
 	void resetLastCursor() { mLastCursor = -1; }
 
 	virtual bool onMouseClick(int button, bool pressed, int x, int y) override;
@@ -126,7 +136,16 @@ private:
 	void renderCarousel(const Transform4x4f& parentTrans);	
 	
 	void ensureLogo(IList<CarouselComponentData, IBindable*>::Entry& entry);
-	void ensureLogos();
+	bool updateArtworkResidency(bool allowRelease = false, bool prepareHidden = false);
+	void getLogoRange(float offset, int& first, int& last);
+	std::shared_ptr<GuiComponent> retainLogo(int index);
+
+	using ArtworkResidencyKey = std::tuple<int, int, int, int, bool, bool>;
+	using ArtworkTracker = ArtworkResidencyTracker<ArtworkResidencyKey>;
+
+	ArtworkTracker mArtworkResidency;
+
+	std::set<std::shared_ptr<GuiComponent>> mResidentLogos;
 
 	// unit is list index
 	float mCamOffset;

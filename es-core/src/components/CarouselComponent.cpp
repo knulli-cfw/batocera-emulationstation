@@ -9,6 +9,8 @@
 #include "Log.h"
 #include "BindingManager.h"
 #include <unordered_set>
+#include <cmath>
+#include "resources/TextureResource.h"
 
 // buffer values for scrolling velocity (left, stopped, right)
 const int logoBuffersLeft[] = { -5, -2, -1 };
@@ -68,6 +70,10 @@ CarouselComponent::~CarouselComponent()
 
 void CarouselComponent::clearEntries()
 {
+	mArtworkResidency.invalidate();
+	cancelAnimation(0);
+	mResidentLogos.clear();
+
 	mWasRendered = false;
 	mEntries.clear();
 }
@@ -169,6 +175,11 @@ bool CarouselComponent::input(InputConfig* config, Input input)
 
 void CarouselComponent::getActiveRange(int& first, int& last)
 {
+	getLogoRange(mCamOffset, first, last);
+}
+
+void CarouselComponent::getLogoRange(float offset, int& first, int& last)
+{
 	const int entryCount = (int)mEntries.size();
 
 	if (entryCount == 0)
@@ -178,14 +189,16 @@ void CarouselComponent::getActiveRange(int& first, int& last)
 		return;
 	}
 
-	const int center = (int)mCamOffset;
+	const int center = (int)std::floor(offset);
 	const int logoCount = Math::min(mMaxLogoCount, entryCount);
 
-	int bufferIndex = Math::max(0, Math::min(2, getScrollingVelocity() + 1));
+	int bufferIndex =
+		Math::max(0, Math::min(2, getScrollingVelocity() + 1));
+
 	int bufferLeft = logoBuffersLeft[bufferIndex];
 	int bufferRight = logoBuffersRight[bufferIndex];
 
-	if (logoCount == 1 && mCamOffset == 0)
+	if (logoCount == 1 && offset == 0)
 	{
 		bufferLeft = 0;
 		bufferRight = 0;
@@ -197,6 +210,11 @@ void CarouselComponent::getActiveRange(int& first, int& last)
 
 void CarouselComponent::update(int deltaTime)
 {
+	if (!isShowing())
+		return;
+
+	updateArtworkResidency();
+
 	if (!mEntries.empty())
 	{
 		const int entryCount = (int)mEntries.size();
@@ -229,7 +247,7 @@ void CarouselComponent::update(int deltaTime)
 		{
 			const std::shared_ptr<GuiComponent>& comp = mEntries.at(index).data.logo;
 
-			if (comp != nullptr)
+			if (comp != nullptr && comp->isShowing())
 				comp->update(deltaTime);
 		}
 	}
@@ -237,10 +255,18 @@ void CarouselComponent::update(int deltaTime)
 	listUpdate(deltaTime);
 
 	GuiComponent::update(deltaTime);
+	updateArtworkResidency();
 }
 
 void CarouselComponent::onCursorChanged(const CursorState& state)
 {
+	if (mEntries.empty())
+	{
+		cancelAnimation(0);
+		mResidentLogos.clear();
+		return;
+	}
+
 	// update help style
 	updateHelpPrompts();
 
@@ -289,7 +315,13 @@ void CarouselComponent::onCursorChanged(const CursorState& state)
 	if (!mScrollSound.empty())
 		Sound::get(mScrollSound)->play();
 
-	ensureLogos();
+	Animation* anim;
+	bool move_carousel = Settings::getInstance()->getBool("MoveCarousel");
+
+	if (Settings::PowerSaverMode() == "instant")
+		move_carousel = false;
+
+	cancelAnimation(0);
 
 	int oldCursor = mLastCursor;
 	
@@ -333,14 +365,9 @@ void CarouselComponent::onCursorChanged(const CursorState& state)
 			continue;
 
 		auto logo = mEntries.at(i).data.logo;
-		if (logo && logo->selectStoryboard("scroll"))
+		if (logo && logo->isShowing() && logo->selectStoryboard("scroll"))
 			logo->startStoryboard();
 	}
-
-	Animation* anim;
-	bool move_carousel = Settings::getInstance()->getBool("MoveCarousel");
-	if (Settings::PowerSaverMode() == "instant")
-		move_carousel = false;
 
 	if (transition_style == "fade" || transition_style == "fade & slide")
 	{
@@ -385,7 +412,13 @@ void CarouselComponent::onCursorChanged(const CursorState& state)
 	mLastCursor = mCursor;
 	mLastCursorState = state;
 
-	setAnimation(anim, 0);
+	mWindow->normalizeNextUpdate();
+
+	setAnimation(anim, 0, [this] {
+		updateArtworkResidency();
+	});
+
+	updateArtworkResidency();
 }
 
 void CarouselComponent::render(const Transform4x4f& parentTrans)
@@ -399,6 +432,8 @@ void CarouselComponent::render(const Transform4x4f& parentTrans)
 	if (!Renderer::isVisibleOnScreen(rect))
 		return;
 
+	const bool loaderWasIdle = TextureResource::getQueueSize() == 0;
+
 	Renderer::pushClipRect(rect);
 	renderCarousel(trans);
 	Renderer::popClipRect();
@@ -408,6 +443,8 @@ void CarouselComponent::render(const Transform4x4f& parentTrans)
 		mWasRendered = true;
 		onShow();
 	}
+
+	updateArtworkResidency(loaderWasIdle);
 }
 
 std::vector<HelpPrompt> CarouselComponent::getHelpPrompts()
@@ -430,30 +467,196 @@ void CarouselComponent::setDefaultBackground(unsigned int color, unsigned int co
 }
 
 //  Render system carousel
-void CarouselComponent::ensureLogos()
+std::shared_ptr<GuiComponent> CarouselComponent::retainLogo(int index)
 {
-	if (mEntries.size() == 0)
+	const int count = (int)mEntries.size();
+	index = (index % count + count) % count;
+
+	auto& entry = mEntries[index];
+	ensureLogo(entry);
+
+	if (mResidentLogos.insert(entry.data.logo).second)
+	{
+		mArtworkResidency.invalidate();
+		entry.data.logo->preloadArtwork(false);
+	}
+
+	return entry.data.logo;
+}
+
+bool CarouselComponent::setHiddenCursor(IBindable* object)
+{
+	if (isShowing())
+		return false;
+
+	auto entry = findEntry(object);
+	if (entry == mEntries.end())
+		return false;
+
+	cancelAnimation(0);
+	cancelAnimation(1);
+	cancelAnimation(2);
+
+	// Stop scrolling without triggering a cursor change.
+	mScrollVelocity = 0;
+	listInput(0);
+	mTitleOverlayOpacity = 0;
+
+	mCursor = static_cast<int>(entry - mEntries.begin());
+	mCamOffset = static_cast<float>(mCursor);
+	mLastCursor = mCursor;
+	mLastCursorState = CURSOR_STOPPED;
+
+	mPressedCursor = -1;
+
+	return true;
+}
+
+bool CarouselComponent::visitArtworkChildren(
+	const std::function<bool(GuiComponent*)>& visitor)
+{
+	if (!GuiComponent::visitArtworkChildren(visitor))
+		return false;
+
+	for (const auto& entry : mEntries)
+	{
+		if (entry.data.logo && !visitor(entry.data.logo.get()))
+			return false;
+	}
+
+	return true;
+}
+
+void CarouselComponent::releaseArtwork()
+{
+	if (isShowing())
 		return;
 
-	int center = mCursor;
-	int logoCount = Math::min(mMaxLogoCount, (int)mEntries.size());
-	int bufferLeft = logoBuffersLeft[0];
-	int bufferRight = logoBuffersRight[0];
+	GuiComponent::releaseArtwork();
 
-	if (logoCount == 1)
+	mResidentLogos.clear();
+	mArtworkResidency.invalidate();
+}
+
+void CarouselComponent::releaseHiddenArtwork()
+{
+	releaseArtwork();
+}
+
+bool CarouselComponent::prepareHiddenArtwork()
+{
+	if (isShowing())
+		return false;
+
+	return updateArtworkResidency(true, true);
+}
+
+bool CarouselComponent::updateArtworkResidency(bool allowRelease, bool prepareHidden)
+{
+	if (mEntries.empty())
 	{
-		bufferLeft = 0;
-		bufferRight = 0;
+		mArtworkResidency.invalidate();
+		return true;
 	}
 
-	for (int i = center - logoCount / 2 + bufferLeft; i <= center + logoCount / 2 + bufferRight; i++)
-	{
-		int index = i % (int)mEntries.size();
-		if (index < 0)
-			index += (int)mEntries.size();
+	const int count = static_cast<int>(mEntries.size());
+	const bool showing = isShowing();
 
-		ensureLogo(mEntries.at(index));
+	int first, last;
+	getActiveRange(first, last);
+
+	const auto key = std::make_tuple(first, last, count, mCursor, showing, prepareHidden);
+	const auto work = mArtworkResidency.workFor(key);
+
+	if (work == ArtworkTracker::Work::None)
+		return true;
+
+	bool canRelease = allowRelease &&
+		(showing || prepareHidden) &&
+		!isAnimationPlaying(0) &&
+		getScrollingVelocity() == 0 &&
+		TextureResource::getQueueSize() == 0;
+
+	// Prepare the new range even if cleanup has to wait.
+	if (work == ArtworkTracker::Work::Cleanup && !canRelease)
+		return false;
+
+	std::set<std::shared_ptr<GuiComponent>> visible;
+	std::set<std::shared_ptr<GuiComponent>> retained;
+
+	if (showing)
+	{
+		const int warmCount = std::min(last - first + 5, count);
+
+		for (int offset = 0; offset < warmCount; ++offset)
+			retainLogo(first - 2 + offset);
 	}
+
+	if (showing || prepareHidden)
+	{
+		const int activeCount = std::min(last - first + 1, count);
+
+		for (int offset = 0; offset < activeCount; ++offset)
+		{
+			auto logo = retainLogo(first + offset);
+
+			if (showing)
+			{
+				if (work == ArtworkTracker::Work::Prepare)
+					logo->preloadArtwork(true);
+
+				visible.insert(logo);
+			}
+		}
+	}
+
+	const int retainCount = std::min(last - first + 9, count);
+
+	for (int offset = 0; offset < retainCount; ++offset)
+	{
+		const int index = ((first - 4 + offset) % count + count) % count;
+
+		if (mEntries[index].data.logo)
+			retained.insert(mEntries[index].data.logo);
+	}
+
+	// Check again since preparing the range may have queued more artwork.
+	if (canRelease)
+		canRelease = TextureResource::getQueueSize() == 0;
+
+	bool cleanupPending = false;
+
+	for (auto it = mResidentLogos.begin(); it != mResidentLogos.end(); )
+	{
+		auto logo = *it;
+
+		if (visible.count(logo))
+		{
+			if (!logo->isShowing())
+				logo->onShow();
+		}
+		else if (logo->isShowing())
+		{
+			logo->onHide();
+		}
+
+		if (canRelease && !retained.count(logo))
+		{
+			logo->releaseArtwork();
+			it = mResidentLogos.erase(it);
+			canRelease = false;
+		}
+		else
+		{
+			if (!retained.count(logo))
+				cleanupPending = true;
+
+			++it;
+		}
+	}
+
+	mArtworkResidency.complete(key, cleanupPending);
+	return !cleanupPending;
 }
 
 //  Render system carousel
@@ -559,7 +762,7 @@ void CarouselComponent::renderCarousel(const Transform4x4f& trans)
 		int opacity = (int)Math::round(opref + ((0xFF - opref) * (1.0f - fabs(distance))));
 		opacity = Math::max((int)opref, opacity);
 
-		ensureLogo(mEntries.at(index));
+		retainLogo(index);
 
 		const std::shared_ptr<GuiComponent> &comp = mEntries.at(index).data.logo;
 		if (mType == CarouselType::VERTICAL_WHEEL || mType == CarouselType::HORIZONTAL_WHEEL)
@@ -689,22 +892,17 @@ void CarouselComponent::getCarouselFromTheme(const ThemeData::ThemeElement* elem
 
 void CarouselComponent::onShow()
 {
-	GuiComponent::onShow();		
+	mArtworkResidency.invalidate();
+	GuiComponent::onShow();
+	updateArtworkResidency();
 
 	if (!mWasRendered)
 	{
-		// If it's not rendered yet, every logo is null. Do defer storyboarding to the 1st render()
+		// Start the storyboards on the first render.
 		return;
 	}
 
 	bool cursorStoryboardSet = false;
-
-	for (int i = 0; i < mEntries.size(); i++)
-	{
-		auto logo = mEntries.at(i).data.logo;
-		if (logo)
-			logo->isShowing() = true;
-	}
 
 	if (mCursor >= 0 && mCursor < mEntries.size())
 	{
@@ -732,21 +930,20 @@ void CarouselComponent::onShow()
 			continue;
 
 		auto logo = mEntries.at(i).data.logo;
-		if (logo && (logo->selectStoryboard("scroll") || logo->selectStoryboard()))
+		if (logo && logo->isShowing() && (logo->selectStoryboard("scroll") || logo->selectStoryboard()))
 			logo->startStoryboard();
 	}
 }
 
 void CarouselComponent::onHide()
 {
-	GuiComponent::onHide();	
+	mArtworkResidency.invalidate();
+	GuiComponent::onHide();
 
-	for (int i = 0; i < mEntries.size(); i++)
-	{
-		auto logo = mEntries.at(i).data.logo;
-		if (logo)
-			logo->isShowing() = false;
-	}
+	cancelAnimation(0);
+	mCamOffset = (float)mCursor;
+
+	updateArtworkResidency();
 }
 
 void CarouselComponent::onScreenSaverActivate()
@@ -904,6 +1101,7 @@ void CarouselComponent::add(const std::string& name, IBindable* obj, bool preloa
 
 void CarouselComponent::applyTheme(const std::shared_ptr<ThemeData>& theme, const std::string& view, const std::string& element, unsigned int properties)
 {
+	mArtworkResidency.invalidate();
 	mTheme = theme;
 	mThemeViewName = view;
 

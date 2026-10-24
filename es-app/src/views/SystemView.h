@@ -11,12 +11,14 @@
 #include "components/CarouselComponent.h"
 #include "components/TextListComponent.h"
 #include "components/ImageGridComponent.h"
+#include "components/ArtworkResidencyTracker.h"
 
 #include <memory>
 #include <functional>
 #include <map>
 #include <unordered_set>
 #include <vector>
+#include <tuple>
 
 #include "SystemViewControlWrapper.h"
 
@@ -51,8 +53,12 @@ public:
 	void onThemeChanged(const std::shared_ptr<ThemeData>& theme);
 	void reloadTheme(SystemData* system);
 
-	void releaseExtrasForGameLaunch() { updateExtraResidency(ExtraResidencyMode::GameLaunch); }
-	void releaseHiddenExtras() { updateExtraResidency(ExtraResidencyMode::Hidden); }
+	void releaseExtrasForGameLaunch();
+	void prepareHiddenSystem(SystemData* system);
+	void releaseHiddenExtras()
+	{
+		updateExtraResidency(ExtraResidencyMode::Hidden);
+	}
 
 	SystemData* getActiveSystem();
 
@@ -92,27 +98,32 @@ private:
 	{
 		Navigation,
 		Hidden,
+		HiddenPrepared,
 		GameLaunch
 	};
+
+	using ExtraResidencyKey = std::tuple<int, int, int, int, int, ExtraResidencyMode>;
+	using ExtraTracker = ArtworkResidencyTracker<ExtraResidencyKey>;
+
+	ExtraTracker mExtraResidency;
 
 	void	 loadExtras(SystemData* system, bool preservePlaylists = false);
 	void	 saveExtraPlaylists(SystemViewData& entry);
 	void	 ensureExtras(int index);
+	void	 prepareExtras(int index, bool prioritize);
 	void	 ensureWarmExtras();
 	void	 releaseExtras(SystemViewData& entry);
-	void	 ensureTexture(GuiComponent* extra, TextureLoadMode mode = TextureLoadMode::LOADNOMOVETOTOP);
 
 	void	 updateExtraTextBinding();
 	void	 showQuickSearch();
 
-	void	 preloadExtraNeighbours(int cursor);
 	void	 setExtraRequired(SystemViewData& data, bool required);
 
 	void	 activateExtras(int cursor, bool activate = true);	
 	void	 updateExtras(const std::function<void(GuiComponent*)>& func);
 	void	 collectExtraUpdateEntries(std::unordered_set<int>& entries);
 	void	 collectExtraResidencyEntries(std::unordered_set<int>& entries, int padding);
-	void	 updateExtraResidency(ExtraResidencyMode mode);
+	bool	 updateExtraResidency(ExtraResidencyMode mode, bool allowRelease = false);
 	void	 clearEntries();
 
 	int		 moveCursorFast(bool forward = true);

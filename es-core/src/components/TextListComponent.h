@@ -9,12 +9,14 @@
 #include "Sound.h"
 #include <memory>
 #include "components/ScrollbarComponent.h"
+#include "components/ArtworkResidencyTracker.h"
 #include "Settings.h"
 #include "Window.h"
 #include "InputManager.h"
 #include "utils/Delegate.h"
 #include "CarouselComponent.h"
 #include "BindingManager.h"
+#include <tuple>
 
 #define HOLD_TIME 1000
 
@@ -73,6 +75,12 @@ public:
 
 	void add(const std::string& name, const T& obj, unsigned int colorId);
 
+	void clear() override
+	{
+		mArtworkResidency.invalidate();
+		IList<TextListData, T>::clear();
+	}
+
 	enum Alignment
 	{
 		ALIGN_LEFT,
@@ -88,6 +96,8 @@ public:
 
 	inline void setFont(const std::shared_ptr<Font>& font)
 	{
+		mArtworkResidency.invalidate();
+
 		mFont = font;
 		for (auto it = mEntries.begin(); it != mEntries.end(); it++)
 			it->data.textCache.reset();
@@ -107,7 +117,11 @@ public:
 	inline void setSelectorColorGradientHorizontal(bool horizontal) { mSelectorColorGradientHorizontal = horizontal; }
 	inline void setSelectedColor(unsigned int color) { mSelectedColor = color; }
 	inline void setColor(unsigned int id, unsigned int color) { mColors[id] = color; }
-	inline void setLineSpacing(float lineSpacing) { mLineSpacing = lineSpacing; }
+	inline void setLineSpacing(float lineSpacing)
+	{
+		mLineSpacing = lineSpacing;
+		mArtworkResidency.invalidate();
+	}
 	inline void setBonusTextColor(unsigned int color) { mBonusColor = color; mHasBonusColor = true; }
 	inline void setBonusSelectedTextColor(unsigned int color) { mBonusSelectedColor = color; mHasBonusSelectedColor = true; }
 
@@ -128,7 +142,14 @@ public:
 			(int)(mSize.y() / rowHeight);
 	}
 
-	void getActiveRange(int& first, int& last) const;
+	void getActiveRange(int& first, int& last, int padding = 2) const;
+
+	bool setHiddenCursor(const T& object);
+
+	bool visitArtworkChildren(const std::function<bool(GuiComponent*)>& visitor) override;
+	bool prepareHiddenArtwork();
+	void releaseHiddenArtwork();
+	void releaseArtwork() override;
 
 	virtual bool onMouseClick(int button, bool pressed, int x, int y) override;
 	virtual void onMouseMove(int x, int y) override;
@@ -143,6 +164,13 @@ protected:
 
 private:
 	void  updateCameraOffset();
+	std::shared_ptr<GuiComponent> retainItemTemplate(int index);
+
+	bool updateArtworkResidency(bool prepareHidden = false);
+	using ArtworkResidencyKey = std::tuple<int, int, int, bool>;
+	using ArtworkTracker = ArtworkResidencyTracker<ArtworkResidencyKey>;
+	ArtworkTracker mArtworkResidency;
+
 	float getRowHeight() const;
 	float getTotalRowHeight() const;
 
@@ -252,6 +280,210 @@ TextListComponent<T>::TextListComponent(Window* window) :
 }
 
 template <typename T>
+std::shared_ptr<GuiComponent> TextListComponent<T>::retainItemTemplate(int index)
+{
+	if (index < 0 || index >= static_cast<int>(mEntries.size()))
+		return nullptr;
+
+	auto& entry = mEntries[index];
+
+	if (entry.data.itemTemplate)
+		return entry.data.itemTemplate;
+
+	if (mItemTemplate.type.empty())
+		return nullptr;
+
+	auto bindable = getBindable(entry);
+	if (bindable == nullptr)
+		return nullptr;
+
+	auto templ = std::make_shared<CarouselItemTemplate>(entry.name, mWindow);
+	templ->setScaleOrigin(0.0f);
+	templ->setSize(mSize.x(), getRowHeight());
+	templ->isShowing() = isShowing();
+	templ->setAmbientOpacity(getOpacity());
+	templ->loadTemplatedChildren(&mItemTemplate);
+	templ->updateBindings(bindable);
+
+	entry.data.itemTemplate = templ;
+	return templ;
+}
+
+template <typename T>
+bool TextListComponent<T>::setHiddenCursor(const T& object)
+{
+	if (isShowing())
+		return false;
+
+	const auto entry = this->findEntry(object);
+	if (entry == mEntries.end())
+		return false;
+
+	// Reset scrolling without triggering a selection callback.
+	mScrollVelocity = 0;
+	listInput(0);
+	this->mTitleOverlayOpacity = 0;
+
+	mCursor = static_cast<int>(entry - mEntries.begin());
+	updateCameraOffset();
+
+	mLastCursor = mCursor;
+	mLastCursorState = CURSOR_STOPPED;
+
+	mMarqueeOffset = 0;
+	mMarqueeOffset2 = 0;
+	mMarqueeTime = 0;
+
+	mHotRow = -1;
+	mPressedRow = -1;
+	mPressedPoint = Vector2i(-1, -1);
+	mTimeHoldingButton = -1;
+
+	mArtworkResidency.invalidate();
+	return true;
+}
+
+template <typename T>
+bool TextListComponent<T>::prepareHiddenArtwork()
+{
+	if (isShowing())
+		return false;
+
+	if (mEntries.empty())
+		return true;
+
+	mSelectorImage.preloadArtwork(false);
+	return updateArtworkResidency(true);
+}
+
+template<typename T>
+bool TextListComponent<T>::visitArtworkChildren(
+	const std::function<bool(GuiComponent*)>& visitor)
+{
+	if (!GuiComponent::visitArtworkChildren(visitor))
+		return false;
+
+	if (!visitor(&mSelectorImage) || !visitor(&mScrollbar))
+		return false;
+
+	for (const auto& entry : mEntries)
+	{
+		if (entry.data.itemTemplate &&
+			!visitor(entry.data.itemTemplate.get()))
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+template<typename T>
+void TextListComponent<T>::releaseArtwork()
+{
+	if (isShowing())
+		return;
+
+	GuiComponent::releaseArtwork();
+	mArtworkResidency.invalidate();
+}
+
+template<typename T>
+void TextListComponent<T>::releaseHiddenArtwork()
+{
+	releaseArtwork();
+}
+
+template <typename T>
+bool TextListComponent<T>::updateArtworkResidency(bool prepareHidden)
+{
+	const bool showing = isShowing();
+
+	if (!showing && !prepareHidden)
+		return false;
+
+	if (mEntries.empty() || mItemTemplate.type.empty())
+	{
+		mArtworkResidency.invalidate();
+		return true;
+	}
+
+	if (getRowHeight() <= 0.0f)
+		return false;
+
+	int first;
+	int last;
+	getActiveRange(first, last, showing ? 2 : 0);
+
+	const ArtworkResidencyKey key = std::make_tuple(first, last, static_cast<int>(mEntries.size()), showing);
+
+	if (mArtworkResidency.workFor(key) == ArtworkTracker::Work::None)
+		return true;
+
+	int retainFirst;
+	int retainLast;
+	getActiveRange(retainFirst, retainLast, 4);
+
+	for (int index = 0; index < static_cast<int>(mEntries.size()); ++index)
+	{
+		auto& entry = mEntries[index];
+
+		if (index < first || index > last)
+		{
+			auto& templ = entry.data.itemTemplate;
+			if (!templ)
+				continue;
+
+			if (templ->isShowing())
+				templ->onHide();
+
+			templ->setVisible(false);
+
+			// Release artwork without resetting the component or playlist.
+			if (index < retainFirst || index > retainLast)
+				templ->releaseArtwork();
+
+			continue;
+		}
+
+		const bool newlyCreated = !entry.data.itemTemplate;
+		auto templ = retainItemTemplate(index);
+		if (!templ)
+			continue;
+
+		templ->setVisible(true);
+
+		if (showing)
+		{
+			const bool entering = newlyCreated || !templ->isShowing();
+
+			if (!templ->isShowing())
+				templ->onShow();
+
+			if (entering)
+			{
+				const char* storyboard = index == mCursor ? "activate" : "deactivate";
+
+				if (templ->selectStoryboard(storyboard) || templ->selectStoryboard())
+				{
+					templ->startStoryboard();
+					templ->update(0);
+				}
+			}
+		}
+		else if (templ->isShowing())
+		{
+			templ->onHide();
+		}
+
+		templ->preloadArtwork(showing);
+	}
+
+	mArtworkResidency.complete(key, false);
+	return true;
+}
+
+template <typename T>
 void TextListComponent<T>::render(const Transform4x4f& parentTrans)
 {
 	Transform4x4f trans = parentTrans * getTransform();
@@ -287,13 +519,14 @@ void TextListComponent<T>::render(const Transform4x4f& parentTrans)
 
 	if (!mItemTemplate.type.empty())
 	{
-		getActiveRange(startEntry, lastEntry);
+		updateArtworkResidency(!isShowing());
+		getActiveRange(startEntry, lastEntry, isShowing() ? 2 : 0);
 
 		// Render uses an exclusive end.
 		lastEntry++;
 
-		loopStart = 0;
-		loopEnd = mEntries.size();
+		loopStart = startEntry;
+		loopEnd = lastEntry;
 	}
 
 	Renderer::pushClipRect(rect);
@@ -304,43 +537,6 @@ void TextListComponent<T>::render(const Transform4x4f& parentTrans)
 	{
 		typename IList<TextListData, T>::Entry& entry = mEntries.at((unsigned int)i);
 
-		if (i < startEntry || i >= lastEntry)
-		{
-			if (entry.data.itemTemplate)
-			{
-				if (entry.data.itemTemplate->isShowing())
-					entry.data.itemTemplate->onHide();
-
-				if (entry.data.itemTemplate->isVisible())
-					entry.data.itemTemplate->setVisible(false);
-			}
-
-			continue;
-		}
-
-		if (!entry.data.itemTemplate && !mItemTemplate.type.empty())
-		{
-			auto bindable = getBindable(entry);
-			if (bindable != nullptr)
-			{
-				CarouselItemTemplate* templ = new CarouselItemTemplate(entry.name, mWindow);
-				templ->setScaleOrigin(0.0f);
-				templ->setSize(mSize.x(), entrySize);
-				templ->isShowing() = isShowing();
-				templ->setAmbientOpacity(getOpacity());
-				templ->loadTemplatedChildren(&mItemTemplate);
-				templ->updateBindings(bindable);
-
-				entry.data.itemTemplate = std::shared_ptr<GuiComponent>(templ);
-
-				if (mCursor == i && (entry.data.itemTemplate->selectStoryboard("activate") || entry.data.itemTemplate->selectStoryboard()))
-				{
-					entry.data.itemTemplate->startStoryboard();
-					entry.data.itemTemplate->update(0);
-				}
-			}
-		}
-		
 		if (entry.data.itemTemplate)
 		{
 			if (!entry.data.itemTemplate->isVisible())
@@ -595,6 +791,8 @@ void TextListComponent<T>::update(int deltaTime)
 template <typename T>
 void TextListComponent<T>::add(const std::string& name, const T& obj, unsigned int color)
 {
+	mArtworkResidency.invalidate();
+
 	assert(color < COLOR_ID_COUNT);
 
 	typename IList<TextListData, T>::Entry entry;
@@ -607,6 +805,8 @@ void TextListComponent<T>::add(const std::string& name, const T& obj, unsigned i
 template <typename T>
 void TextListComponent<T>::onSizeChanged()
 {
+	mArtworkResidency.invalidate();
+
 	IList<TextListData, T>::onSizeChanged();
 	updateCameraOffset();
 }
@@ -644,7 +844,7 @@ float TextListComponent<T>::getTotalRowHeight() const
 }
 
 template <typename T>
-void TextListComponent<T>::getActiveRange(int& first, int& last) const
+void TextListComponent<T>::getActiveRange(int& first, int& last, int padding) const
 {
 	if (mEntries.empty())
 	{
@@ -665,11 +865,11 @@ void TextListComponent<T>::getActiveRange(int& first, int& last) const
 	const int firstVisible = (int)(mCameraOffset / rowHeight);
 	const int visibleCount = Math::max(1, getVisibleItemCount());
 
-	// Include nearby rows for smooth scrolling.
-	first = Math::max(0, firstVisible - 2);
+	// Keep the trailing row for partially visible items.
+	first = Math::max(0, firstVisible - padding);
 	last = Math::min(
-		(int)mEntries.size() - 1,
-		firstVisible + visibleCount + 2);
+		static_cast<int>(mEntries.size()) - 1,
+		firstVisible + visibleCount + padding);
 }
 
 template <typename T>
@@ -722,6 +922,8 @@ void TextListComponent<T>::onCursorChanged(const CursorState& state)
 template <typename T>
 void TextListComponent<T>::applyTheme(const std::shared_ptr<ThemeData>& theme, const std::string& view, const std::string& element, unsigned int properties)
 {
+	mArtworkResidency.invalidate();
+
 	GuiComponent::applyTheme(theme, view, element, properties);
 
 	const ThemeData::ThemeElement* elem = theme->getElement(view, element, "textlist");
@@ -998,15 +1200,9 @@ void TextListComponent<T>::onShow()
 {
 	IList<TextListData, T>::onShow();
 
-	if (!mItemTemplate.type.empty())
-	{
-		for (unsigned int i = 0; i < mEntries.size(); i++)
-		{
-			auto& entry = mEntries.at(i);
-			if (entry.data.itemTemplate)
-				entry.data.itemTemplate->onShow();
-		}
-	}
+	mArtworkResidency.invalidate();
+	mSelectorImage.preloadArtwork(true);
+	updateArtworkResidency();
 
 	mMarqueeOffset = 0;
 	mMarqueeOffset2 = 0;
@@ -1018,6 +1214,8 @@ void TextListComponent<T>::onShow()
 template<typename T>
 void TextListComponent<T>::onHide()
 {
+	mArtworkResidency.invalidate();
+
 	IList<TextListData, T>::onHide();
 
 	if (!mItemTemplate.type.empty())

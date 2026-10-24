@@ -64,6 +64,11 @@ public:
 
 	virtual void onShow() override;
 	virtual void onHide() override;
+
+	bool visitArtworkChildren(const std::function<bool(GuiComponent*)>& visitor) override;
+	void preloadArtwork(bool prioritize = false) override;
+	void releaseArtwork() override;
+
 	virtual void onScreenSaverActivate() override;
 	virtual void onScreenSaverDeactivate() override;
 	virtual void topWindow(bool isTop) override;

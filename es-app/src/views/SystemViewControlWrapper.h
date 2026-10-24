@@ -46,6 +46,49 @@ public:
 		return mGrid;
 	}
 
+	bool supportsHiddenArtwork() const
+	{
+		return mCarousel != nullptr || mGrid != nullptr || mText != nullptr;
+	}
+
+	bool setHiddenCursor(SystemData* system)
+	{
+		if (mCarousel)
+			return mCarousel->setHiddenCursor(system);
+
+		if (mGrid)
+			return mGrid->setHiddenCursor(system);
+
+		if (mText)
+			return mText->setHiddenCursor(system);
+
+		return false;
+	}
+
+	bool prepareHiddenArtwork()
+	{
+		if (mCarousel)
+			return mCarousel->prepareHiddenArtwork();
+
+		if (mGrid)
+			return mGrid->prepareHiddenArtwork();
+
+		if (mText)
+			return mText->prepareHiddenArtwork();
+
+		return false;
+	}
+
+	void releaseHiddenArtwork()
+	{
+		if (mCarousel)
+			mCarousel->releaseHiddenArtwork();
+		else if (mGrid)
+			mGrid->releaseHiddenArtwork();
+		else if (mText)
+			mText->releaseHiddenArtwork();
+	}
+
 	void setCursorChangedCallback(const std::function<void(CursorState state)>& func)
 	{
 		if (mText) mText->setCursorChangedCallback(func);

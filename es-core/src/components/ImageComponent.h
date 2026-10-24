@@ -109,6 +109,8 @@ public:
 
 	void onShow() override;
 	void onHide() override;
+	void preloadArtwork(bool prioritize = false) override;
+	void releaseArtwork() override;
 	void update(int deltaTime) override;
 	void onPaddingChanged() override;
 
@@ -155,6 +157,7 @@ private:
 	void updateColors();
 	void updateRoundCorners();
 	bool watchTextureLoading();
+	void restoreArtwork();
 
 	void fadeIn(bool textureLoaded);
 
@@ -179,6 +182,12 @@ private:
 	bool mAllowFading;
 
 	std::string mPath;
+
+	// Keep the image settings so the artwork can be reloaded.
+	bool mFileImage = false;
+	bool mArtworkReleased = false;
+	bool mImageTiled = false;
+	MaxSizeInfo mImageMaxSize = MaxSizeInfo::Empty;
 
 	Alignment mHorizontalAlignment;
 	Alignment mVerticalAlignment;

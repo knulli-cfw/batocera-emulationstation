@@ -955,6 +955,33 @@ void GuiComponent::onHide()
 		child->onHide();
 }
 
+bool GuiComponent::visitArtworkChildren(
+	const std::function<bool(GuiComponent*)>& visitor)
+{
+	for (auto child : mChildren)
+	{
+		if (!visitor(child))
+			return false;
+	}
+
+	return true;
+}
+
+void GuiComponent::preloadArtwork(bool prioritize)
+{
+	for (auto child : mChildren)
+		child->preloadArtwork(prioritize);
+}
+
+void GuiComponent::releaseArtwork()
+{
+	visitArtworkChildren([](GuiComponent* child)
+	{
+		child->releaseArtwork();
+		return true;
+	});
+}
+
 void GuiComponent::onScreenSaverActivate()
 {
 	for (auto child : mChildren)
