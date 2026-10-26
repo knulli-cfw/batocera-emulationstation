@@ -123,6 +123,7 @@ public:
 	}
 
 private:
+	bool initImage(const unsigned char* fileData, size_t length, int subImageIndex, bool fileBacked);
 	bool			mRequired;
 	std::unordered_set<const void*> mRequiredOwners;
 

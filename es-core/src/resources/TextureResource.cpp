@@ -355,6 +355,11 @@ int TextureResource::getQueueSize()
 	return sTextureDataManager.getQueueSize();
 }
 
+bool TextureResource::isLoadingIdle()
+{
+	return sTextureDataManager.isLoadingIdle();
+}
+
 const Vector2i TextureResource::getSize() const
 {
 	auto data = mTextureData ? mTextureData : sTextureDataManager.get(this, TextureLoadMode::NOLOAD);

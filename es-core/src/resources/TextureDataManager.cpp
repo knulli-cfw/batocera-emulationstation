@@ -379,6 +379,13 @@ int TextureLoader::getQueueSize()
 	return static_cast<int>(mTextureDataQ.size() + mProcessingTextureDataQ.size());
 }
 
+bool TextureLoader::isLoadingIdle()
+{
+	std::unique_lock<std::mutex> lock(mLoaderLock, std::try_to_lock);
+
+	return lock.owns_lock() && mTextureDataQ.empty() && mProcessingTextureDataQ.empty();
+}
+
 void TextureDataManager::suspend()
 {
 	{
@@ -401,6 +408,11 @@ void TextureDataManager::resume()
 int TextureDataManager::getQueueSize()
 {
 	return mLoader ? mLoader->getQueueSize() : 0;
+}
+
+bool TextureDataManager::isLoadingIdle()
+{
+	return mLoader && mLoader->isLoadingIdle();
 }
 
 std::shared_ptr<TextureData> TextureDataManager::getBlankTexture()

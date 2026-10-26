@@ -32,6 +32,7 @@ public:
 	void suspend();
 	void resume();
 	int getQueueSize();
+	bool isLoadingIdle();
 
 	static std::atomic<bool> paused;
 
@@ -98,6 +99,7 @@ public:
 	void suspend();
 	void resume();
 	int getQueueSize();
+	bool isLoadingIdle();
 
 	void cleanupVRAM();
 

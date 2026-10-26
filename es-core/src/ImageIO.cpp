@@ -29,6 +29,39 @@
 
 const MaxSizeInfo MaxSizeInfo::Empty;
 
+MaxSizeInfo ImageIO::getTextureDecodeSize(
+	const MaxSizeInfo& requested, const Vector2i& screenSize, bool optimizeVRAM)
+{
+	if (optimizeVRAM && !requested.empty() && requested.x() < screenSize.x() && requested.y() < screenSize.y())
+	{
+		return requested;
+	}
+
+	return MaxSizeInfo(screenSize.x(), screenSize.y(), false);
+}
+
+Vector2i ImageIO::getRasterOutputSize(
+	const Vector2i& sourceSize, const MaxSizeInfo* maxSize, const Vector2i& screenSize)
+{
+	if (maxSize == nullptr)
+		return sourceSize;
+
+	const int maxX = (int)Math::round(maxSize->x());
+	const int maxY = (int)Math::round(maxSize->y());
+
+	if (maxX <= 0 || maxY <= 0 || (sourceSize.x() <= maxX && sourceSize.y() <= maxY))
+	{
+		return sourceSize;
+	}
+
+	Vector2i output = adjustPictureSize(sourceSize, Vector2i(maxX, maxY), maxSize->externalZoom());
+
+	if (output.x() > screenSize.x() || output.y() > screenSize.y())
+		output = adjustPictureSize(output, screenSize, false);
+
+	return output;
+}
+
 namespace
 {
 	unsigned char* loadStbRGBA(
@@ -64,30 +97,9 @@ namespace
 		if (sourceWidth <= 0 || sourceHeight <= 0 || sourceWidth > maxStride / 4)
 			return nullptr;
 
-		Vector2i target(sourceWidth, sourceHeight);
-
-		const size_t maxX = maxSize == nullptr ?
-			0 : static_cast<size_t>(Math::round(maxSize->x()));
-		const size_t maxY = maxSize == nullptr ?
-			0 : static_cast<size_t>(Math::round(maxSize->y()));
-
-		if (maxSize != nullptr && maxX > 0 && maxY > 0 &&
-			(static_cast<size_t>(sourceWidth) > maxX ||
-			 static_cast<size_t>(sourceHeight) > maxY))
-		{
-			target = ImageIO::adjustPictureSize(
-				Vector2i(sourceWidth, sourceHeight),
-				Vector2i(maxX, maxY), maxSize->externalZoom());
-
-			if (target.x() > Renderer::getScreenWidth() || target.y() > Renderer::getScreenHeight())
-			{
-				target = ImageIO::adjustPictureSize(
-					target,
-					Vector2i(Renderer::getScreenWidth(),
-                                            Renderer::getScreenHeight()),
-					false);
-			}
-		}
+		const Vector2i target = ImageIO::getRasterOutputSize(
+			Vector2i(sourceWidth, sourceHeight), maxSize,
+			Vector2i(Renderer::getScreenWidth(), Renderer::getScreenHeight()));
 
 		if (target.x() <= 0 || target.y() <= 0 || target.x() > maxStride / 4)
 			return nullptr;
@@ -273,43 +285,48 @@ unsigned char* ImageIO::loadFromMemoryRGBA32(const unsigned char * data, const s
 					if (baseSize != nullptr)
 						*baseSize = Vector2i(width, height);
 
-					size_t maxX = maxSize == nullptr ? 0 : (size_t) Math::round(maxSize->x());
-					size_t maxY = maxSize == nullptr ? 0 : (size_t) Math::round(maxSize->y());
-
-					if (maxSize != nullptr && maxX > 0 && maxY > 0 && (width > maxX || height > maxY))
-					{
-						Vector2i sz = adjustPictureSize(Vector2i(width, height), Vector2i(maxX, maxY), maxSize->externalZoom());
-
-						if (sz.x() > Renderer::getScreenWidth() || sz.y() > Renderer::getScreenHeight())
-							sz = adjustPictureSize(sz, Vector2i(Renderer::getScreenWidth(), Renderer::getScreenHeight()), false);
+					const Vector2i sz = getRasterOutputSize(Vector2i(width, height), maxSize, Vector2i(Renderer::getScreenWidth(), Renderer::getScreenHeight()));
 						
-						if (sz.x() != width || sz.y() != height)
+					if (sz.x() != width || sz.y() != height)
+					{
+						LOG(LogDebug) << "ImageIO : rescaling image from " << std::string(std::to_string(width) + "x" + std::to_string(height)).c_str() << " to " << std::string(std::to_string(sz.x()) + "x" + std::to_string(sz.y())).c_str();
+
+						FIBITMAP* imageRescaled = resizeBitmap(fiBitmap, sz.x(), sz.y());
+
+						if (imageRescaled == nullptr)
 						{
-							LOG(LogDebug) << "ImageIO : rescaling image from " << std::string(std::to_string(width) + "x" + std::to_string(height)).c_str() << " to " << std::string(std::to_string(sz.x()) + "x" + std::to_string(sz.y())).c_str();
-
-							FIBITMAP* imageRescaled = resizeBitmap(fiBitmap, sz.x(), sz.y());
-
 							if (fiMultiBitmap != nullptr)
 							{
 								FreeImage_UnlockPage(fiMultiBitmap, fiBitmap, false);
 								FreeImage_CloseMultiBitmap(fiMultiBitmap);
-								fiMultiBitmap = nullptr;
 							}
 							else
 								FreeImage_Unload(fiBitmap);
 
-							fiBitmap = imageRescaled;
-
-							width = FreeImage_GetWidth(fiBitmap);
-							height = FreeImage_GetHeight(fiBitmap);
-
-							if (packedSize != nullptr)
-								*packedSize = Vector2i(width, height);
+							FreeImage_CloseMemory(fiMemory);
+							return nullptr;
 						}
+
+						if (fiMultiBitmap != nullptr)
+						{
+							FreeImage_UnlockPage(fiMultiBitmap, fiBitmap, false);
+							FreeImage_CloseMultiBitmap(fiMultiBitmap);
+							fiMultiBitmap = nullptr;
+						}
+						else
+							FreeImage_Unload(fiBitmap);
+
+						fiBitmap = imageRescaled;
+
+						width = FreeImage_GetWidth(fiBitmap);
+						height = FreeImage_GetHeight(fiBitmap);
+
+						if (packedSize != nullptr)
+							*packedSize = Vector2i(width, height);
 					}
 
 					unsigned char* tempData = new unsigned char[width * height * 4];
-											
+
 					const size_t w = width;
 					const size_t h = height;
 					const int pitch = FreeImage_GetPitch(fiBitmap);

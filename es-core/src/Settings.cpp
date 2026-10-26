@@ -341,6 +341,8 @@ void Settings::setDefaults()
 	mBoolMap["PreloadMedias"] = Settings::_PreloadMedias;
 	mBoolMap["OptimizeVRAM"] = true;
 	mBoolMap["OptimizeVideo"] = true;
+	mBoolMap["TextureDiskCache"] = false;
+	mIntMap["TextureDiskCacheSize"] = 1500;
 
 	mBoolMap["ShowFilenames"] = false;
 

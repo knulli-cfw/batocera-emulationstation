@@ -57,6 +57,7 @@ public:
 	static void resumeLoading();
 
 	static int getQueueSize();
+	static bool isLoadingIdle();
 
 	static void cleanupVRAM();
 

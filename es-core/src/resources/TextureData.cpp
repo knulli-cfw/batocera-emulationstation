@@ -3,6 +3,7 @@
 #include "math/Misc.h"
 #include "renderers/Renderer.h"
 #include "resources/ResourceManager.h"
+#include "resources/TextureDiskCache.h"
 #include "ImageIO.h"
 #include "Log.h"
 #include <nanosvg/nanosvg.h>
@@ -210,28 +211,29 @@ bool TextureData::initSVGFromMemory(const unsigned char* fileData, size_t length
 
 bool TextureData::initImageFromMemory(const unsigned char* fileData, size_t length, int subImageIndex)
 {
-	if (fileData == nullptr || length == 0)
+	return initImage(fileData, length, subImageIndex, false);
+}
+
+bool TextureData::initImage(const unsigned char* fileData, size_t length, int subImageIndex, bool fileBacked)
+{
+	if (!fileBacked && (fileData == nullptr || length == 0))
 		return false;
 
 	std::unique_lock<std::mutex> imageLoadLock(mImageLoadMutex);
 
-	const bool optimizeVRAM = OPTIMIZEVRAM;
-	const MaxSizeInfo screenSize(Renderer::getScreenWidth(), Renderer::getScreenHeight(), false);
-
-	// Caller must hold mMutex.
-	auto getDecodeSize = [&]() -> MaxSizeInfo
-	{
-		if (optimizeVRAM && !mMaxSize.empty() && mMaxSize.x() < screenSize.x() && mMaxSize.y() < screenSize.y())
-		{
-			return mMaxSize;
-		}
-
-		return screenSize;
-	};
-
-	// Try again if the requested size changed while loading.
 	for (;;)
 	{
+		const int screenWidth = Renderer::getScreenWidth();
+		const int screenHeight = Renderer::getScreenHeight();
+		const bool optimizeVRAM = OPTIMIZEVRAM;
+		const Vector2i screenSize(screenWidth, screenHeight);
+
+		// Caller holds mMutex.
+		auto getDecodeSize = [&]() -> MaxSizeInfo
+		{
+			return ImageIO::getTextureDecodeSize(mMaxSize, screenSize, optimizeVRAM);
+		};
+
 		MaxSizeInfo maxSize = MaxSizeInfo::Empty;
 
 		{
@@ -243,20 +245,54 @@ bool TextureData::initImageFromMemory(const unsigned char* fileData, size_t leng
 			maxSize = getDecodeSize();
 		}
 
-		size_t width = 0;
-		size_t height = 0;
-		Vector2i physicalSize = Vector2i::Zero();
+		TextureDiskCache::Image image;
+		uint64_t key = 0;
+		bool hit = false;
 
-		std::unique_ptr<unsigned char[]> imageRGBA(
-			ImageIO::loadFromMemoryRGBA32(
-				fileData, length, width, height,
-				&maxSize, &physicalSize, nullptr, subImageIndex));
-
-		if (!imageRGBA)
+		if (fileBacked && TextureDiskCache::enabled())
 		{
-			LOG(LogError) << "Could not initialize texture from memory: "
-				<< mPath;
-			return false;
+			key = TextureDiskCache::makeKey(mPath, maxSize.x(), maxSize.y(), maxSize.externalZoom(), screenWidth, screenHeight);
+			hit = TextureDiskCache::read(key, image);
+		}
+
+		if (!hit)
+		{
+			std::shared_ptr<unsigned char> source;
+			const unsigned char* input = fileData;
+			size_t inputLength = length;
+
+			if (fileBacked)
+			{
+				const ResourceData data = ResourceManager::getInstance()->getFileData(mPath);
+				source = data.ptr;
+				input = source.get();
+				inputLength = data.length;
+			}
+
+			if (!input || !inputLength)
+				return false;
+
+			size_t width = 0;
+			size_t height = 0;
+			Vector2i physicalSize = Vector2i::Zero();
+
+			image.pixels.reset(ImageIO::loadFromMemoryRGBA32(input, inputLength, width, height, &maxSize, &physicalSize, nullptr, subImageIndex));
+
+			if (!image.pixels)
+			{
+				LOG(LogError) << "Could not initialize texture from memory: " << mPath;
+				return false;
+			}
+
+			image.width = static_cast<uint32_t>(width);
+			image.height = static_cast<uint32_t>(height);
+			image.originalWidth = static_cast<uint32_t>(physicalSize.x());
+			image.originalHeight = static_cast<uint32_t>(physicalSize.y());
+
+			source.reset();
+
+			if (key)
+				TextureDiskCache::write(key, image);
 		}
 
 		std::unique_lock<std::mutex> lock(mMutex);
@@ -266,19 +302,18 @@ bool TextureData::initImageFromMemory(const unsigned char* fileData, size_t leng
 
 		const MaxSizeInfo currentSize = getDecodeSize();
 
-		if (currentSize.x() != maxSize.x() ||
-			currentSize.y() != maxSize.y() ||
-			currentSize.externalZoom() != maxSize.externalZoom())
+		if (currentSize.x() != maxSize.x() || currentSize.y() != maxSize.y() ||
+			currentSize.externalZoom() != maxSize.externalZoom() ||
+			Renderer::getScreenWidth() != screenWidth || Renderer::getScreenHeight() != screenHeight)
 		{
 			continue;
 		}
 
-		// Update the pixels and dimensions together.
-		mPhysicalSize = Vector2f(physicalSize.x(), physicalSize.y());
-		mSize = Vector2i(width, height);
+		mPhysicalSize = Vector2f(image.originalWidth, image.originalHeight);
+		mSize = Vector2i(image.width, image.height);
 		mScalable = false;
 		mIsExternalDataRGBA = false;
-		mDataRGBA = imageRGBA.release();
+		mDataRGBA = image.pixels.release();
 
 		return true;
 	}
@@ -546,6 +581,9 @@ bool TextureData::load()
 		path = mPath.substr(0, idx);
 	}
 
+	if (ext != ".svg" && subImageIndex == -1 && !path.empty() && path[0] == '/')
+		return initImage(nullptr, 0, -1, true);
+
 	const ResourceData& data = ResourceManager::getInstance()->getFileData(path);
 	if (data.length == 0)
 		return false;
@@ -623,6 +661,14 @@ void TextureData::setMaxSize(const MaxSizeInfo& maxSize)
 {
 	std::unique_lock<std::mutex> lock(mMutex);
 
+	if (mMaxSize.x() == maxSize.x() &&
+		mMaxSize.y() == maxSize.y() &&
+		mMaxSize.externalZoom() == maxSize.externalZoom() &&
+		mMaxSize.isExternalZoomKnown() == maxSize.isExternalZoomKnown())
+	{
+		return;
+	}
+
 	if (mPhysicalSize.empty())
 		mMaxSize = maxSize;
 	else
@@ -630,7 +676,7 @@ void TextureData::setMaxSize(const MaxSizeInfo& maxSize)
 		auto imageSize = Vector2i((int)Math::round(mPhysicalSize.x()), Math::round(mPhysicalSize.y()));
 
 		Vector2i value = ImageIO::adjustPictureSize(imageSize, Vector2i(mMaxSize.x(), mMaxSize.y()), mMaxSize.externalZoom());
-		Vector2i newVal = ImageIO::adjustPictureSize(imageSize, Vector2i(maxSize.x(), maxSize.y()), mMaxSize.externalZoom());
+		Vector2i newVal = ImageIO::adjustPictureSize(imageSize, Vector2i(maxSize.x(), maxSize.y()), maxSize.externalZoom());
 
 		if (newVal.x() > value.x() || newVal.y() > value.y())
 			mMaxSize = maxSize;
@@ -649,6 +695,20 @@ bool TextureData::isMaxSizeValid()
 
 	if (mMaxSize.empty())
 		return true;
+
+	// Raster textures should be validated against the actual output size.
+	if (!mScalable)
+	{
+		const Vector2i screenSize(Renderer::getScreenWidth(), Renderer::getScreenHeight());
+
+		const MaxSizeInfo decodeSize = ImageIO::getTextureDecodeSize(mMaxSize, screenSize, true);
+
+		const Vector2i sourceSize((int)Math::round(mPhysicalSize.x()), (int)Math::round(mPhysicalSize.y()));
+
+		const Vector2i expectedSize = ImageIO::getRasterOutputSize(sourceSize, &decodeSize, screenSize);
+
+		return mSize.x() >= expectedSize.x() && mSize.y() >= expectedSize.y();
+	}
 
 	if ((int) Math::round(mPhysicalSize.x()) == mSize.x() && (int)Math::round(mPhysicalSize.y()) == mSize.y())
 		return true;

@@ -718,7 +718,7 @@ void GuiMenu::openDeveloperSettings()
 	s->addGroup(_("VIDEO OPTIONS"));
 
 	// maximum vram
-	auto max_vram = std::make_shared<SliderComponent>(mWindow, 40.f, 1000.f, 10.f, "Mb");
+	auto max_vram = std::make_shared<SliderComponent>(mWindow, 40.f, 1000.f, 10.f, "MB");
 	max_vram->setValue((float)(Settings::getInstance()->getInt("MaxVRAM")));
 	s->addWithLabel(_("VRAM LIMIT"), max_vram);
 	s->addSaveFunc([max_vram] { Settings::getInstance()->setInt("MaxVRAM", (int)round(max_vram->getValue())); });
@@ -1167,6 +1167,18 @@ void GuiMenu::openDeveloperSettings()
 	optimizeVram->setState(Settings::getInstance()->getBool("OptimizeVRAM"));
 	s->addWithLabel(_("OPTIMIZE IMAGES VRAM USE"), optimizeVram);
 	s->addSaveFunc([optimizeVram] { Settings::getInstance()->setBool("OptimizeVRAM", optimizeVram->getState()); });
+
+	// texture disk cache
+	auto textureDiskCache = std::make_shared<SwitchComponent>(mWindow);
+	textureDiskCache->setState(Settings::getInstance()->getBool("TextureDiskCache"));
+	s->addWithLabel(_("TEXTURE DISK CACHE"), textureDiskCache);
+	s->addSaveFunc([s, textureDiskCache] { if (Settings::getInstance()->setBool("TextureDiskCache", textureDiskCache->getState())) s->setVariable("reboot", true); });
+
+	// texture disk cache size
+	auto textureDiskCacheSize = std::make_shared<SliderComponent>(mWindow, 500.f, 5000.f, 250.f, "MB");
+	textureDiskCacheSize->setValue((float)(Settings::getInstance()->getInt("TextureDiskCacheSize")));
+	s->addWithLabel(_("TEXTURE DISK CACHE SIZE"), textureDiskCacheSize);
+	s->addSaveFunc([s, textureDiskCacheSize] { if (Settings::getInstance()->setInt("TextureDiskCacheSize", (int)round(textureDiskCacheSize->getValue()))) s->setVariable("reboot", true); });
 
 	// optimizeVideo
 	auto optimizeVideo = std::make_shared<SwitchComponent>(mWindow);

@@ -117,6 +117,7 @@ set(CORE_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/src/resources/TextureResource.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/resources/TextureData.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/resources/TextureDataManager.h
+	${CMAKE_CURRENT_SOURCE_DIR}/src/resources/TextureDiskCache.h
 
 	# Utils
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/FileSystemUtil.h
@@ -135,6 +136,7 @@ set(CORE_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/HtmlColor.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/stb_image.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/stb_image_resize2.h
+	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/lz4.h
 
 	# Watchers
 	${CMAKE_CURRENT_SOURCE_DIR}/src/watchers/WatchersManager.h
@@ -256,6 +258,7 @@ set(CORE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/resources/TextureResource.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/resources/TextureData.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/resources/TextureDataManager.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/resources/TextureDiskCache.cpp
 
 	# Utils
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/FileSystemUtil.cpp
@@ -269,6 +272,7 @@ set(CORE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/md5.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/Randomizer.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/HtmlColor.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/lz4.c
 
 	# Watchers
 	${CMAKE_CURRENT_SOURCE_DIR}/src/watchers/WatchersManager.cpp
