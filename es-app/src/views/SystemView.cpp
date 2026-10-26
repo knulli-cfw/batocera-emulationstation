@@ -29,6 +29,7 @@
 #include "guis/GuiRetroAchievements.h"
 #include "components/CarouselComponent.h"
 #include <cmath>
+#include "utils/Randomizer.h"
 
 namespace
 {
@@ -596,6 +597,20 @@ SystemData* SystemView::getSelected()
 	//return dynamic_cast<SystemData*>(mCarousel.getActiveObject());
 }
 
+void SystemView::selectRandomSystem()
+{
+	const int count = static_cast<int>(mEntries.size());
+	if (count < 2)
+		return;
+
+	const int current = mCarousel.getCursorIndex();
+	int target = Randomizer::random(count - 1);
+	if (target >= current)
+		++target;
+
+	mCarousel.setCursor(mEntries[target].object);
+}
+
 bool SystemView::input(InputConfig* config, Input input)
 {
 	if (mYButton.isShortPressed(config, input))
@@ -721,7 +736,7 @@ bool SystemView::input(InputConfig* config, Input input)
 
 		if (config->isMappedTo("x", input))
 		{
-			mCarousel.setCursor(SystemData::getRandomSystem());
+			selectRandomSystem();
 			return true;
 		}
 
@@ -1045,7 +1060,7 @@ void SystemView::update(int deltaTime)
 	{
 		bool netPlay = SystemData::isNetplayActivated() && SystemConf::getInstance()->getBool("global.netplay");
 		if (netPlay)
-			mCarousel.setCursor(SystemData::getRandomSystem());
+			selectRandomSystem();
 		else
 			showQuickSearch();
 	}
@@ -1979,7 +1994,7 @@ bool SystemView::onAction(const std::string& action)
 
 	if (action == "random")
 	{
-		mCarousel.setCursor(SystemData::getRandomSystem());
+		selectRandomSystem();
 		return true;
 	}
 

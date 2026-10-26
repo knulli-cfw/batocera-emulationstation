@@ -116,6 +116,7 @@ private:
 
 	void	 updateExtraTextBinding();
 	void	 showQuickSearch();
+	void	 selectRandomSystem();
 
 	void	 setExtraRequired(SystemViewData& data, bool required);
 
