@@ -2743,7 +2743,7 @@ void GuiMenu::addFeatureItem(Window* window, GuiSettings* settings, const Custom
 	{
 		item->add(_("AUTO"), "auto", storedValue.empty() || storedValue == "auto");
 
-		auto sets = GuiMenu::getDecorationsSets(ViewController::get()->getState().getSystem());
+		auto sets = GuiMenu::getDecorationsSets(ViewController::get()->getSelectedSystem());
 		if (sets.size() > 0)
 		{
 			item->setRowTemplate([window, sets](std::string data, ComponentListRow& row) { createDecorationItemTemplate(window, sets, data, row); });
@@ -3163,7 +3163,7 @@ void GuiMenu::openGamesSettings()
 	// decorations
 	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::DECORATIONS) && !hasGlobalFeature("bezel"))
 	{
-		auto sets = GuiMenu::getDecorationsSets(ViewController::get()->getState().getSystem());
+		auto sets = GuiMenu::getDecorationsSets(ViewController::get()->getSelectedSystem());
 		if (sets.size() > 0)
 		{
 #ifdef BATOCERA
@@ -5046,7 +5046,7 @@ void GuiMenu::createDecorationItemTemplate(Window* window, std::vector<Decoratio
 
 	// spacer between icon and text
 	auto spacer = std::make_shared<GuiComponent>(window);
-	spacer->setSize(IMGPADDING, maxSize.y());
+	spacer->setSize(IMGPADDING, 0);
 	row.addElement(spacer, false);
 
 	std::string label = data;
@@ -5068,6 +5068,7 @@ void GuiMenu::createDecorationItemTemplate(Window* window, std::vector<Decoratio
 	// image
 	if (!imageUrl.empty())
 	{
+		spacer->setSize(IMGPADDING, maxSize.y());
 		auto icon = std::make_shared<ImageComponent>(window);
 		icon->setImage(imageUrl, false, maxSize);
 		icon->setMaxSize(maxSize);
@@ -5648,7 +5649,25 @@ std::vector<DecorationSetInfo> GuiMenu::getDecorationsSets(SystemData* system)
 	if (system == nullptr)
 		return sets;
 
-	static const size_t pathCount = 3;
+	const int width = Renderer::getScreenWidth();
+	const int height = Renderer::getScreenHeight();
+
+	int divisor = width;
+	int remainder = height;
+	while (remainder != 0)
+	{
+		int next = divisor % remainder;
+		divisor = remainder;
+		remainder = next;
+	}
+
+	std::string resolution;
+	std::string aspectRatio;
+	if (width > 0 && height > 0)
+	{
+		resolution = std::to_string(width) + "x" + std::to_string(height);
+		aspectRatio = std::to_string(width / divisor) + "_" + std::to_string(height / divisor);
+	}
 
 	std::vector<std::string> paths =
 	{
@@ -5678,18 +5697,29 @@ std::vector<DecorationSetInfo> GuiMenu::getDecorationsSets(SystemData* system)
 				info.name = folder.substr(path.size() + 1);
 				info.path = folder;
 
-				if (system != nullptr && Utils::String::startsWith(info.name, "default"))
+				std::vector<std::string> candidates;
+
+				const std::string systemImage = folder + "/systems/" + system->getName();
+				const std::string defaultImage = folder + "/default";
+
+				if (!resolution.empty())
 				{
-					std::string systemImg = path + "/"+ info.name +"/systems/" + system->getName() + ".png";
-					if (Utils::FileSystem::exists(systemImg))
-						info.imageUrl = systemImg;
+					candidates.push_back(systemImage + "-" + resolution + ".png");
+					candidates.push_back(systemImage + "-" + aspectRatio + ".png");
+					candidates.push_back(defaultImage + "-" + resolution + ".png");
+					candidates.push_back(defaultImage + "-" + aspectRatio + ".png");
 				}
 
-				if (info.imageUrl.empty())
+				candidates.push_back(systemImage + ".png");
+				candidates.push_back(defaultImage + ".png");
+
+				for (const auto& candidate : candidates)
 				{
-					std::string img = folder + "/default.png";
-					if (Utils::FileSystem::exists(img))
-						info.imageUrl = img;
+					if (Utils::FileSystem::exists(candidate))
+					{
+						info.imageUrl = candidate;
+						break;
+					}
 				}
 
 				sets.push_back(info);
