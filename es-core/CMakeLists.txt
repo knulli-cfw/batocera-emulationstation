@@ -80,6 +80,7 @@ set(CORE_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/VideoPlayerComponent.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/VideoVlcComponent.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/VolumeInfoComponent.h
+	${CMAKE_CURRENT_SOURCE_DIR}/src/components/BrightnessInfoComponent.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/MultiLineMenuEntry.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/ScrollbarComponent.h	
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/ComponentTab.h
@@ -215,6 +216,7 @@ set(CORE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/VideoPlayerComponent.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/VideoVlcComponent.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/VolumeInfoComponent.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/components/BrightnessInfoComponent.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/ScrollbarComponent.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/MultiLineMenuEntry.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/ComponentTab.cpp

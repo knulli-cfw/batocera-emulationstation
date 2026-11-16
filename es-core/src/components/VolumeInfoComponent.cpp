@@ -103,11 +103,21 @@ VolumeInfoComponent::VolumeInfoComponent(Window* window, bool actionLine)
 	mLabel->setSize(fullSize.x(), h);
 	addChild(mLabel);
 
+	moveToSlot(0);
+}
+
+void VolumeInfoComponent::moveToSlot(int slot)
+{
 	// FCA TopLeft
-	float posX = Renderer::getScreenWidth() * 0.02f;
+	float posX = Renderer::getScreenWidth() * 0.02f + slot * (mSize.x() + Renderer::getScreenWidth() * 0.01f);
 	float posY = Renderer::getScreenHeight() * 0.04f;
 
 	setPosition(posX, posY, 0);
+}
+
+int VolumeInfoComponent::readLevel()
+{
+	return VolumeControl::getInstance()->getVolume();
 }
 
 VolumeInfoComponent::~VolumeInfoComponent()
@@ -141,10 +151,10 @@ void VolumeInfoComponent::update(int deltaTime)
 
 	mCheckTime = 0;
 
-	int volume = VolumeControl::getInstance()->getVolume();
+	int volume = readLevel();
 	if (volume != mVolume)
 	{
-		bool firstTime = (mVolume < 0);
+		bool firstTime = (mVolume < 0) || !showChange();
 
 		mVolume = volume;
 

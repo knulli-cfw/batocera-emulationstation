@@ -161,6 +161,7 @@ private:
 	std::shared_ptr<TextComponent>	mClock;
 	std::shared_ptr<ControllerActivityComponent>	mControllerActivity;
 	std::shared_ptr<VolumeInfoComponent> mVolumeInfo;
+	std::shared_ptr<VolumeInfoComponent> mBrightnessInfo;
 	std::shared_ptr<BatteryIndicatorComponent>	mBatteryIndicator;	
 
 	float mNotificationOffsetY = 0.02f;
