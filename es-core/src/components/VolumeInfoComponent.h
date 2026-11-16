@@ -27,4 +27,7 @@ private:
 
 	int mCheckTime;
 	int mDisplayTime;
+
+	unsigned int mFillColor;
+	int mTrackDivider;
 };
