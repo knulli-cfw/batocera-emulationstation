@@ -975,6 +975,9 @@ Can be created as an extra.
 
 Can be created as an extra.
 
+A file VLC cannot read (empty, truncated, not a video; it has 2 seconds to read the tracks) is no video: the
+snapshot shows, and the file is not tried again until its size changes.
+
 * `pos` - type: NORMALIZED_PAIR.
 * `size` - type: NORMALIZED_PAIR.
 	- If only one axis is specified (and the other is zero), the other will be automatically calculated in accordance with the video's aspect ratio.

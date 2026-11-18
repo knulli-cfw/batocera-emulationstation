@@ -18,10 +18,14 @@
 #endif
 
 #include "ImageIO.h"
+#include "Log.h"
 
 #define MATHPI          3.141592653589793238462643383279502884L
 
 libvlc_instance_t* VideoVlcComponent::mVLC = NULL;
+
+// How long VLC may take to read a video's tracks before the file counts as no video
+static const int PARSE_TIMEOUT_MS = 2000;
 
 // VLC prepares to render a video frame.
 static void *lock(void *data, void **p_pixels) 
@@ -753,8 +757,8 @@ void VideoVlcComponent::startVideo()
 #else
 	std::string path(mVideoPath);
 #endif
-	// Make sure we have a video path
-	if (mVLC && (path.size() > 0))
+	// Make sure we have a video path, and not one VLC could not read before
+	if (mVLC && (path.size() > 0) && !isUnplayable(mVideoPath))
 	{
 		// Set the video that we are going to be playing so we don't attempt to restart it
 		mPlayingVideoPath = mVideoPath;
@@ -787,9 +791,29 @@ void VideoVlcComponent::startVideo()
 			// It looks like an older version of the library is being used on Windows.
 			libvlc_media_parse(mMedia);
 #else
-			libvlc_media_parse_with_options(mMedia, libvlc_media_parse_local, 0);
-			while (libvlc_media_get_parsed_status(mMedia) != libvlc_media_parsed_status_done)
+			// A finite parse, and out of the loop on any final status: a file VLC cannot read (empty, truncated,
+			// not a video) fails, is skipped or times out instead of holding the UI thread forever
+			libvlc_media_parse_with_options(mMedia, libvlc_media_parse_local, PARSE_TIMEOUT_MS);
+
+			libvlc_media_parsed_status_t parsed = libvlc_media_get_parsed_status(mMedia);
+			Uint32 parseEnd = SDL_GetTicks() + PARSE_TIMEOUT_MS + 500;
+			while (parsed != libvlc_media_parsed_status_done && parsed != libvlc_media_parsed_status_failed &&
+				parsed != libvlc_media_parsed_status_timeout && parsed != libvlc_media_parsed_status_skipped && SDL_GetTicks() < parseEnd)
+			{
 				std::this_thread::sleep_for(std::chrono::milliseconds(10));
+				parsed = libvlc_media_get_parsed_status(mMedia);
+			}
+
+			// Anything but a parsed file is no video: the snapshot shows, and this file is not tried again
+			// (while it keeps its size), so there is no restart loop
+			if (parsed != libvlc_media_parsed_status_done)
+			{
+				LOG(LogWarning) << "VideoVlcComponent: cannot read " << path << " (parse status " << (int)parsed << ")";
+				markUnplayable(mVideoPath);
+				libvlc_media_release(mMedia);
+				mMedia = NULL;
+				return;
+			}
 #endif
 			libvlc_media_track_t** tracks;
 			track_count = libvlc_media_tracks_get(mMedia, &tracks);

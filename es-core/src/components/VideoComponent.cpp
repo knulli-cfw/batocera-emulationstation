@@ -8,6 +8,8 @@
 #include <SDL_timer.h>
 #include "LocaleES.h"
 #include "Paths.h"
+#include <map>
+#include <mutex>
 
 #define FADE_TIME_MS	400
 
@@ -209,11 +211,43 @@ void VideoComponent::render(const Transform4x4f& parentTrans)
 	handleLooping();
 }
 
+static std::map<std::string, unsigned long long> sUnplayableVideos;
+static std::mutex sUnplayableVideosLock;
+
+void VideoComponent::markUnplayable(const std::string& path)
+{
+	if (path.empty())
+		return;
+
+	std::unique_lock<std::mutex> lock(sUnplayableVideosLock);
+	sUnplayableVideos[path] = Utils::FileSystem::getFileSize(path);
+}
+
+bool VideoComponent::isUnplayable(const std::string& path)
+{
+	if (path.empty())
+		return false;
+
+	std::unique_lock<std::mutex> lock(sUnplayableVideosLock);
+	auto it = sUnplayableVideos.find(path);
+	if (it == sUnplayableVideos.cend())
+		return false;
+
+	// Replaced since (a new size): try it again
+	if (Utils::FileSystem::getFileSize(path) != it->second)
+	{
+		sUnplayableVideos.erase(it);
+		return false;
+	}
+
+	return true;
+}
+
 void VideoComponent::renderSnapshot(const Transform4x4f& parentTrans)
 {
 	// This is the case where the video is not currently being displayed. Work out
 	// if we need to display a static image
-	if ((mConfig.showSnapshotNoVideo && mVideoPath.empty()) || ((mStartDelayed || mFadeIn < 1.0) && mConfig.showSnapshotDelay))
+	if ((mConfig.showSnapshotNoVideo && (mVideoPath.empty() || isUnplayable(mVideoPath))) || ((mStartDelayed || mFadeIn < 1.0) && mConfig.showSnapshotDelay))
 	{
 		float t = 1.0 - mFadeIn;
 		t -= 1; // cubic ease out

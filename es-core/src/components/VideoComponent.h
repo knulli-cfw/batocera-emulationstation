@@ -163,6 +163,11 @@ public:
 
 	bool showSnapshots();
 
+	// A video file that could not be read (VLC parse failed or timed out) is not tried again while it keeps
+	// its size; it counts as no video, so the snapshot shows
+	static void markUnplayable(const std::string& path);
+	static bool isUnplayable(const std::string& path);
+
 protected:
 	std::shared_ptr<IPlaylist> mPlaylist;
 	std::function<bool()> mVideoEnded;
