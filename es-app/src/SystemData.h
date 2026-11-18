@@ -18,6 +18,7 @@
 #include "CustomFeatures.h"
 #include "utils/VectorEx.h"
 #include "BindingManager.h"
+#include "HomeSlides.h"
 
 class FileData;
 class FolderData;
@@ -119,6 +120,11 @@ public:
 	static bool isUtilitySystem(SystemData* system);
 	// The game played last on the console (tools and screenshots left out)
 	static FileData* getConsoleLastPlayedGame();
+
+	// The tabbed home. The captures the system's card slides through ({system:slides}): its favorites
+	// with one, else its best-rated games, as the theme variable "systemslides" orders and filters them
+	// (HomeSlides::Rules); none on collections and utilities.
+	const std::vector<std::string>& getSlides();
 
 	static bool IsManufacturerSupported;
 	static bool hasDirtySystems();
@@ -285,6 +291,11 @@ private:
 
 	GameCountInfo* mGameCountInfo;
 	SaveStateRepository* mSaveRepository;
+
+	std::vector<HomeSlides::Candidate> getHomeCandidates(bool video);
+
+	std::vector<std::string> mSlides;
+	bool mSlidesReady;
 
 	bool mHidden;
 };

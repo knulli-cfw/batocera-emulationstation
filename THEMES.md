@@ -757,6 +757,26 @@ separated by `,`:
   include can redefine the items of a theme's grid. Without `replace="true"` the first template stays the one used,
   as before.
 
+##### Slides (system grid)
+
+`{system:slides}` lists a system's captures, one path per line, for a `slideshow` in the grid's item template
+(see `slideshow`): its favorites that have a screenshot, else its 12 best-rated games that have one, the systems
+grouped in it included, by rating. Collections, tools, emulators and screenshots have none. The theme variable
+`systemslides` picks the capture each card shows first and leaves out the ones that do not fit (title screens,
+menus, duplicates), one game per line: `+` (first) or `-` (left out), the game's own system, a space and its
+path as the gamelist writes it; `%`, `=`, `<`, `>` and `$` written as `%25`, `%3D`, `%3C`, `%3E` and `%24`:
+
+```xml
+<variables>
+	<systemslides>
+		+snes ./Some Game.sfc
+		-snes ./Some Title Screen.sfc
+	</systemslides>
+</variables>
+```
+
+ES versions with slides support the feature `slideshow`.
+
 #### menu
 * `helpsystem name="help"` - ALL
 	- The help system style for this view. If not defined, menus will have the same helpsystem as defined in system view.

@@ -47,6 +47,7 @@ lastPlayed                  game                   The game played last ({system
 continue                    game                   lastPlayed, else the best-rated favorite (else the best-rated game)
 hasLastPlayed               bool                   lastPlayed exists and still resolves to a game
 hasContinue                 bool                   continue resolves and is not on tools, emulators or screenshots (X does nothing there)
+slides                      string                 The captures of the system's card, one path per line: favorites with a screenshot, else the 12 best-rated games with one (THEMES.md, Slides)
 image                       path
 showManual                  bool
 showSaveStates              bool

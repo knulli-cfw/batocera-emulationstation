@@ -73,6 +73,7 @@ SystemData::SystemData(const SystemMetadata& meta, SystemEnvironmentData* envDat
 	mIsGroupSystem = groupedSystem;
 	mGameListHash = 0;
 	mGameCountInfo = nullptr;
+	mSlidesReady = false;
 	mSortId = Settings::getInstance()->getInt(getName() + ".sort");
 	mUnlimitedRecursiveDepth = Settings::getInstance()->getBool(getName() + ".unlimited_recursive_depth");
 	int depth;
@@ -1498,6 +1499,9 @@ void SystemData::updateDisplayedGameCount()
 		delete mGameCountInfo;
 
 	mGameCountInfo = nullptr;
+
+	// A favorite or a capture changed: the home's slides are made again
+	mSlidesReady = false;
 }
 
 void SystemData::loadTheme()
@@ -2154,6 +2158,54 @@ FileData* SystemData::getLastPlayedGame(bool orChefPick)
 	return game;
 }
 
+// The games of the system and of the systems grouped in it, each keyed by its own system and its path
+// in that system's folder (as the gamelist and the theme variable "systemslides" write it)
+std::vector<HomeSlides::Candidate> SystemData::getHomeCandidates(bool video)
+{
+	std::vector<HomeSlides::Candidate> candidates;
+	if (mRootFolder == nullptr)
+		return candidates;
+
+	for (auto game : mRootFolder->getFilesRecursive(GAME, true))
+	{
+		FileData* source = game->getSourceFileData();
+		SystemData* system = source->getSystem();
+		if (system == nullptr || system->getRootFolder() == nullptr)
+			continue;
+
+		HomeSlides::Candidate candidate;
+		candidate.key = HomeSlides::key(system->getName(), Utils::FileSystem::createRelativePath(source->getPath(), system->getRootFolder()->getPath(), false));
+		candidate.id = game->getPath();
+		candidate.name = game->getName();
+		candidate.media = video ? game->getVideoPath() : game->getImagePath();
+		candidate.rating = Utils::String::toFloat(game->getMetadata(MetaDataId::Rating));
+		candidate.favorite = game->getFavorite();
+
+		if (!candidate.media.empty() && !Utils::FileSystem::exists(candidate.media))
+			candidate.media.clear();
+
+		candidates.push_back(candidate);
+	}
+
+	return candidates;
+}
+
+const std::vector<std::string>& SystemData::getSlides()
+{
+	if (mSlidesReady)
+		return mSlides;
+
+	mSlidesReady = true;
+	mSlides.clear();
+
+	if (isCollection() || isUtilitySystem(this) || mTheme == nullptr)
+		return mSlides;
+
+	auto rules = HomeSlides::parseRules(mTheme->getVariable("systemslides"));
+	mSlides = HomeSlides::orderSlides(getHomeCandidates(false), rules, 12);
+	return mSlides;
+}
+
 FileData* SystemData::getContinueGame()
 {
 	return isUtilitySystem(this) ? nullptr : getLastPlayedGame(true);
@@ -2293,6 +2345,9 @@ BindableProperty SystemData::getProperty(const std::string& name)
 
 		return timeText;
 	}
+
+	if (name == "slides")
+		return Utils::String::join(getSlides(), "\n");
 
 	if (name == "lastPlayed" || name == "continue")
 	{
