@@ -1117,6 +1117,12 @@ namespace Renderer
 		glDisable(GL_STENCIL_TEST);
 	}
 
+	bool GLES20Renderer::readPixels(int _x, int _y, int _w, int _h, unsigned char* _rgba)
+	{
+		GL_CHECK_ERROR(glReadPixels(_x, _y, _w, _h, GL_RGBA, GL_UNSIGNED_BYTE, _rgba));
+		return true;
+	}
+
 	size_t GLES20Renderer::getTotalMemUsage()
 	{
 		size_t total = 0;

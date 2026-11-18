@@ -67,6 +67,10 @@ public:
 	void normalizeNextUpdate();
 
 	inline bool isSleeping() const { return mSleeping; }
+
+	// The home and the game lists, with nothing over them, draw a frame only when it changes
+	// (Settings "RenderOnChange")
+	bool drawsOnlyChanges();
 	bool getAllowSleep();
 	void setAllowSleep(bool sleep);
 	
@@ -153,6 +157,7 @@ private:
 
 	int mFrameTimeElapsed;
 	int mFrameCountElapsed;
+	int mFrameDrawnStart;
 	int mAverageDeltaTime;
 
 	std::unique_ptr<TextCache> mFrameDataText;

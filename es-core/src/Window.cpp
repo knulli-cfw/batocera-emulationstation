@@ -31,7 +31,7 @@
 #include <SDL_syswm.h>
 #endif
 
-Window::Window() : mNormalizeNextUpdate(false), mFrameTimeElapsed(0), mFrameCountElapsed(0), mAverageDeltaTime(10),
+Window::Window() : mNormalizeNextUpdate(false), mFrameTimeElapsed(0), mFrameCountElapsed(0), mFrameDrawnStart(0), mAverageDeltaTime(10),
   mAllowSleep(true), mSleeping(false), mTimeSinceLastInput(0), mScreenSaver(NULL), mRenderScreenSaver(false), mClockElapsed(0), mMouseCapture(nullptr), mMenuBackgroundShaderTextureCache(-1)
 {			
 	mTransitionOffset = 0;
@@ -474,9 +474,10 @@ void Window::update(int deltaTime)
 		{
 			std::stringstream ss;
 
-			// fps
+			// fps, and the frames drawn (RenderOnChange draws only those that change)
 			ss << std::fixed << std::setprecision(1) << (1000.0f * (float)mFrameCountElapsed / (float)mFrameTimeElapsed) << "fps, ";
 			ss << std::fixed << std::setprecision(2) << ((float)mFrameTimeElapsed / (float)mFrameCountElapsed) << "ms";
+			ss << ", " << std::fixed << std::setprecision(1) << (1000.0f * (float)(Renderer::getCurrentFrame() - mFrameDrawnStart) / (float)mFrameTimeElapsed) << " drawn/s";
 
 			// vram
 			float textureVramUsageMb = TextureResource::getTotalMemUsage(false) / 1024.0f / 1024.0f;
@@ -491,6 +492,7 @@ void Window::update(int deltaTime)
 
 		mFrameTimeElapsed = 0;
 		mFrameCountElapsed = 0;
+		mFrameDrawnStart = Renderer::getCurrentFrame();
 	}
 
 	/* draw the clock */ 
@@ -920,6 +922,11 @@ void Window::render()
 
 		Renderer::setScreenMargin(margin.x(), margin.y());
 	}
+}
+
+bool Window::drawsOnlyChanges()
+{
+	return mGuiStack.size() == 1 && !mRenderScreenSaver && !mSleeping && Settings::getInstance()->getBool("RenderOnChange");
 }
 
 void Window::normalizeNextUpdate()

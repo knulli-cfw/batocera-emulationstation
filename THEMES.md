@@ -1203,6 +1203,14 @@ dots over them.
       (default 4 px at 480), `dotsOffset` the distance of the row from the element's top-right corner, as
       fractions of the screen (default 9 px, 9 px). The current dot is wider.
 
+##### Drawing only what changes
+
+With `RenderOnChange` (es_settings, default true), the home and the game lists, with nothing over them, draw
+and show a frame only when it differs from the frame on screen or a texture it uses changed (a video's new
+frame), and at least once a second; otherwise the screen keeps its frame and ES waits for the next frame's time
+or an event. `RenderOnChangeVerify` (for tests) draws every frame and logs any frame the cache would have left
+out whose pixels changed; `DrawFramerate` shows the frames drawn per second.
+
 #### rating
 
 * `pos` - type: NORMALIZED_PAIR.
