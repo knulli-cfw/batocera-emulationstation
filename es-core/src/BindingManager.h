@@ -4,6 +4,7 @@
 
 #include <string>
 #include <vector>
+#include <functional>
 
 class GuiComponent;
 class IBindable;
@@ -106,6 +107,9 @@ class BindingManager
 {
 public:
 	static void          updateBindings(GuiComponent* comp, IBindable* system, bool recursive = true);
+
+	// Adds a {global:name} property, read when bindings update (the app registers what es-core cannot see)
+	static void          registerGlobalProperty(const std::string& name, const std::function<BindableProperty()>& getter);
 
 private:
 	static void          bindValues(IBindable* current, std::string& xp, bool showDefaultText, std::string& evaluableExpression);

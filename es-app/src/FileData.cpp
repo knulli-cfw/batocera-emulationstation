@@ -1971,6 +1971,28 @@ BindableProperty FileData::getProperty(const std::string& name)
 		return hasSaveState;
 	}
 
+	// When the game was last played: "HH:MM" and the calendar days since (0 today, -1 never)
+	if (name == "lastplayedTime" || name == "lastplayedDays")
+	{
+		std::string iso = getMetadata(MetaDataId::LastPlayed);
+		time_t played = iso.size() >= 15 && iso[8] == 'T' ? Utils::Time::stringToTime(iso) : 0;
+		if (played <= 0)
+			return name == "lastplayedDays" ? BindableProperty(-1) : BindableProperty::EmptyString;
+
+		if (name == "lastplayedTime")
+			return Utils::Time::timeToString(played, "%H:%M");
+
+		time_t now = time(nullptr);
+		tm day = *localtime(&played);
+		tm today = *localtime(&now);
+		day.tm_hour = today.tm_hour = 12;
+		day.tm_min = today.tm_min = day.tm_sec = today.tm_sec = 0;
+		day.tm_isdst = today.tm_isdst = -1;
+
+		int days = (int)Math::round((float)(difftime(mktime(&today), mktime(&day)) / 86400.0));
+		return Math::max(0, days);
+	}
+
 	if (name == "releaseyear" || name == "releaseYear")
 	{
 		std::string releaseDateMeta = getMetadata(MetaDataId::ReleaseDate);

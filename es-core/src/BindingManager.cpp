@@ -2,6 +2,7 @@
 #include "utils/StringUtil.h"
 #include "LocaleES.h"
 #include <time.h>
+#include <map>
 
 #include "components/TextComponent.h"
 #include "components/ImageComponent.h"
@@ -15,10 +16,16 @@
 BindableProperty BindableProperty::Null;
 BindableProperty BindableProperty::EmptyString("", BindablePropertyType::String);
 
+static std::map<std::string, std::function<BindableProperty()>> sGlobalProperties;
+
 class GlobalBinding : public IBindable
 {
 	BindableProperty getProperty(const std::string& name) override
 	{
+		auto registered = sGlobalProperties.find(name);
+		if (registered != sGlobalProperties.cend())
+			return registered->second();
+
 		if (name == "help")
 			return Settings::getInstance()->getBool("ShowHelpPrompts");
 
@@ -75,6 +82,11 @@ static GlobalBinding globalBinding;
 /////////////////////////////////////////////////////////////////////////////////////////////
 // BindingManager
 /////////////////////////////////////////////////////////////////////////////////////////////
+
+void BindingManager::registerGlobalProperty(const std::string& name, const std::function<BindableProperty()>& getter)
+{
+	sGlobalProperties[name] = getter;
+}
 
 void BindingManager::bindValues(IBindable* current, std::string& xp, bool showDefaultText, std::string& evaluableExpression)
 {

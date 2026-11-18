@@ -1430,6 +1430,8 @@ GameCountInfo* SystemData::getGameCountInfo()
 	mGameCountInfo->playTime = 0;
 	
 	int mostPlayCount = 0;
+	float chefScore = 0;
+	std::string lastPlayedStamp;
 
 	for (auto game : games)
 	{
@@ -1459,6 +1461,24 @@ GameCountInfo* SystemData::getGameCountInfo()
 		auto lastPlayed = game->getMetadata(MetaDataId::LastPlayed);
 		if (!lastPlayed.empty() && lastPlayed > mGameCountInfo->lastPlayedDate)
 			mGameCountInfo->lastPlayedDate = lastPlayed;
+
+		// A collection never continues a tool, an emulator or a screenshot
+		if (isCollection() && isUtilitySystem(game->getSourceFileData()->getSystem()))
+			continue;
+
+		if (!lastPlayed.empty() && lastPlayed > lastPlayedStamp)
+		{
+			lastPlayedStamp = lastPlayed;
+			mGameCountInfo->lastPlayedPath = game->getPath();
+		}
+
+		// Favorites first, then the rating (0 to 1)
+		float score = (game->getFavorite() ? 2.0f : 0.0f) + Utils::String::toFloat(game->getMetadata(MetaDataId::Rating));
+		if (score > chefScore)
+		{
+			chefScore = score;
+			mGameCountInfo->chefPickPath = game->getPath();
+		}
 	}
 
 	return mGameCountInfo;
@@ -2118,6 +2138,72 @@ BindableProperty BindableRandom::getProperty(const std::string& name)
 	return mRandom;
 }
 
+// Paths are kept rather than pointers: the counts are only reset when a game changes, and a game
+// can be removed in between.
+FileData* SystemData::getLastPlayedGame(bool orChefPick)
+{
+	GameCountInfo* info = getGameCountInfo();
+	if (info == nullptr || mRootFolder == nullptr)
+		return nullptr;
+
+	FileData* game = info->lastPlayedPath.empty() ? nullptr : mRootFolder->FindByPath(info->lastPlayedPath);
+	if (game == nullptr && orChefPick && !info->chefPickPath.empty())
+		game = mRootFolder->FindByPath(info->chefPickPath);
+
+	return game;
+}
+
+FileData* SystemData::getContinueGame()
+{
+	return isUtilitySystem(this) ? nullptr : getLastPlayedGame(true);
+}
+
+// Tools, emulators and the screenshot viewer (a group's systems count as their group's): what they ran
+// is shown, but X does not run it again.
+bool SystemData::isUtilitySystem(SystemData* system)
+{
+	if (system == nullptr)
+		return false;
+
+	for (SystemData* s : { system, system->getParentGroupSystem() })
+	{
+		if (s == nullptr)
+			continue;
+
+		const std::string& hardware = s->getSystemMetadata().hardwareType;
+		if (hardware == "tool" || hardware == "emulator" || hardware == "system" || s->hasPlatformId(PlatformIds::IMAGEVIEWER) ||
+			s->getName() == "tools" || s->getName() == "emulators" || s->getName() == "imageviewer")
+			return true;
+	}
+
+	return false;
+}
+
+FileData* SystemData::getConsoleLastPlayedGame()
+{
+	FileData* last = nullptr;
+	std::string lastDate;
+
+	for (auto system : sSystemVector)
+	{
+		if (system->isCollection() || !system->isGameSystem() || system->getName() == "tools" || system->getName() == "imageviewer")
+			continue;
+
+		FileData* game = system->getLastPlayedGame();
+		if (game == nullptr)
+			continue;
+
+		std::string date = game->getMetadata(MetaDataId::LastPlayed);
+		if (date > lastDate)
+		{
+			lastDate = date;
+			last = game;
+		}
+	}
+
+	return last;
+}
+
 BindableProperty SystemData::getProperty(const std::string& name)
 {
 	auto it = properties.find(name);
@@ -2206,6 +2292,19 @@ BindableProperty SystemData::getProperty(const std::string& name)
 
 		return timeText;
 	}
+
+	if (name == "lastPlayed" || name == "continue")
+	{
+		FileData* game = getLastPlayedGame(name == "continue");
+		return game != nullptr ? BindableProperty((IBindable*)game) : BindableProperty::Null;
+	}
+
+	// Only a game that still resolves: the panel never offers a game X cannot start
+	if (name == "hasLastPlayed")
+		return getLastPlayedGame() != nullptr;
+
+	if (name == "hasContinue")
+		return getContinueGame() != nullptr;
 
 	if (name == "lastPlayedDate")
 	{

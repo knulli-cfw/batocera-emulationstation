@@ -42,6 +42,8 @@
 #include "watchers/WatchersManager.h"
 #include "HttpReq.h"
 #include "QuickResume.h"
+#include "BindingManager.h"
+#include "FileData.h"
 
 #ifdef WIN32
 #include <Windows.h>
@@ -293,6 +295,13 @@ bool loadSystemConfigFile(Window* window, const char** errorString)
 			"VISIT EMULATIONSTATION.ORG FOR MORE INFORMATION.";
 		return false;
 	}
+
+	// {global:lastPlayed}: the game played last on the console
+	BindingManager::registerGlobalProperty("lastPlayed", []
+	{
+		FileData* game = SystemData::getConsoleLastPlayedGame();
+		return game != nullptr ? BindableProperty((IBindable*)game) : BindableProperty::Null;
+	});
 
 #ifdef KNULLI
 	ApiSystem::getInstance()->callBatoceraPreGameListsHook();

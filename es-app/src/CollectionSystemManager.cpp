@@ -440,6 +440,17 @@ void CollectionSystemManager::refreshCollectionSystems(FileData* file)
 	if (!file->getSystem()->isGameSystem() || file->getType() != GAME)
 		return;
 
+	// The game's own system (and its group) counts it too: played games, favorites, the last played
+	SystemData* source = file->getSourceFileData()->getSystem();
+	if (source != nullptr)
+	{
+		source->updateDisplayedGameCount();
+
+		SystemData* group = source->getParentGroupSystem();
+		if (group != nullptr && group != source)
+			group->updateDisplayedGameCount();
+	}
+
 	std::map<std::string, CollectionSystemData> allCollections;
 	allCollections.insert(mAutoCollectionSystemsData.cbegin(), mAutoCollectionSystemsData.cend());
 	allCollections.insert(mCustomCollectionSystemsData.cbegin(), mCustomCollectionSystemsData.cend());

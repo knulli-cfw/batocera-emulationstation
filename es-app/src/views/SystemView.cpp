@@ -1677,6 +1677,9 @@ void SystemView::onShow()
 
 	mCarousel.onShow();
 
+	// What changed while hidden (a game played since, a favorite) shows at once
+	updateExtraTextBinding();
+
 	activateExtras(mCarousel.getCursorIndex());
 
 	for (auto sb : mStaticBackgrounds)

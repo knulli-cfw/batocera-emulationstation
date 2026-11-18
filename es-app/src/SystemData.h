@@ -36,6 +36,8 @@ struct GameCountInfo
 	long playTime;
 	std::string mostPlayed;
 	std::string lastPlayedDate;
+	std::string lastPlayedPath;	// the game played last, if any
+	std::string chefPickPath;	// the best-rated favorite (else best-rated game), for systems never played
 };
 
 struct SystemMetadata
@@ -109,6 +111,14 @@ public:
 
 	GameCountInfo* getGameCountInfo();
 	void updateDisplayedGameCount();
+
+	// The game played last (nullptr if none); with orChefPick, else the best-rated favorite or game
+	FileData* getLastPlayedGame(bool orChefPick = false);
+	// What X continues: getLastPlayedGame(true), nothing on a utility system
+	FileData* getContinueGame();
+	static bool isUtilitySystem(SystemData* system);
+	// The game played last on the console (tools and screenshots left out)
+	static FileData* getConsoleLastPlayedGame();
 
 	static bool IsManufacturerSupported;
 	static bool hasDirtySystems();

@@ -43,6 +43,10 @@ gamesPlayed                 int
 mostPlayed                  int
 gameTime                    string
 lastPlayedDate              string
+lastPlayed                  game                   The game played last ({system:lastPlayed:name}); empty if none. A collection leaves out tools, emulators and screenshots
+continue                    game                   lastPlayed, else the best-rated favorite (else the best-rated game)
+hasLastPlayed               bool                   lastPlayed exists and still resolves to a game
+hasContinue                 bool                   continue resolves and is not on tools, emulators or screenshots (X does nothing there)
 image                       path
 showManual                  bool
 showSaveStates              bool
@@ -113,6 +117,8 @@ arcadesystemname            string
 players                     string
 playcount                   int
 lastplayed                  date
+lastplayedTime              string                "HH:MM" of lastplayed, empty if never played
+lastplayedDays              int                   calendar days since lastplayed: 0 today, 1 yesterday, -1 never
 crc32                       string
 md5                         string	
 lang                        string
@@ -142,6 +148,7 @@ screenWidth                 int
 screenHeight                int
 screenRatio                 string
 vertical                    bool
+lastPlayed                  game                  The game played last on the console, tools and screenshots left out ({global:lastPlayed:system:fullName})
 ```	
 
 **systemrandom:**
