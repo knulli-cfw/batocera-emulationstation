@@ -1466,7 +1466,8 @@ GameCountInfo* SystemData::getGameCountInfo()
 		if (isCollection() && isUtilitySystem(game->getSourceFileData()->getSystem()))
 			continue;
 
-		if (!lastPlayed.empty() && lastPlayed > lastPlayedStamp)
+		// Only a real date (YYYYMMDDTHHMMSS): a game never played has the default "0"
+		if (lastPlayed.size() >= 15 && lastPlayed[8] == 'T' && lastPlayed > lastPlayedStamp)
 		{
 			lastPlayedStamp = lastPlayed;
 			mGameCountInfo->lastPlayedPath = game->getPath();

@@ -423,6 +423,10 @@ void ViewController::playViewTransition(bool forceImmediate)
 
 void ViewController::onFileChanged(FileData* file, FileChangeType change)
 {
+	// The system view shows counts and last games too (back from a game launched there, say)
+	if (mSystemListView != nullptr)
+		mSystemListView->refreshBindings();
+
 	std::string key = file->getFullPath();
 	auto sourceSystem = file->getSourceFileData()->getSystem();
 

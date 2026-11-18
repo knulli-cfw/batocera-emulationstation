@@ -79,6 +79,9 @@ public:
 	// The index of the tab that shows a system, in the theme's "systemtabs" order; -1 without tabs
 	static int getSystemTab(SystemData* system);
 
+	// Binds the selected system's extras again (its counts or last game changed)
+	void refreshBindings() { updateExtraTextBinding(); }
+
 protected:
 	//virtual void onCursorChanged(const CursorState& state) override;
 	void onCursorChanged(const CursorState& state);
