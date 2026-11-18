@@ -89,6 +89,8 @@ public:
 	void render(const Transform4x4f& parentTrans) { mComp->render(parentTrans); }
 	void onShow() { mComp->onShow(); }
 	void onHide() { mComp->onHide(); }
+	void onScreenSaverActivate() { mComp->onScreenSaverActivate(); }
+	void onScreenSaverDeactivate() { mComp->onScreenSaverDeactivate(); }
 	bool onMouseClick(int button, bool pressed, int x, int y) { return mComp->onMouseClick(button, pressed, x, y); }
 	void onMouseMove(int x, int y) { mComp->onMouseMove(x, y); }
 	bool onMouseWheel(int delta) { return mComp->onMouseWheel(delta); }

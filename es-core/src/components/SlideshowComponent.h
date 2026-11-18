@@ -3,6 +3,7 @@
 #define ES_CORE_COMPONENTS_SLIDESHOW_COMPONENT_H
 
 #include "GuiComponent.h"
+#include "components/SlideLayout.h"
 #include "math/Vector4f.h"
 #include <memory>
 #include <string>
@@ -37,7 +38,6 @@ public:
 
 private:
 	bool isActive();
-	void rewind();
 	std::shared_ptr<TextureResource> loadTexture(const std::string& path);
 	void drawSlide(const std::shared_ptr<TextureResource>& texture, float dx, const Transform4x4f& trans);
 	void drawDots(int shown, const Transform4x4f& trans);
@@ -45,16 +45,13 @@ private:
 	std::string mPathsValue;
 	std::vector<std::string> mPaths;
 
-	int mCurrent;
-	int mElapsed;
-	float mProgress;	// of the slide to the next capture, 0 to 1; -1 while waiting
+	SlideLayout::Clock mClock;
+	int mShown;			// the capture mTexture holds
 	bool mScreenSaverActive;
 
 	std::shared_ptr<TextureResource> mTexture;
 	std::shared_ptr<TextureResource> mNextTexture;
 
-	int mInterval;
-	int mDuration;
 	unsigned int mColor;
 	float mSaturation;
 	float mRoundCorners;

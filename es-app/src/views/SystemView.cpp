@@ -1774,6 +1774,9 @@ void SystemView::onScreenSaverActivate()
 	mScreensaverActive = true;
 	updateExtras([this](GuiComponent* p) { p->onScreenSaverActivate(); });
 
+	// The grid's items too: a slideshow on the selected one stops
+	mCarousel.onScreenSaverActivate();
+
 	for (auto sb : mStaticBackgrounds)
 		sb->onScreenSaverActivate();
 }
@@ -1782,6 +1785,8 @@ void SystemView::onScreenSaverDeactivate()
 {
 	mScreensaverActive = false;
 	updateExtras([this](GuiComponent* p) { p->onScreenSaverDeactivate(); });
+
+	mCarousel.onScreenSaverDeactivate();
 
 	for (auto sb : mStaticBackgrounds)
 		sb->onScreenSaverDeactivate();

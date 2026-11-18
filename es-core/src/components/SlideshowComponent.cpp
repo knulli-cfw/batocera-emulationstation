@@ -9,8 +9,7 @@
 #include "ThemeData.h"
 
 SlideshowComponent::SlideshowComponent(Window* window) : GuiComponent(window),
-	mCurrent(0), mElapsed(0), mProgress(-1.0f), mScreenSaverActive(false),
-	mInterval(4000), mDuration(600), mColor(0xFFFFFFFF), mSaturation(1.0f), mRoundCorners(0.0f), mRoi(0, 0, 1, 1),
+	mShown(0), mScreenSaverActive(false), mColor(0xFFFFFFFF), mSaturation(1.0f), mRoundCorners(0.0f), mRoi(0, 0, 1, 1),
 	mDots(false), mMaxDots(9), mDotSize(4.0f / 480.0f), mDotsOffset(9.0f / 640.0f, 9.0f / 480.0f),
 	mDotColor(0xFFFFFF55), mDotSelectedColor(0xFFFFFFD0)
 {
@@ -36,19 +35,9 @@ void SlideshowComponent::setPaths(const std::string& paths)
 	}
 
 	mTexture = nullptr;
-	rewind();
-}
-
-// The first capture again, waiting a whole interval
-void SlideshowComponent::rewind()
-{
-	if (mCurrent != 0)
-		mTexture = nullptr;
-
-	mCurrent = 0;
-	mElapsed = 0;
-	mProgress = -1.0f;
 	mNextTexture = nullptr;
+	mClock.rewind();
+	mShown = 0;
 }
 
 // Moves on the selected item of a grid only; anywhere else, always
@@ -69,53 +58,44 @@ std::shared_ptr<TextureResource> SlideshowComponent::loadTexture(const std::stri
 	return TextureResource::get(path, false, linear);
 }
 
+// Ready to slide in: loaded and with pixels (a file that is gone gives an empty texture)
+static bool isReady(const std::shared_ptr<TextureResource>& texture)
+{
+	return texture != nullptr && texture->isLoaded() && texture->getPhysicalSize().x() > 0;
+}
+
 void SlideshowComponent::update(int deltaTime)
 {
 	GuiComponent::update(deltaTime);
 
-	if (!mVisible || mPaths.size() < 2)
+	if (!mVisible)
 		return;
 
-	if (!isActive())
+	// Paused under the screen saver and while the view is hidden (a game list, a game): no capture is loaded
+	bool paused = mScreenSaverActive || !isShowing();
+	bool sliding = mClock.progress() >= 0;
+	int target = mClock.next();
+	auto request = mClock.update(deltaTime, (int)mPaths.size(), isActive(), paused, isReady(mNextTexture));
+
+	if (mClock.current() != mShown)
 	{
-		if (mCurrent != 0 || mProgress >= 0 || mElapsed != 0)
-			rewind();
-
-		return;
+		// Slid to the next capture (its texture is the one that slid in), or back to the first one
+		bool arrived = sliding && mClock.current() == target;
+		mTexture = arrived ? mNextTexture : nullptr;
+		mShown = mClock.current();
 	}
 
-	if (mScreenSaverActive || !isShowing())
-		return;
-
-	int next = (mCurrent + 1) % (int)mPaths.size();
-
-	if (mProgress < 0)
-	{
-		mElapsed += deltaTime;
-
-		// The next capture loads while this one shows
-		if (mNextTexture == nullptr)
-		{
-			mNextTexture = loadTexture(mPaths[next]);
-			if (mNextTexture != nullptr)
-				mNextTexture->reload();
-		}
-
-		if (mElapsed >= mInterval && mNextTexture != nullptr && mNextTexture->isLoaded())
-			mProgress = 0.0f;
-
-		return;
-	}
-
-	mProgress += (float)deltaTime / (float)std::max(1, mDuration);
-	if (mProgress >= 1.0f)
-	{
-		mCurrent = next;
-		mTexture = mNextTexture;
+	if (mClock.next() < 0 || mClock.next() >= (int)mPaths.size())
 		mNextTexture = nullptr;
-		mProgress = -1.0f;
-		mElapsed = 0;
+	else if (request == SlideLayout::Clock::LOAD)
+	{
+		// The next capture loads while this one shows
+		mNextTexture = loadTexture(mPaths[mClock.next()]);
+		if (mNextTexture != nullptr)
+			mNextTexture->reload();
 	}
+	else if (request == SlideLayout::Clock::RELOAD && mNextTexture != nullptr)
+		mNextTexture->reload();
 }
 
 void SlideshowComponent::drawSlide(const std::shared_ptr<TextureResource>& texture, float dx, const Transform4x4f& trans)
@@ -203,11 +183,9 @@ void SlideshowComponent::render(const Transform4x4f& parentTrans)
 		return;
 	}
 
-	if (mCurrent >= (int)mPaths.size())
-		mCurrent = 0;
-
+	int current = mClock.current() < (int)mPaths.size() ? mClock.current() : 0;
 	if (mTexture == nullptr)
-		mTexture = loadTexture(mPaths[mCurrent]);
+		mTexture = loadTexture(mPaths[current]);
 
 	// Everything inside the box, its corners rounded
 	Renderer::setMatrix(trans);
@@ -216,16 +194,16 @@ void SlideshowComponent::render(const Transform4x4f& parentTrans)
 	else
 		Renderer::pushClipRect(Vector2i((int)rect.x, (int)rect.y), Vector2i((int)rect.w, (int)rect.h));
 
-	int shown = mCurrent;
-	if (mProgress >= 0 && mNextTexture != nullptr)
+	int shown = current;
+	if (mClock.progress() >= 0 && mNextTexture != nullptr)
 	{
-		float t = SlideLayout::ease(mProgress);
+		float t = SlideLayout::ease(mClock.progress());
 		float dx = Math::round(t * mSize.x());
 		drawSlide(mTexture, -dx, trans);
 		drawSlide(mNextTexture, mSize.x() - dx, trans);
 
 		if (t > 0.5f)
-			shown = (mCurrent + 1) % (int)mPaths.size();
+			shown = mClock.next();
 	}
 	else
 		drawSlide(mTexture, 0, trans);
@@ -248,8 +226,10 @@ void SlideshowComponent::onHide()
 	GuiComponent::onHide();
 
 	// Back on the first capture next time, and nothing kept loaded for a hidden view
-	rewind();
+	mClock.rewind();
+	mShown = 0;
 	mTexture = nullptr;
+	mNextTexture = nullptr;
 }
 
 void SlideshowComponent::onScreenSaverActivate()
@@ -272,11 +252,14 @@ void SlideshowComponent::applyTheme(const std::shared_ptr<ThemeData>& theme, con
 
 	GuiComponent::applyTheme(theme, view, element, properties);
 
+	int interval = 4000, duration = 600;
 	if (elem->has("interval"))
-		mInterval = (int)(Math::max(0.5f, elem->get<float>("interval")) * 1000.0f);
+		interval = (int)(Math::max(0.5f, elem->get<float>("interval")) * 1000.0f);
 
 	if (elem->has("duration"))
-		mDuration = (int)(Math::max(0.0f, elem->get<float>("duration")) * 1000.0f);
+		duration = (int)(Math::max(0.0f, elem->get<float>("duration")) * 1000.0f);
+
+	mClock.setTiming(interval, duration);
 
 	if (elem->has("color"))
 		mColor = elem->get<unsigned int>("color");

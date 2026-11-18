@@ -99,6 +99,117 @@ namespace SlideLayout
 		t = std::max(0.0f, std::min(1.0f, t));
 		return t < 0.5f ? 2.0f * t * t : 1.0f - (-2.0f * t + 2.0f) * (-2.0f * t + 2.0f) / 2.0f;
 	}
+
+	// When a slideshow moves on, and what to do about a next capture that does not load (a file that cannot
+	// be decoded or is gone, a texture evicted or dropped from the load queue). The next capture is asked for
+	// while the current one shows; RETRY_AFTER ms past the interval it is asked for once more, and SKIP_AFTER
+	// ms after that the following capture is tried instead, so the slideshow never waits for one forever.
+	class Clock
+	{
+	public:
+		enum Request { NONE, LOAD, RELOAD };	// what the caller does with the next capture's texture
+
+		static const int RETRY_AFTER = 1000;
+		static const int SKIP_AFTER = 2000;
+
+		Clock() : mInterval(4000), mDuration(600) { rewind(); }
+
+		void setTiming(int interval, int duration) { mInterval = std::max(1, interval); mDuration = std::max(1, duration); }
+
+		// The first capture, waiting a whole interval
+		void rewind() { mCurrent = 0; mNext = -1; mElapsed = 0; mWait = 0; mRetried = false; mProgress = -1.0f; }
+
+		bool atRest() const { return mCurrent == 0 && mNext < 0 && mProgress < 0 && mElapsed == 0; }
+
+		int current() const { return mCurrent; }
+		int next() const { return mNext; }
+		float progress() const { return mProgress; }	// of the slide to the next capture, 0 to 1; -1 while waiting
+
+		// One frame of deltaTime ms over count captures. Only a selected item moves; a deselected one goes back
+		// to the first capture; a paused one (screen saver, view hidden) keeps its place without moving.
+		Request update(int deltaTime, int count, bool selected, bool paused, bool nextLoaded)
+		{
+			if (count < 2 || !selected)
+			{
+				if (!atRest())
+					rewind();
+
+				return NONE;
+			}
+
+			if (paused)
+				return NONE;
+
+			if (mCurrent >= count || mNext >= count)
+				rewind();
+
+			if (mProgress >= 0)
+			{
+				mProgress += (float)deltaTime / (float)mDuration;
+				if (mProgress >= 1.0f)
+				{
+					mCurrent = mNext;
+					mNext = -1;
+					mProgress = -1.0f;
+					mElapsed = 0;
+				}
+
+				return NONE;
+			}
+
+			if (mNext < 0)
+			{
+				mNext = (mCurrent + 1) % count;
+				mWait = 0;
+				mRetried = false;
+				return LOAD;
+			}
+
+			mElapsed += deltaTime;
+			if (mElapsed < mInterval)
+				return NONE;
+
+			if (nextLoaded)
+			{
+				mProgress = 0.0f;
+				return NONE;
+			}
+
+			mWait += deltaTime;
+			if (!mRetried)
+			{
+				if (mWait < RETRY_AFTER)
+					return NONE;
+
+				mRetried = true;
+				return RELOAD;
+			}
+
+			if (mWait < RETRY_AFTER + SKIP_AFTER)
+				return NONE;
+
+			// Skip it; when every other capture fails, wait a whole interval and try again
+			int skip = (mNext + 1) % count;
+			if (skip == mCurrent)
+			{
+				mElapsed = 0;
+				mWait = 0;
+				mRetried = false;
+				return RELOAD;
+			}
+
+			mNext = skip;
+			mWait = 0;
+			mRetried = false;
+			return LOAD;
+		}
+
+	private:
+		int mInterval, mDuration;
+		int mCurrent, mNext, mElapsed, mWait;
+		bool mRetried;
+		float mProgress;
+	};
 }
 
 #endif // ES_CORE_COMPONENTS_SLIDE_LAYOUT_H
