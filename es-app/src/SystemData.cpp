@@ -23,6 +23,7 @@
 #include <unordered_set>
 #include <algorithm>
 #include <functional>
+#include <random>
 #include "SaveStateRepository.h"
 #include "Paths.h"
 #include "SystemRandomPlaylist.h"
@@ -74,6 +75,7 @@ SystemData::SystemData(const SystemMetadata& meta, SystemEnvironmentData* envDat
 	mGameListHash = 0;
 	mGameCountInfo = nullptr;
 	mSlidesReady = false;
+	mSuggestionsReady = false;
 	mSortId = Settings::getInstance()->getInt(getName() + ".sort");
 	mUnlimitedRecursiveDepth = Settings::getInstance()->getBool(getName() + ".unlimited_recursive_depth");
 	int depth;
@@ -1500,8 +1502,9 @@ void SystemData::updateDisplayedGameCount()
 
 	mGameCountInfo = nullptr;
 
-	// A favorite or a capture changed: the home's slides are made again
+	// A favorite or a capture changed: the home's slides and suggestions are made again
 	mSlidesReady = false;
+	mSuggestionsReady = false;
 }
 
 void SystemData::loadTheme()
@@ -2152,10 +2155,19 @@ FileData* SystemData::getLastPlayedGame(bool orChefPick)
 		return nullptr;
 
 	FileData* game = info->lastPlayedPath.empty() ? nullptr : mRootFolder->FindByPath(info->lastPlayedPath);
+	if (game == nullptr && orChefPick)
+		game = getSuggestedGame();
 	if (game == nullptr && orChefPick && !info->chefPickPath.empty())
 		game = mRootFolder->FindByPath(info->chefPickPath);
 
 	return game;
+}
+
+static std::mt19937& homeRandom()
+{
+	static std::random_device device;
+	static std::mt19937 engine(device());
+	return engine;
 }
 
 // The games of the system and of the systems grouped in it, each keyed by its own system and its path
@@ -2204,6 +2216,31 @@ const std::vector<std::string>& SystemData::getSlides()
 	auto rules = HomeSlides::parseRules(mTheme->getVariable("systemslides"));
 	mSlides = HomeSlides::orderSlides(getHomeCandidates(false), rules, 12);
 	return mSlides;
+}
+
+FileData* SystemData::getSuggestedGame()
+{
+	if (mRootFolder == nullptr || isUtilitySystem(this))
+		return nullptr;
+
+	if (!mSuggestionsReady)
+	{
+		mSuggestionsReady = true;
+		mSuggestions.reset(HomeSlides::pickPool(getHomeCandidates(true), 12), homeRandom());
+	}
+
+	if (mSuggestions.empty())
+		return nullptr;
+
+	return mRootFolder->FindByPath(mSuggestions.current());
+}
+
+bool SystemData::nextSuggestion()
+{
+	if (getSuggestedGame() == nullptr)
+		return false;
+
+	return mSuggestions.next(homeRandom());
 }
 
 FileData* SystemData::getContinueGame()

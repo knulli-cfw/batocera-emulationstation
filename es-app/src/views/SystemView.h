@@ -116,6 +116,7 @@ private:
 	bool	 buildTabs();
 	void	 applyTabGrid();
 	void	 moveTab(int direction);
+	bool	 onContinueVideoEnded(SystemData* system);
 
 	void	 renderCarousel(const Transform4x4f& parentTrans);
 	void	 renderExtras(const Transform4x4f& parentTrans, float lower, float upper);
@@ -163,6 +164,7 @@ private:
 	std::vector<SystemViewTab>			mTabs;
 	int									mActiveTab;
 	std::map<int, std::string>			mTabCursors;
+	bool								mSuggestionChanged;
 
 	static std::map<std::string, int>	sSystemTabs;
 };

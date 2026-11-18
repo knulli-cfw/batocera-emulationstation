@@ -743,9 +743,13 @@ separated by `,`:
 * Each visible system is in one tab: the first that lists it. Visible systems that no tab lists go to the
   tab with `*`, or to the last tab. Hidden and empty systems are left out, and so are tabs with no system.
 * Going to a system (back from its game list, at start-up) shows its tab.
-* X continues the selected system's game, `{system:continue}`: the one played last, else its best-rated
-  favorite; with neither, and on tools, emulators and screenshots (`{system:hasContinue}` false), X does nothing.
-  B does not open the navigation bar, which lists every system.
+* X continues the selected system's game, `{system:continue}`: the one played last, else the suggested game
+  (below), else its best-rated favorite; with none, and on tools, emulators and screenshots
+  (`{system:hasContinue}` false), X does nothing. B does not open the navigation bar, which lists every system.
+* On a system never played, `{system:continue}` is a suggestion: a random favorite with a preview video, each
+  favorite once before any repeats (without favorites, one of the 12 best-rated games with a video). A system
+  view `<video>` whose path is `{system:continue:video}` plays it once and the view moves on to the next
+  suggestion, so the panel's other bindings follow the video; the last game's video loops.
 * `{system:tab}` is the index of the system's tab in the list (0 for the first), -1 without tabs, so the
   theme can draw the tab row (`"./tabs/" + {system:tab} + ".png"`).
 * A tab with more systems than the grid shows at once (`autoLayout` columns × rows) uses

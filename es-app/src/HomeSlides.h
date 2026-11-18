@@ -2,11 +2,12 @@
 #ifndef ES_APP_HOME_SLIDES_H
 #define ES_APP_HOME_SLIDES_H
 
+#include <random>
 #include <set>
 #include <string>
 #include <vector>
 
-// The tabbed home's slides: the captures a system card slides through.
+// The tabbed home's slides: the captures a system card slides through and the games its panel suggests.
 // Free of ES types so it can be tested alone.
 namespace HomeSlides
 {
@@ -40,6 +41,30 @@ namespace HomeSlides
 	// A card's captures: its favorites with a capture, else its best-rated games with one (at most
 	// fallbackCount); the excluded left out; the representatives first, then by rating and name.
 	std::vector<std::string> orderSlides(std::vector<Candidate> candidates, const Rules& rules, size_t fallbackCount);
+
+	// The panel's pool, as ids: the favorites with a video, else the best-rated games with one (at most
+	// fallbackCount). Exclusions are about captures, so they do not apply.
+	std::vector<std::string> pickPool(std::vector<Candidate> candidates, size_t fallbackCount);
+
+	// Items in a random order, each shown once before any repeats; a new round never starts with the item
+	// shown last.
+	class Deck
+	{
+	public:
+		Deck() : mIndex(0) { }
+
+		void reset(const std::vector<std::string>& items, std::mt19937& rng);
+		bool empty() const { return mItems.empty(); }
+		size_t size() const { return mItems.size(); }
+		const std::string& current() const;
+
+		// Moves to the next item; false (and stays) when there is no other one
+		bool next(std::mt19937& rng);
+
+	private:
+		std::vector<std::string> mItems;
+		size_t mIndex;
+	};
 }
 
 #endif // ES_APP_HOME_SLIDES_H

@@ -113,7 +113,8 @@ public:
 	GameCountInfo* getGameCountInfo();
 	void updateDisplayedGameCount();
 
-	// The game played last (nullptr if none); with orChefPick, else the best-rated favorite or game
+	// The game played last (nullptr if none); with orChefPick, else the suggested game, else the best-rated
+	// favorite or game
 	FileData* getLastPlayedGame(bool orChefPick = false);
 	// What X continues: getLastPlayedGame(true), nothing on a utility system
 	FileData* getContinueGame();
@@ -125,6 +126,11 @@ public:
 	// with one, else its best-rated games, as the theme variable "systemslides" orders and filters them
 	// (HomeSlides::Rules); none on collections and utilities.
 	const std::vector<std::string>& getSlides();
+	// On a system never played, the game the panel suggests: a random favorite with a preview video, each
+	// one once before any repeats, else a best-rated game with one; nullptr without any
+	FileData* getSuggestedGame();
+	// The next suggestion (when its video ends); false when there is no other one
+	bool nextSuggestion();
 
 	static bool IsManufacturerSupported;
 	static bool hasDirtySystems();
@@ -296,6 +302,8 @@ private:
 
 	std::vector<std::string> mSlides;
 	bool mSlidesReady;
+	HomeSlides::Deck mSuggestions;
+	bool mSuggestionsReady;
 
 	bool mHidden;
 };

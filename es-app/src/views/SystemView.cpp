@@ -58,6 +58,7 @@ SystemView::SystemView(Window* window) : GuiComponent(window),
 	mPressedPoint = Vector2i(-1, -1);
 
 	mActiveTab = 0;
+	mSuggestionChanged = false;
 
 	setSize((float)Renderer::getScreenWidth(), (float)Renderer::getScreenHeight());
 	populate();
@@ -132,6 +133,15 @@ void SystemView::reloadTheme(SystemData* system)
 	loadExtras(system);	
 }
 
+static void forEachVideo(GuiComponent* comp, const std::function<void(VideoComponent*)>& func)
+{
+	if (comp->isKindOf<VideoComponent>())
+		func((VideoComponent*)comp);
+
+	for (int i = 0; i < comp->getChildCount(); i++)
+		forEachVideo(comp->getChild(i), func);
+}
+
 void SystemView::loadExtras(SystemData* system)
 {
 	auto it = std::find_if(mEntries.begin(), mEntries.end(), [system](const SystemViewData& ss) { return ss.object == system; });
@@ -195,6 +205,18 @@ void SystemView::loadExtras(SystemData* system)
 				((ImageComponent*)extra)->setPlaylist(std::make_shared<SystemRandomPlaylist>(system, type));
 			}
 		}
+	}
+
+	// The panel's videos of {system:continue}, in a container or not: see onContinueVideoEnded
+	for (auto extra : extras)
+	{
+		forEachVideo(extra, [this, system](VideoComponent* video)
+		{
+			auto expressions = video->getBindingExpressions();
+			auto path = expressions.find("path");
+			if (path != expressions.cend() && path->second.find("{system:continue") != std::string::npos)
+				video->setOnVideoEnded([this, system]() { return onContinueVideoEnded(system); });
+		});
 	}
 
 	// sort the extras by z-index
@@ -530,8 +552,8 @@ bool SystemView::input(InputConfig* config, Input input)
 
 	if (input.value != 0)
 	{
-		// Tabs: X continues the selected system's last game, else plays its best-rated favorite; nothing
-		// on tools, emulators and screenshots (it never runs a tool again unasked)
+		// Tabs: X continues the selected system's last game, else plays the game the panel suggests;
+		// nothing on tools, emulators and screenshots (it never runs a tool again unasked)
 		if (hasTabs() && config->isMappedTo("x", input))
 		{
 			SystemData* system = getSelected();
@@ -690,6 +712,13 @@ void SystemView::showNavigationBar(const std::string& title, const std::function
 
 void SystemView::update(int deltaTime)
 {
+	// A suggestion's video ended: the panel shows the next suggestion, before the video restarts
+	if (mSuggestionChanged)
+	{
+		mSuggestionChanged = false;
+		updateExtraTextBinding();
+	}
+
 	mCarousel.update(deltaTime);
 	mSystemInfo.update(deltaTime);
 
@@ -710,6 +739,20 @@ void SystemView::update(int deltaTime)
 		else
 			showQuickSearch();
 	}
+}
+
+// The panel's video of {system:continue}: the last game's loops; on a system never played, a suggestion's
+// ends and the panel moves on to the next suggestion (SystemData::nextSuggestion)
+bool SystemView::onContinueVideoEnded(SystemData* system)
+{
+	if (system == nullptr || system != getSelected() || system->getLastPlayedGame() != nullptr)
+		return true;
+
+	if (!system->nextSuggestion())
+		return true;
+
+	mSuggestionChanged = true;
+	return false;
 }
 
 void SystemView::updateExtraTextBinding()

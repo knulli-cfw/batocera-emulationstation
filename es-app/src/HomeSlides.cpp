@@ -147,4 +147,47 @@ namespace HomeSlides
 
 		return slides;
 	}
+
+	std::vector<std::string> pickPool(std::vector<Candidate> candidates, size_t fallbackCount)
+	{
+		std::vector<std::string> ids;
+		for (auto& candidate : pool(candidates, fallbackCount))
+			ids.push_back(candidate.id);
+
+		return ids;
+	}
+
+	void Deck::reset(const std::vector<std::string>& items, std::mt19937& rng)
+	{
+		mItems = items;
+		mIndex = 0;
+		std::shuffle(mItems.begin(), mItems.end(), rng);
+	}
+
+	const std::string& Deck::current() const
+	{
+		static const std::string none;
+		return mItems.empty() ? none : mItems[mIndex];
+	}
+
+	bool Deck::next(std::mt19937& rng)
+	{
+		if (mItems.size() < 2)
+			return false;
+
+		if (mIndex + 1 < mItems.size())
+		{
+			mIndex++;
+			return true;
+		}
+
+		// A new round: shuffled again, not starting with the item just shown
+		std::string last = mItems[mIndex];
+		std::shuffle(mItems.begin(), mItems.end(), rng);
+		if (mItems.front() == last)
+			std::swap(mItems.front(), mItems[1 + rng() % (mItems.size() - 1)]);
+
+		mIndex = 0;
+		return true;
+	}
 }
