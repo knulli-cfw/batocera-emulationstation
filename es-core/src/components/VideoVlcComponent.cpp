@@ -5,6 +5,7 @@
 #include "utils/StringUtil.h"
 #include "PowerSaver.h"
 #include "Settings.h"
+#include "Window.h"
 #include <vlc/vlc.h>
 #include <SDL_mutex.h>
 #include <cmath>
@@ -702,6 +703,15 @@ void VideoVlcComponent::handleLooping()
 					mVideoPath = "";
 					return;
 				}
+			}
+
+			// The idle pause: a view's video ends its loop on its capture, and the panel moves on to no other
+			if (mIdlePause && !mScreensaverMode && mWindow->isIdlePaused(Window::IDLE_VIDEO))
+			{
+				stopVideo();
+				mFadeIn = 0.0;
+				mIdleStopped = true;
+				return;
 			}
 
 			if (mPlaylist != nullptr)

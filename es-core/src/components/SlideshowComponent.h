@@ -14,7 +14,8 @@ class TextureResource;
 // <slideshow>: captures shown one at a time at whole-pixel scales (SlideLayout::fit). In a grid's item
 // template it moves only on the selected item: every <interval> seconds the next capture slides in from
 // the right in <duration> seconds, with dots for the position; the other items show the first capture.
-// <path> lists the captures, one per line ("{system:slides}" on the system grid).
+// <path> lists the captures, one per line ("{system:slides}" on the system grid). It stops with the idle pause
+// (Window::isIdlePaused).
 class SlideshowComponent : public GuiComponent
 {
 public:

@@ -67,6 +67,8 @@ VideoComponent::VideoComponent(Window* window) :
 	mIsTopWindow(true),
 	mEnabled(true),
 	mScreensaverMode(false),
+	mIdlePause(false),
+	mIdleStopped(false),
 	mTargetIsMax(false),
 	mTargetIsMin(false),
 	mTargetSize(0, 0),
@@ -247,7 +249,7 @@ void VideoComponent::renderSnapshot(const Transform4x4f& parentTrans)
 {
 	// This is the case where the video is not currently being displayed. Work out
 	// if we need to display a static image
-	if ((mConfig.showSnapshotNoVideo && (mVideoPath.empty() || isUnplayable(mVideoPath))) || ((mStartDelayed || mFadeIn < 1.0) && mConfig.showSnapshotDelay))
+	if ((mConfig.showSnapshotNoVideo && (mVideoPath.empty() || isUnplayable(mVideoPath) || mIdleStopped)) || ((mStartDelayed || mFadeIn < 1.0 || mIdleStopped) && mConfig.showSnapshotDelay))
 	{
 		float t = 1.0 - mFadeIn;
 		t -= 1; // cubic ease out
@@ -281,6 +283,8 @@ void VideoComponent::renderSnapshot(const Transform4x4f& parentTrans)
 
 void VideoComponent::applyTheme(const std::shared_ptr<ThemeData>& theme, const std::string& view, const std::string& element, unsigned int properties)
 {
+	mIdlePause = true;
+
 	using namespace ThemeFlags;
 
 	const ThemeData::ThemeElement* elem = theme->getElement(view, element, "video");
@@ -504,6 +508,15 @@ void VideoComponent::manageState()
 	bool show = isShowing() && !mScreensaverActive && mIsTopWindow && mVisible && mEnabled;
 	if (!show)
 		mStartDelayed = false;
+
+	// Stopped by the idle pause at the end of a loop: it starts again on input, or as another video
+	if (mIdleStopped)
+	{
+		if (show && mVideoPath == mPlayingVideoPath && mWindow->isIdlePaused(Window::IDLE_VIDEO))
+			return;
+
+		mIdleStopped = false;
+	}
 
 	// See if we're already playing
 	if (mIsPlaying || mIsWaitingForVideoToStart)

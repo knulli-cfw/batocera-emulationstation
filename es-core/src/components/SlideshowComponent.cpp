@@ -7,6 +7,7 @@
 #include "utils/StringUtil.h"
 #include "ImageIO.h"
 #include "ThemeData.h"
+#include "Window.h"
 
 SlideshowComponent::SlideshowComponent(Window* window) : GuiComponent(window),
 	mShown(0), mScreenSaverActive(false), mColor(0xFFFFFFFF), mSaturation(1.0f), mRoundCorners(0.0f), mRoi(0, 0, 1, 1),
@@ -75,7 +76,8 @@ void SlideshowComponent::update(int deltaTime)
 	bool paused = mScreenSaverActive || !isShowing();
 	bool sliding = mClock.progress() >= 0;
 	int target = mClock.next();
-	auto request = mClock.update(deltaTime, (int)mPaths.size(), isActive(), paused, isReady(mNextTexture));
+	bool held = mWindow->isIdlePaused(Window::IDLE_SLIDES);
+	auto request = mClock.update(deltaTime, (int)mPaths.size(), isActive(), paused, isReady(mNextTexture), held);
 
 	if (mClock.current() != mShown)
 	{

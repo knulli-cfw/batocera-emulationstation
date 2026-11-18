@@ -217,6 +217,8 @@ protected:
 	bool							mIsPlaying;		
 	bool							mScreensaverActive;
 	bool							mScreensaverMode;
+	bool							mIdlePause;		// a theme's video: stops for the idle pause (Window::isIdlePaused)
+	bool							mIdleStopped;	// stopped by it at the end of a loop, until input
 	bool							mTargetIsMax;
 	bool							mTargetIsMin;
 

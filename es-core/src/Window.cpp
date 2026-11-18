@@ -32,7 +32,7 @@
 #endif
 
 Window::Window() : mNormalizeNextUpdate(false), mFrameTimeElapsed(0), mFrameCountElapsed(0), mFrameDrawnStart(0), mAverageDeltaTime(10),
-  mAllowSleep(true), mSleeping(false), mTimeSinceLastInput(0), mScreenSaver(NULL), mRenderScreenSaver(false), mClockElapsed(0), mMouseCapture(nullptr), mMenuBackgroundShaderTextureCache(-1)
+  mAllowSleep(true), mSleeping(false), mTimeSinceLastInput(0), mIdleVideo(false), mIdleSlides(false), mScreenSaver(NULL), mRenderScreenSaver(false), mClockElapsed(0), mMouseCapture(nullptr), mMenuBackgroundShaderTextureCache(-1)
 {			
 	mTransitionOffset = 0;
 
@@ -523,6 +523,7 @@ void Window::update(int deltaTime)
 	}
 
 	mTimeSinceLastInput += deltaTime;
+	updateIdlePause();
 
 	if (peekGui())
 		peekGui()->update(deltaTime);
@@ -927,6 +928,15 @@ void Window::render()
 bool Window::drawsOnlyChanges()
 {
 	return mGuiStack.size() == 1 && !mRenderScreenSaver && !mSleeping && Settings::getInstance()->getBool("RenderOnChange");
+}
+
+void Window::updateIdlePause()
+{
+	int seconds = Settings::getInstance()->getInt("IdlePause");
+	bool idle = seconds > 0 && mTimeSinceLastInput >= (unsigned int)seconds * 1000;
+
+	mIdleVideo = idle && Settings::getInstance()->getBool("IdlePauseVideo");
+	mIdleSlides = idle && Settings::getInstance()->getBool("IdlePauseSlides");
 }
 
 void Window::normalizeNextUpdate()

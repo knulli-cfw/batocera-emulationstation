@@ -126,8 +126,9 @@ namespace SlideLayout
 		float progress() const { return mProgress; }	// of the slide to the next capture, 0 to 1; -1 while waiting
 
 		// One frame of deltaTime ms over count captures. Only a selected item moves; a deselected one goes back
-		// to the first capture; a paused one (screen saver, view hidden) keeps its place without moving.
-		Request update(int deltaTime, int count, bool selected, bool paused, bool nextLoaded)
+		// to the first capture; a paused one (screen saver, view hidden) keeps its place without moving; a held
+		// one (the idle pause) ends the change under way, then stays on its capture.
+		Request update(int deltaTime, int count, bool selected, bool paused, bool nextLoaded, bool held = false)
 		{
 			if (count < 2 || !selected)
 			{
@@ -156,6 +157,9 @@ namespace SlideLayout
 
 				return NONE;
 			}
+
+			if (held)
+				return NONE;
 
 			if (mNext < 0)
 			{

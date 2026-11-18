@@ -123,6 +123,9 @@ void Settings::setDefaults()
 	mBoolMap["DrawFramerate"] = false;
 	mBoolMap["RenderOnChange"] = true;
 	mBoolMap["RenderOnChangeVerify"] = false;
+	mIntMap["IdlePause"] = 60;
+	mBoolMap["IdlePauseVideo"] = true;
+	mBoolMap["IdlePauseSlides"] = true;
 	mBoolMap["ScrollLoadMedias"] = false;	
 	mBoolMap["ShowExit"] = true;
 	mBoolMap["ExitOnRebootRequired"] = false;

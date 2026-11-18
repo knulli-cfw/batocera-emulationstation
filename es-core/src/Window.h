@@ -71,6 +71,11 @@ public:
 	// The home and the game lists, with nothing over them, draw a frame only when it changes
 	// (Settings "RenderOnChange")
 	bool drawsOnlyChanges();
+
+	// Idle pause: after "IdlePause" seconds without input (0: never), the views' videos stop at the end of
+	// their loop ("IdlePauseVideo") and their slideshows stop moving ("IdlePauseSlides"); input resumes them
+	enum IdlePart { IDLE_VIDEO, IDLE_SLIDES };
+	bool isIdlePaused(IdlePart part) const { return part == IDLE_VIDEO ? mIdleVideo : mIdleSlides; }
 	bool getAllowSleep();
 	void setAllowSleep(bool sleep);
 	
@@ -176,6 +181,9 @@ private:
 	bool mAllowSleep;
 	bool mSleeping;
 	unsigned int mTimeSinceLastInput;
+	bool mIdleVideo;
+	bool mIdleSlides;
+	void updateIdlePause();
 
 	bool mRenderedHelpPrompts;
 

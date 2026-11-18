@@ -1176,9 +1176,9 @@ Captures shown one at a time at whole-pixel scales: the smallest of 1/4, 1/2, 1,
 capture's region of interest covers the element, centred (on the capture's pixel grid at 2x and up), so pixel
 art stays sharp. In a grid's item template it moves only on the selected item: every `interval` seconds the
 next capture slides in from the right in `duration` seconds, and the other items show the first capture. It
-stops under the screen saver and while the view is hidden; a capture that does not load (gone, not an image) is
-asked for once more, then skipped. Child elements (a screen filter, a frame) are drawn over the captures, the
-dots over them.
+stops under the screen saver, while the view is hidden and with the idle pause (Idle pause, below); a capture
+that does not load (gone, not an image) is asked for once more, then skipped. Child elements (a screen filter, a
+frame) are drawn over the captures, the dots over them.
 
 * `pos`, `size`, `x`, `y`, `w`, `h`, `origin`, `opacity`, `visible`, `zIndex` - as for `image`.
 * `path` - type: STRING.
@@ -1210,6 +1210,14 @@ and show a frame only when it differs from the frame on screen or a texture it u
 frame), and at least once a second; otherwise the screen keeps its frame and ES waits for the next frame's time
 or an event. `RenderOnChangeVerify` (for tests) draws every frame and logs any frame the cache would have left
 out whose pixels changed; `DrawFramerate` shows the frames drawn per second.
+
+##### Idle pause
+
+After `IdlePause` seconds without input (es_settings, default 60; 0 never), the videos of the views stop at the
+end of their loop and show their snapshot or what is under them (`IdlePauseVideo`, default true; the system
+view's panel moves on to no other suggestion), and slideshows finish the change under way and stay on their
+capture (`IdlePauseSlides`, default true). Any input resumes them; so does a resume from system suspend, which
+also leaves the screen saver. The screen saver's videos are not paused.
 
 #### rating
 
