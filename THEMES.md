@@ -743,6 +743,9 @@ separated by `,`:
 * Each visible system is in one tab: the first that lists it. Visible systems that no tab lists go to the
   tab with `*`, or to the last tab. Hidden and empty systems are left out, and so are tabs with no system.
 * Going to a system (back from its game list, at start-up) shows its tab.
+* X continues the selected system's game, `{system:continue}`: the one played last, else its best-rated
+  favorite; with neither, and on tools, emulators and screenshots (`{system:hasContinue}` false), X does nothing.
+  B does not open the navigation bar, which lists every system.
 * `{system:tab}` is the index of the system's tab in the list (0 for the first), -1 without tabs, so the
   theme can draw the tab row (`"./tabs/" + {system:tab} + ".png"`).
 * A tab with more systems than the grid shows at once (`autoLayout` columns × rows) uses

@@ -530,6 +530,21 @@ bool SystemView::input(InputConfig* config, Input input)
 
 	if (input.value != 0)
 	{
+		// Tabs: X continues the selected system's last game, else plays its best-rated favorite; nothing
+		// on tools, emulators and screenshots (it never runs a tool again unasked)
+		if (hasTabs() && config->isMappedTo("x", input))
+		{
+			SystemData* system = getSelected();
+			FileData* game = system != nullptr ? system->getContinueGame() : nullptr;
+			if (game != nullptr)
+			{
+				mCarousel.stopScrolling();
+				ViewController::get()->launch(game);
+			}
+
+			return true;
+		}
+
 		bool netPlay = SystemData::isNetplayActivated() && SystemConf::getInstance()->getBool("global.netplay");
 		if (netPlay && config->isMappedTo("x", input))
 		{
@@ -586,7 +601,8 @@ bool SystemView::input(InputConfig* config, Input input)
 
 bool SystemView::showNavigationBar()
 {
-	if (!SystemData::IsManufacturerSupported)
+	// The bar lists every system, the tabbed grid only one tab's: L1/R1 move between tabs instead
+	if (!SystemData::IsManufacturerSupported || hasTabs())
 		return false;
 
 	auto sortMode = Settings::getInstance()->getString("SortSystems");
@@ -966,7 +982,16 @@ std::vector<HelpPrompt> SystemView::getHelpPrompts()
 
 	bool netPlay = SystemData::isNetplayActivated() && SystemConf::getInstance()->getBool("global.netplay");
 
-	if (netPlay)
+	if (hasTabs())
+	{
+		SystemData* system = getSelected();
+		if (system != nullptr && system->getContinueGame() != nullptr)
+			prompts.push_back(HelpPrompt("x", _("CONTINUE")));
+
+		if (SystemData::getSystem("all") != nullptr)
+			prompts.push_back(HelpPrompt("y", _("SEARCH"), [&] { showQuickSearch(); }));
+	}
+	else if (netPlay)
 	{
 		prompts.push_back(HelpPrompt("x", _("NETPLAY"), [&] { showNetplay(); }));
 		prompts.push_back(HelpPrompt("y", _("SEARCH") + std::string("/") + _("RANDOM"), [&] { showQuickSearch(); })); // QUICK 
@@ -978,7 +1003,7 @@ std::vector<HelpPrompt> SystemView::getHelpPrompts()
 			prompts.push_back(HelpPrompt("y", _("SEARCH"), [&] { showQuickSearch(); })); // QUICK 
 	}
 
-	if (SystemData::IsManufacturerSupported)
+	if (SystemData::IsManufacturerSupported && !hasTabs())
 		prompts.push_back(HelpPrompt("b", _("NAVIGATION BAR"), [&] { showNavigationBar(); }));
 
 #ifdef _ENABLE_FILEMANAGER_
