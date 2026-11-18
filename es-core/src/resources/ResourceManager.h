@@ -59,6 +59,7 @@ private:
 	};
 
 	std::list<std::shared_ptr<ReloadableInfo>> mReloadables;
+	int mAddedSincePrune;
 };
 
 #endif // ES_CORE_RESOURCES_RESOURCE_MANAGER_H
