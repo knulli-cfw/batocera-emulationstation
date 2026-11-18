@@ -1137,6 +1137,39 @@ Can be created as an extra.
 
 EmulationStation borrows the concept of "nine patches" from Android (or "9-Slices"). Currently the implementation is very simple and hard-coded to only use 48x48px images (16x16px for each "patch"). Check the `data/resources` directory for some examples (button.png, frame.png).
 
+#### slideshow
+
+Can be created as an extra, or in an `itemTemplate`.
+
+Captures shown one at a time at whole-pixel scales: the smallest of 1/4, 1/2, 1, 2, 3 and 4 at which the
+capture's region of interest covers the element, centred (on the capture's pixel grid at 2x and up), so pixel
+art stays sharp. In a grid's item template it moves only on the selected item: every `interval` seconds the
+next capture slides in from the right in `duration` seconds, and the other items show the first capture. Child
+elements (a screen filter, a frame) are drawn over the captures, the dots over them.
+
+* `pos`, `size`, `x`, `y`, `w`, `h`, `origin`, `opacity`, `visible`, `zIndex` - as for `image`.
+* `path` - type: STRING.
+    - The captures, one path per line; usually bound: `{system:slides}`.
+* `interval` - type: FLOAT.
+    - Seconds on each capture (default 4).
+* `duration` - type: FLOAT.
+    - Seconds of the slide to the next capture (default 0.6).
+* `color` - type: COLOR.
+    - Multiplied with the captures (a Game Boy's green, say).
+* `saturation` - type: FLOAT.
+    - 0 (grey) to 1 (default).
+* `roundCorners` - type: FLOAT.
+    - Corner radius of the element: pixels, or a fraction of its size below 1.
+* `roi` - type: NORMALIZED_RECT.
+    - The part of each capture to centre, as fractions of it: x y w h (default 0 0 1 1; `0 0 1 0.5` for the
+      top screen of a DS capture).
+* `dots`, `maxDots`, `dotSize`, `dotsOffset`, `dotColor`, `dotSelectedColor` - BOOLEAN, FLOAT, FLOAT,
+  NORMALIZED_PAIR, COLOR, COLOR.
+    - The position dots, on the selected item only: at most `maxDots` (default 9) in a window that follows the
+      current capture, smaller at an end with more captures beyond. `dotSize` is a fraction of the screen height
+      (default 4 px at 480), `dotsOffset` the distance of the row from the element's top-right corner, as
+      fractions of the screen (default 9 px, 9 px). The current dot is wider.
+
 #### rating
 
 * `pos` - type: NORMALIZED_PAIR.

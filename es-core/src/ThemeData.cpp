@@ -13,6 +13,7 @@
 #include "components/WebImageComponent.h"
 #include "components/RatingComponent.h"
 #include "components/RectangleComponent.h"
+#include "components/SlideshowComponent.h"
 
 #include "utils/FileSystemUtil.h"
 #include "utils/StringUtil.h"
@@ -29,7 +30,7 @@
 
 std::set<std::string> ThemeData::sSupportedItemTemplate { "imagegrid", "carousel", "gamecarousel", "textlist" };
 std::set<std::string> ThemeData::sSupportedViews        { "system", "basic", "detailed", "grid", "video", "gamecarousel", "menu", "screen", "splash" };
-std::set<std::string> ThemeData::sSupportedFeatures     { "video", "carousel", "gamecarousel", "z-index", "visible", "manufacturer", "systemtabs" };
+std::set<std::string> ThemeData::sSupportedFeatures     { "video", "carousel", "gamecarousel", "z-index", "visible", "manufacturer", "systemtabs", "slideshow" };
 
 static std::set<std::string> _autoExtraTypes            { "stackpanel", "container", "screenshader", "clock", "networkIcon", "webimage", "batteryText", "batteryIcon", "rectangle" };
 
@@ -99,6 +100,31 @@ std::map<std::string, std::map<std::string, ThemeData::ElementPropertyType>> The
 		{ "visible", BOOLEAN },
 		{ "padding", NORMALIZED_RECT },
 		{ "clipChildren", BOOLEAN },
+		{ "zIndex", FLOAT } } },
+
+	{ "slideshow", {
+		{ "pos", NORMALIZED_PAIR },
+		{ "size", NORMALIZED_PAIR },
+		{ "x", FLOAT },
+		{ "y", FLOAT },
+		{ "h", FLOAT },
+		{ "w", FLOAT },
+		{ "origin", NORMALIZED_PAIR },
+		{ "path", STRING },					// the captures, one per line ({system:slides})
+		{ "interval", FLOAT },				// seconds on each capture
+		{ "duration", FLOAT },				// seconds of the slide to the next one
+		{ "color", COLOR },
+		{ "saturation", FLOAT },
+		{ "roundCorners", FLOAT },
+		{ "roi", NORMALIZED_RECT },			// the part of a capture to centre, fractions of it: x y w h
+		{ "dots", BOOLEAN },
+		{ "maxDots", FLOAT },
+		{ "dotSize", FLOAT },				// fraction of the screen height
+		{ "dotsOffset", NORMALIZED_PAIR },	// from the top-right corner, fractions of the screen
+		{ "dotColor", COLOR },
+		{ "dotSelectedColor", COLOR },
+		{ "opacity", FLOAT },
+		{ "visible", BOOLEAN },
 		{ "zIndex", FLOAT } } },
 
 	{ "screenshader", {
@@ -2165,6 +2191,8 @@ GuiComponent* ThemeData::createExtraComponent(Window* window, const ThemeElement
 		comp = new RatingComponent(window);
 	else if (elem.type == "rectangle")
 		comp = new RectangleComponent(window);
+	else if (elem.type == "slideshow")
+		comp = new SlideshowComponent(window);
 
 	if (comp != nullptr)
 	{
