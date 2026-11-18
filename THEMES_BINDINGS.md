@@ -34,6 +34,7 @@ command                     string
 group                       string                 Name of the group
 collection                  bool
 subSystems                  int                    Number of susbystems (collections / groups)
+tab                         int                    Index of the system's tab on a tabbed system grid, -1 without tabs (THEMES.md, Tabs)
 total                       int                    Number of games / elements
 played                      int
 favorites                   int

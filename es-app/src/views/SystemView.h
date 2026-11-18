@@ -29,6 +29,13 @@ struct SystemViewData
 	std::vector<GuiComponent*> backgroundExtras;
 };
 
+// A tab of the system grid (theme variable "systemtabs"): its name and the systems it shows, in order
+struct SystemViewTab
+{
+	std::string name;
+	std::vector<SystemData*> systems;
+};
+
 
 class SystemView : public GuiComponent
 {
@@ -69,6 +76,9 @@ public:
 	int getCursorIndex();
 	std::vector<SystemData*> getObjects();
 
+	// The index of the tab that shows a system, in the theme's "systemtabs" order; -1 without tabs
+	static int getSystemTab(SystemData* system);
+
 protected:
 	//virtual void onCursorChanged(const CursorState& state) override;
 	void onCursorChanged(const CursorState& state);
@@ -98,6 +108,11 @@ private:
 	void	 getViewElements(const std::shared_ptr<ThemeData>& theme);
 	void	 getDefaultElements(void);
 	void	 getCarouselFromTheme(const ThemeData::ThemeElement* elem);
+
+	bool	 hasTabs();
+	bool	 buildTabs();
+	void	 applyTabGrid();
+	void	 moveTab(int direction);
 
 	void	 renderCarousel(const Transform4x4f& parentTrans);
 	void	 renderExtras(const Transform4x4f& parentTrans, float lower, float upper);
@@ -137,6 +152,16 @@ private:
 	std::string		mExtraTransitionType;
 	float			mExtraTransitionSpeed;
 	bool			mExtraTransitionHorizontal;
+
+	// Tabs: the theme's definition, the tabs built from it, the shown one and each tab's last system
+	std::shared_ptr<ThemeData>			mGridTheme;
+	std::string							mGridElement;
+	std::string							mTabDefinition;
+	std::vector<SystemViewTab>			mTabs;
+	int									mActiveTab;
+	std::map<int, std::string>			mTabCursors;
+
+	static std::map<std::string, int>	sSystemTabs;
 };
 
 #endif // ES_APP_VIEWS_SYSTEM_VIEW_H

@@ -726,6 +726,34 @@ This kind of view is used for retrocompatibility with Retropie themes, but is de
 	- Displays details of the system currently selected in the carousel.
 * You can use extra elements (elements with `extra="true"`) to add your own backgrounds, etc.  They will be displayed behind the carousel, and scroll relative to the carousel.
 
+##### Tabs (system grid)
+
+A system grid (`imagegrid name="imagegrid"`) can be split into tabs with the theme variable `systemtabs`.
+Its value lists the tabs in order, separated by `;`, each as a name, `=` and the names of its systems,
+separated by `,`:
+
+```xml
+<variables>
+	<systemtabs>COLLECTIONS=all,favorites,recent;8-BIT=atari2600,nes,mastersystem;MORE=dos,pico8,*</systemtabs>
+</variables>
+```
+
+* The grid shows the systems of one tab, in the listed order. L1/R1 (`pageup`/`pagedown`) show the previous
+  or next tab that has systems, wrapping around; the grid comes back to the system last selected in that tab.
+* Each visible system is in one tab: the first that lists it. Visible systems that no tab lists go to the
+  tab with `*`, or to the last tab. Hidden and empty systems are left out, and so are tabs with no system.
+* Going to a system (back from its game list, at start-up) shows its tab.
+* `{system:tab}` is the index of the system's tab in the list (0 for the first), -1 without tabs, so the
+  theme can draw the tab row (`"./tabs/" + {system:tab} + ".png"`).
+* A tab with more systems than the grid shows at once (`autoLayout` columns × rows) uses
+  `<imagegrid name="imagegrid-dense">` instead, when the theme has one (another layout, say); its items keep
+  the template of `imagegrid`.
+* ES versions with tabs support the feature `systemtabs`: put the tabbed view inside
+  `<feature supported="systemtabs">` so other versions keep the theme's own system view.
+* `<itemTemplate replace="true">` replaces the templates an earlier definition of the same element had, so an
+  include can redefine the items of a theme's grid. Without `replace="true"` the first template stays the one used,
+  as before.
+
 #### menu
 * `helpsystem name="help"` - ALL
 	- The help system style for this view. If not defined, menus will have the same helpsystem as defined in system view.

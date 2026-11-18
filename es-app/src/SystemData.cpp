@@ -18,6 +18,7 @@
 #include "utils/StringUtil.h"
 #include "utils/Randomizer.h"
 #include "views/ViewController.h"
+#include "views/SystemView.h"
 #include "ThreadedHasher.h"
 #include <unordered_set>
 #include <algorithm>
@@ -2145,6 +2146,9 @@ BindableProperty SystemData::getProperty(const std::string& name)
 			return BindableProperty("", BindablePropertyType::Path);
 		}
 	}
+
+	if (name == "tab")
+		return SystemView::getSystemTab(this);
 
 	if (name == "subSystems")
 	{

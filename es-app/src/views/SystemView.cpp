@@ -29,6 +29,10 @@
 #include "guis/GuiRetroAchievements.h"
 #include "components/CarouselComponent.h"
 
+#include <set>
+
+std::map<std::string, int> SystemView::sSystemTabs;
+
 SystemView::SystemView(Window* window) : GuiComponent(window),
 	mViewNeedsReload(true),
 	mSystemInfo(window, _("SYSTEM INFO"), Font::get(FONT_SIZE_SMALL), 0x33333300, ALIGN_CENTER), mYButton("y")
@@ -52,6 +56,8 @@ SystemView::SystemView(Window* window) : GuiComponent(window),
 	mLockExtraChanges = false;
 	mPressedCursor = -1;
 	mPressedPoint = Vector2i(-1, -1);
+
+	mActiveTab = 0;
 
 	setSize((float)Renderer::getScreenWidth(), (float)Renderer::getScreenHeight());
 	populate();
@@ -213,28 +219,45 @@ void SystemView::populate()
 	TextureLoader::paused = true;
 
 	clearEntries();
-	
-	for (auto system : SystemData::sSystemVector)
+
+	// The view's elements come from the first system with a theme
+	if (mViewNeedsReload)
 	{
-		const std::shared_ptr<ThemeData>& theme = system->getTheme();
-		if (theme == nullptr)
-			continue;
-
-		if (mViewNeedsReload)
-			getViewElements(theme);
-
-		if (system->isVisible())
+		for (auto system : SystemData::sSystemVector)
 		{
-			mCarousel.add(system->getName(), system, true);
-			loadExtras(system);
+			if (system->getTheme() == nullptr)
+				continue;
 
-			auto carousel = mCarousel.asCarousel();
-			if (carousel)
-			{
-				auto logo = carousel->getLogo(mCarousel.size() - 1);
-				if (logo)
-					ensureTexture(logo.get(), true);
-			}
+			getViewElements(system->getTheme());
+			break;
+		}
+	}
+
+	// With tabs, only the systems of the shown tab
+	std::vector<SystemData*> systems;
+	if (buildTabs())
+	{
+		applyTabGrid();
+		systems = mTabs[mActiveTab].systems;
+	}
+	else
+	{
+		for (auto system : SystemData::sSystemVector)
+			if (system->getTheme() != nullptr && system->isVisible())
+				systems.push_back(system);
+	}
+
+	for (auto system : systems)
+	{
+		mCarousel.add(system->getName(), system, true);
+		loadExtras(system);
+
+		auto carousel = mCarousel.asCarousel();
+		if (carousel)
+		{
+			auto logo = carousel->getLogo(mCarousel.size() - 1);
+			if (logo)
+				ensureTexture(logo.get(), true);
 		}
 	}
 
@@ -268,6 +291,21 @@ void SystemView::populate()
 
 void SystemView::goToSystem(SystemData* system, bool animate)
 {
+	// With tabs, show the system's tab first
+	if (system != nullptr && hasTabs())
+	{
+		auto it = sSystemTabs.find(system->getName());
+		if (it != sSystemTabs.cend() && it->second != mActiveTab)
+		{
+			auto current = getSelected();
+			if (current != nullptr)
+				mTabCursors[mActiveTab] = current->getName();
+
+			mActiveTab = it->second;
+			populate();
+		}
+	}
+
 	mLastCursor = -1;
 	mCarousel.setCursor(system);
 
@@ -396,6 +434,22 @@ bool SystemView::input(InputConfig* config, Input input)
 	{
 		showQuickSearch();
 		return true;
+	}
+
+	// Tabs: L1/R1 show the previous or next tab
+	if (hasTabs() && input.value != 0)
+	{
+		if (config->isMappedTo("pageup", input))
+		{
+			moveTab(-1);
+			return true;
+		}
+
+		if (config->isMappedTo("pagedown", input))
+		{
+			moveTab(1);
+			return true;
+		}
 	}
 
 	// Move selection fast using group (manufacturers)
@@ -961,6 +1015,8 @@ void  SystemView::getViewElements(const std::shared_ptr<ThemeData>& theme)
 {
 	LOG(LogDebug) << "SystemView::getViewElements()";
 
+	mTabDefinition = theme->getVariable("systemtabs");
+
 	const ThemeData::ThemeElement* textListElem = theme->getElement("system", "textlist", "textlist");
 	if (textListElem)
 	{
@@ -990,6 +1046,8 @@ void  SystemView::getViewElements(const std::shared_ptr<ThemeData>& theme)
 			getDefaultElements();
 
 			mCarousel.applyTheme(theme, "system", "imagegrid", ThemeFlags::ALL);
+			mGridTheme = theme;
+			mGridElement = "imagegrid";
 		}
 		else
 		{
@@ -1065,6 +1123,162 @@ void  SystemView::getViewElements(const std::shared_ptr<ThemeData>& theme)
 	std::stable_sort(mStaticBackgrounds.begin(), mStaticBackgrounds.end(), [](GuiComponent* a, GuiComponent* b) { return b->getZIndex() > a->getZIndex(); });
 
 	mViewNeedsReload = false;
+}
+
+// Tabs come from the theme variable "systemtabs", which only a system grid uses:
+//   <systemtabs>NAME=system,system,...;NAME=...;NAME=system,*</systemtabs>
+// in the order shown. Each visible system is in one tab: the first that lists it, else the tab
+// with "*" (else the last one). L1/R1 move between the tabs that have systems.
+bool SystemView::buildTabs()
+{
+	mTabs.clear();
+	sSystemTabs.clear();
+
+	if (mTabDefinition.empty() || !mCarousel.isGrid())
+		return false;
+
+	std::vector<SystemData*> visible;
+	for (auto system : SystemData::sSystemVector)
+		if (system->getTheme() != nullptr && system->isVisible())
+			visible.push_back(system);
+
+	std::set<SystemData*> placed;
+	int wildcard = -1;
+
+	for (auto definition : Utils::String::split(mTabDefinition, ';', true))
+	{
+		if (Utils::String::trim(definition).empty())
+			continue;
+
+		SystemViewTab tab;
+
+		auto equal = definition.find('=');
+		tab.name = Utils::String::trim(definition.substr(0, equal));
+
+		if (equal != std::string::npos)
+		{
+			for (auto name : Utils::String::split(definition.substr(equal + 1), ',', true))
+			{
+				name = Utils::String::trim(name);
+				if (name == "*")
+				{
+					wildcard = (int)mTabs.size();
+					continue;
+				}
+
+				for (auto system : visible)
+					if (system->getName() == name && placed.insert(system).second)
+						tab.systems.push_back(system);
+			}
+		}
+
+		mTabs.push_back(tab);
+	}
+
+	if (mTabs.empty())
+		return false;
+
+	if (wildcard < 0)
+		wildcard = (int)mTabs.size() - 1;
+
+	for (auto system : visible)
+		if (placed.insert(system).second)
+			mTabs[wildcard].systems.push_back(system);
+
+	int firstFilled = -1;
+	for (int i = 0; i < (int)mTabs.size(); i++)
+	{
+		for (auto system : mTabs[i].systems)
+			sSystemTabs[system->getName()] = i;
+
+		if (firstFilled < 0 && !mTabs[i].systems.empty())
+			firstFilled = i;
+	}
+
+	if (firstFilled < 0)
+	{
+		mTabs.clear();
+		sSystemTabs.clear();
+		return false;
+	}
+
+	if (mActiveTab < 0 || mActiveTab >= (int)mTabs.size() || mTabs[mActiveTab].systems.empty())
+		mActiveTab = firstFilled;
+
+	return true;
+}
+
+bool SystemView::hasTabs()
+{
+	return !mTabs.empty() && mCarousel.isGrid();
+}
+
+int SystemView::getSystemTab(SystemData* system)
+{
+	if (system == nullptr)
+		return -1;
+
+	auto it = sSystemTabs.find(system->getName());
+	return it == sSystemTabs.cend() ? -1 : it->second;
+}
+
+// A tab with more systems than the grid shows at once uses <imagegrid name="imagegrid-dense"> when
+// the theme has one (a layout with more rows, say); the items keep the "imagegrid" template.
+void SystemView::applyTabGrid()
+{
+	if (mGridTheme == nullptr || !mCarousel.isGrid())
+		return;
+
+	std::string element = "imagegrid";
+
+	const ThemeData::ThemeElement* grid = mGridTheme->getElement("system", "imagegrid", "imagegrid");
+	const ThemeData::ThemeElement* dense = mGridTheme->getElement("system", "imagegrid-dense", "imagegrid");
+	if (grid != nullptr && dense != nullptr && grid->has("autoLayout"))
+	{
+		auto layout = grid->get<Vector2f>("autoLayout");
+		if (layout.x() > 0 && layout.y() > 0 && mTabs[mActiveTab].systems.size() > layout.x() * layout.y())
+			element = "imagegrid-dense";
+	}
+
+	if (element == mGridElement)
+		return;
+
+	mCarousel.applyTheme(mGridTheme, "system", element, ThemeFlags::ALL);
+	mGridElement = element;
+}
+
+void SystemView::moveTab(int direction)
+{
+	int count = (int)mTabs.size();
+	int tab = mActiveTab;
+
+	for (int i = 0; i < count; i++)
+	{
+		tab = (tab + direction + count) % count;
+		if (!mTabs[tab].systems.empty())
+			break;
+	}
+
+	if (tab == mActiveTab)
+		return;
+
+	mCarousel.stopScrolling();
+
+	auto current = getSelected();
+	if (current != nullptr)
+		mTabCursors[mActiveTab] = current->getName();
+
+	SystemData* select = mTabs[tab].systems.front();
+
+	auto last = mTabCursors.find(tab);
+	if (last != mTabCursors.cend())
+		for (auto system : mTabs[tab].systems)
+			if (system->getName() == last->second)
+				select = system;
+
+	mActiveTab = tab;
+	populate();
+	goToSystem(select, false);
 }
 
 //  Render system carousel

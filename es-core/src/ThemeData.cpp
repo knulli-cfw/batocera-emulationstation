@@ -29,7 +29,7 @@
 
 std::set<std::string> ThemeData::sSupportedItemTemplate { "imagegrid", "carousel", "gamecarousel", "textlist" };
 std::set<std::string> ThemeData::sSupportedViews        { "system", "basic", "detailed", "grid", "video", "gamecarousel", "menu", "screen", "splash" };
-std::set<std::string> ThemeData::sSupportedFeatures     { "video", "carousel", "gamecarousel", "z-index", "visible", "manufacturer" };
+std::set<std::string> ThemeData::sSupportedFeatures     { "video", "carousel", "gamecarousel", "z-index", "visible", "manufacturer", "systemtabs" };
 
 static std::set<std::string> _autoExtraTypes            { "stackpanel", "container", "screenshader", "clock", "networkIcon", "webimage", "batteryText", "batteryIcon", "rectangle" };
 
@@ -1949,6 +1949,19 @@ void ThemeData::parseElement(const pugi::xml_node& root, const std::map<std::str
 				if (!overwrite && element.properties.find(name) != element.properties.cend())
 					continue;
 
+				// <itemTemplate replace="true">: it replaces the element's earlier templates, so an include can
+				// redefine the items of a grid it overrides. Without it the first template stays the one used.
+				// The other children are copied into a new vector (each copy owns its storyboards).
+				if (overwrite && node.attribute("replace").as_bool())
+				{
+					std::vector<std::pair<std::string, ThemeElement>> kept;
+					for (const auto& child : element.children)
+						if (child.first != "itemTemplate")
+							kept.push_back(child);
+
+					element.children.swap(kept);
+				}
+
 				element.children.push_back(std::pair<std::string, ThemeElement>("itemTemplate", ThemeElement()));
 				std::pair<std::string, ThemeElement>& item = element.children.back();
 				item.second.extra = 99;
@@ -2561,6 +2574,23 @@ ThemeData::ThemeElement::ThemeElement(const ThemeElement& src)
 
 	for (auto sb : src.mStoryBoards)
 		mStoryBoards[sb.first] = new ThemeStoryboard(*sb.second);
+}
+
+// Copy-and-swap: the copy owns its storyboards (the copy constructor clones them), and the element's
+// old ones are deleted with the temporary. The implicit assignment shared the storyboard pointers.
+ThemeData::ThemeElement& ThemeData::ThemeElement::operator=(const ThemeElement& src)
+{
+	if (this != &src)
+	{
+		ThemeElement copy(src);
+		std::swap(extra, copy.extra);
+		type.swap(copy.type);
+		properties.swap(copy.properties);
+		children.swap(copy.children);
+		mStoryBoards.swap(copy.mStoryBoards);
+	}
+
+	return *this;
 }
 
 ThemeData::ThemeElement::~ThemeElement()
