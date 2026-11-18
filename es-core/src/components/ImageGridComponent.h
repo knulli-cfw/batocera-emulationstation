@@ -104,6 +104,9 @@ public:
 
 	virtual void topWindow(bool isTop);
 	virtual void onShow();
+
+	// Binds the items' templates again (what they show changed)
+	void updateTileBindings();
 	virtual void onHide();
 	virtual void onScreenSaverActivate();
 	virtual void onScreenSaverDeactivate();
@@ -626,6 +629,20 @@ void ImageGridComponent<T>::setOpacity(unsigned char opacity)
 	for (auto entry : mEntries)
 		if (entry.data.tile != nullptr)
 			entry.data.tile->setOpacity(opacity);
+}
+
+template<typename T>
+void ImageGridComponent<T>::updateTileBindings()
+{
+	for (auto& entry : mEntries)
+	{
+		if (entry.data.tile == nullptr)
+			continue;
+
+		IBindable* bindable = getBindable(entry);
+		if (bindable != nullptr)
+			entry.data.tile->updateBindings(bindable);
+	}
 }
 
 template<typename T>

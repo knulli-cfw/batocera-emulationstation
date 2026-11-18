@@ -75,7 +75,9 @@ SystemData::SystemData(const SystemMetadata& meta, SystemEnvironmentData* envDat
 	mGameListHash = 0;
 	mGameCountInfo = nullptr;
 	mSlidesReady = false;
+	mSlidesVersion = 0;
 	mSuggestionsReady = false;
+	mPanelVideo = false;
 	mSortId = Settings::getInstance()->getInt(getName() + ".sort");
 	mUnlimitedRecursiveDepth = Settings::getInstance()->getBool(getName() + ".unlimited_recursive_depth");
 	int depth;
@@ -2155,7 +2157,7 @@ FileData* SystemData::getLastPlayedGame(bool orChefPick)
 		return nullptr;
 
 	FileData* game = info->lastPlayedPath.empty() ? nullptr : mRootFolder->FindByPath(info->lastPlayedPath);
-	if (game == nullptr && orChefPick)
+	if (game == nullptr && orChefPick && mPanelVideo)
 		game = getSuggestedGame();
 	if (game == nullptr && orChefPick && !info->chefPickPath.empty())
 		game = mRootFolder->FindByPath(info->chefPickPath);
@@ -2171,7 +2173,9 @@ static std::mt19937& homeRandom()
 }
 
 // The games of the system and of the systems grouped in it, each keyed by its own system and its path
-// in that system's folder (as the gamelist and the theme variable "systemslides" write it)
+// in that system's folder (as the gamelist and the theme variable "systemslides" write it). Games of tools,
+// emulators and screenshots are left out (a collection never offers one to X, as getGameCountInfo), and so
+// is media under 1 KB (an empty or broken file).
 std::vector<HomeSlides::Candidate> SystemData::getHomeCandidates(bool video)
 {
 	std::vector<HomeSlides::Candidate> candidates;
@@ -2182,7 +2186,7 @@ std::vector<HomeSlides::Candidate> SystemData::getHomeCandidates(bool video)
 	{
 		FileData* source = game->getSourceFileData();
 		SystemData* system = source->getSystem();
-		if (system == nullptr || system->getRootFolder() == nullptr)
+		if (system == nullptr || system->getRootFolder() == nullptr || isUtilitySystem(system))
 			continue;
 
 		HomeSlides::Candidate candidate;
@@ -2193,7 +2197,7 @@ std::vector<HomeSlides::Candidate> SystemData::getHomeCandidates(bool video)
 		candidate.rating = Utils::String::toFloat(game->getMetadata(MetaDataId::Rating));
 		candidate.favorite = game->getFavorite();
 
-		if (!candidate.media.empty() && !Utils::FileSystem::exists(candidate.media))
+		if (!candidate.media.empty() && Utils::FileSystem::getFileSize(candidate.media) < 1024)
 			candidate.media.clear();
 
 		candidates.push_back(candidate);
@@ -2207,20 +2211,46 @@ const std::vector<std::string>& SystemData::getSlides()
 	if (mSlidesReady)
 		return mSlides;
 
-	mSlidesReady = true;
-	mSlides.clear();
-
-	if (isCollection() || isUtilitySystem(this) || mTheme == nullptr)
+	// Without its theme yet, the list waits: it is made once the theme (and its "systemslides") is there
+	if (mTheme == nullptr)
+	{
+		mSlides.clear();
 		return mSlides;
+	}
 
-	auto rules = HomeSlides::parseRules(mTheme->getVariable("systemslides"));
-	mSlides = HomeSlides::orderSlides(getHomeCandidates(false), rules, 12);
+	mSlidesReady = true;
+
+	std::vector<std::string> slides;
+	if (!isCollection() && !isUtilitySystem(this))
+		slides = HomeSlides::orderSlides(getHomeCandidates(false), HomeSlides::parseRules(mTheme->getVariable("systemslides")), 12);
+
+	if (slides != mSlides)
+	{
+		mSlides = slides;
+		mSlidesVersion++;
+	}
+
 	return mSlides;
+}
+
+int SystemData::getSlidesVersion()
+{
+	getSlides();
+	return mSlidesVersion;
+}
+
+void SystemData::setPanelVideo(bool value)
+{
+	if (mPanelVideo == value)
+		return;
+
+	mPanelVideo = value;
+	mSuggestionsReady = false;
 }
 
 FileData* SystemData::getSuggestedGame()
 {
-	if (mRootFolder == nullptr || isUtilitySystem(this))
+	if (mRootFolder == nullptr || !mPanelVideo || isUtilitySystem(this))
 		return nullptr;
 
 	if (!mSuggestionsReady)
@@ -2233,6 +2263,11 @@ FileData* SystemData::getSuggestedGame()
 		return nullptr;
 
 	return mRootFolder->FindByPath(mSuggestions.current());
+}
+
+bool SystemData::hasOtherSuggestion()
+{
+	return getSuggestedGame() != nullptr && mSuggestions.size() > 1;
 }
 
 bool SystemData::nextSuggestion()

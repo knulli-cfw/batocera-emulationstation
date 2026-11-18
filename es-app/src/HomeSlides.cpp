@@ -151,6 +151,12 @@ namespace HomeSlides
 	std::vector<std::string> pickPool(std::vector<Candidate> candidates, size_t fallbackCount)
 	{
 		std::vector<std::string> ids;
+
+		// Favorites without a video: no suggestion rather than games that are not favorites
+		bool favorites = std::any_of(candidates.cbegin(), candidates.cend(), [](const Candidate& c) { return c.favorite; });
+		if (favorites && std::none_of(candidates.cbegin(), candidates.cend(), [](const Candidate& c) { return c.favorite && !c.media.empty(); }))
+			return ids;
+
 		for (auto& candidate : pool(candidates, fallbackCount))
 			ids.push_back(candidate.id);
 
@@ -159,9 +165,15 @@ namespace HomeSlides
 
 	void Deck::reset(const std::vector<std::string>& items, std::mt19937& rng)
 	{
+		std::string keep = current();
+
 		mItems = items;
 		mIndex = 0;
 		std::shuffle(mItems.begin(), mItems.end(), rng);
+
+		auto it = std::find(mItems.begin(), mItems.end(), keep);
+		if (!keep.empty() && it != mItems.end())
+			std::iter_swap(mItems.begin(), it);
 	}
 
 	const std::string& Deck::current() const

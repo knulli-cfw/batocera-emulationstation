@@ -126,9 +126,16 @@ public:
 	// with one, else its best-rated games, as the theme variable "systemslides" orders and filters them
 	// (HomeSlides::Rules); none on collections and utilities.
 	const std::vector<std::string>& getSlides();
+	// Changes each time the system's slides change (to bind the cards again)
+	int getSlidesVersion();
 	// On a system never played, the game the panel suggests: a random favorite with a preview video, each
-	// one once before any repeats, else a best-rated game with one; nullptr without any
+	// one once before any repeats; on a system with no favorite, a best-rated game with one; nullptr without
+	// any, and unless the system view plays {system:continue:video} (setPanelVideo): any other theme keeps
+	// {system:continue} on the best-rated favorite
 	FileData* getSuggestedGame();
+	void setPanelVideo(bool value);
+	// More than one suggestion to move on to
+	bool hasOtherSuggestion();
 	// The next suggestion (when its video ends); false when there is no other one
 	bool nextSuggestion();
 
@@ -302,8 +309,10 @@ private:
 
 	std::vector<std::string> mSlides;
 	bool mSlidesReady;
+	int mSlidesVersion;
 	HomeSlides::Deck mSuggestions;
 	bool mSuggestionsReady;
+	bool mPanelVideo;
 
 	bool mHidden;
 };

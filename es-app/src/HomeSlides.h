@@ -42,12 +42,14 @@ namespace HomeSlides
 	// fallbackCount); the excluded left out; the representatives first, then by rating and name.
 	std::vector<std::string> orderSlides(std::vector<Candidate> candidates, const Rules& rules, size_t fallbackCount);
 
-	// The panel's pool, as ids: the favorites with a video, else the best-rated games with one (at most
-	// fallbackCount). Exclusions are about captures, so they do not apply.
+	// The panel's pool, as ids: the favorites with a video; none when there are favorites but none has one
+	// (the panel then shows the best-rated favorite); only a system with no favorite at all uses its best-rated
+	// games with a video (at most fallbackCount). Exclusions are about captures, so they do not apply.
 	std::vector<std::string> pickPool(std::vector<Candidate> candidates, size_t fallbackCount);
 
 	// Items in a random order, each shown once before any repeats; a new round never starts with the item
-	// shown last.
+	// shown last. A reset (the list made again after a game changed) keeps the current item while it is still
+	// in the list, so the panel does not jump to another game.
 	class Deck
 	{
 	public:

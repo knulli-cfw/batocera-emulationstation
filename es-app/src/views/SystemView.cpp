@@ -30,6 +30,7 @@
 #include "components/CarouselComponent.h"
 
 #include <set>
+#include <SDL_timer.h>
 
 std::map<std::string, int> SystemView::sSystemTabs;
 
@@ -58,7 +59,9 @@ SystemView::SystemView(Window* window) : GuiComponent(window),
 	mPressedPoint = Vector2i(-1, -1);
 
 	mActiveTab = 0;
-	mSuggestionChanged = false;
+	mSuggestionEnded = nullptr;
+	mShownSystem = nullptr;
+	mContinueShownAt = 0;
 
 	setSize((float)Renderer::getScreenWidth(), (float)Renderer::getScreenHeight());
 	populate();
@@ -207,17 +210,24 @@ void SystemView::loadExtras(SystemData* system)
 		}
 	}
 
-	// The panel's videos of {system:continue}, in a container or not: see onContinueVideoEnded
+	// The panel's videos of {system:continue:video}, in a container or not: see onContinueVideoEnded. Only a
+	// view that plays one gets suggestions (SystemData::setPanelVideo); any other keeps {system:continue}
+	bool panelVideo = false;
 	for (auto extra : extras)
 	{
-		forEachVideo(extra, [this, system](VideoComponent* video)
+		forEachVideo(extra, [this, system, &panelVideo](VideoComponent* video)
 		{
 			auto expressions = video->getBindingExpressions();
 			auto path = expressions.find("path");
-			if (path != expressions.cend() && path->second.find("{system:continue") != std::string::npos)
+			if (path != expressions.cend() && path->second.find("{system:continue:video}") != std::string::npos)
+			{
 				video->setOnVideoEnded([this, system]() { return onContinueVideoEnded(system); });
+				panelVideo = true;
+			}
 		});
 	}
+
+	system->setPanelVideo(panelVideo);
 
 	// sort the extras by z-index
 	std::stable_sort(extras.begin(), extras.end(), [](GuiComponent* a, GuiComponent* b) { return b->getZIndex() > a->getZIndex(); });
@@ -558,6 +568,15 @@ bool SystemView::input(InputConfig* config, Input input)
 		{
 			SystemData* system = getSelected();
 			FileData* game = system != nullptr ? system->getContinueGame() : nullptr;
+
+			// The game the panel shows, should the suggestion have changed since it was bound
+			if (game != nullptr && system == mShownSystem && !mShownContinue.empty() && game->getPath() != mShownContinue)
+			{
+				FileData* shown = system->getRootFolder()->FindByPath(mShownContinue);
+				if (shown != nullptr)
+					game = shown;
+			}
+
 			if (game != nullptr)
 			{
 				mCarousel.stopScrolling();
@@ -712,11 +731,15 @@ void SystemView::showNavigationBar(const std::string& title, const std::function
 
 void SystemView::update(int deltaTime)
 {
-	// A suggestion's video ended: the panel shows the next suggestion, before the video restarts
-	if (mSuggestionChanged)
+	// A suggestion's video ended: the next suggestion and the panel's rebinding in one step, before the video
+	// restarts, so X never launches a game the panel does not show
+	if (mSuggestionEnded != nullptr)
 	{
-		mSuggestionChanged = false;
-		updateExtraTextBinding();
+		SystemData* system = mSuggestionEnded;
+		mSuggestionEnded = nullptr;
+
+		if (system == getSelected() && system->nextSuggestion())
+			updateExtraTextBinding();
 	}
 
 	mCarousel.update(deltaTime);
@@ -742,16 +765,19 @@ void SystemView::update(int deltaTime)
 }
 
 // The panel's video of {system:continue}: the last game's loops; on a system never played, a suggestion's
-// ends and the panel moves on to the next suggestion (SystemData::nextSuggestion)
+// ends and the panel moves on to the next suggestion (in update). A suggestion stays at least
+// MIN_SUGGESTION_MS: a video that ends at once loops until then rather than start VLC again every few frames.
+static const unsigned int MIN_SUGGESTION_MS = 5000;
+
 bool SystemView::onContinueVideoEnded(SystemData* system)
 {
-	if (system == nullptr || system != getSelected() || system->getLastPlayedGame() != nullptr)
+	if (system == nullptr || system != getSelected() || system->getLastPlayedGame() != nullptr || !system->hasOtherSuggestion())
 		return true;
 
-	if (!system->nextSuggestion())
+	if (SDL_GetTicks() - mContinueShownAt < MIN_SUGGESTION_MS)
 		return true;
 
-	mSuggestionChanged = true;
+	mSuggestionEnded = system;
 	return false;
 }
 
@@ -767,6 +793,16 @@ void SystemView::updateExtraTextBinding()
 
 	for (auto extra : mEntries[mCursor].backgroundExtras)
 		BindingManager::updateBindings(extra, system);
+
+	// The game the panel now shows, for X, and since when
+	FileData* shown = system->getContinueGame();
+	std::string path = shown != nullptr ? shown->getPath() : "";
+	if (system != mShownSystem || path != mShownContinue)
+	{
+		mShownSystem = system;
+		mShownContinue = path;
+		mContinueShownAt = SDL_GetTicks();
+	}
 }
 
 void SystemView::onCursorChanged(const CursorState& state)
@@ -1747,6 +1783,24 @@ void SystemView::onShow()
 
 	// What changed while hidden (a game played since, a favorite) shows at once
 	updateExtraTextBinding();
+
+	// The cards too, when a system's slides changed (a favorite added in a game list)
+	bool slidesChanged = false;
+	for (auto& entry : mEntries)
+	{
+		int version = entry.object->getSlidesVersion();
+		auto it = mSlidesBound.find(entry.object);
+		if (it == mSlidesBound.cend())
+			mSlidesBound[entry.object] = version;
+		else if (it->second != version)
+		{
+			it->second = version;
+			slidesChanged = true;
+		}
+	}
+
+	if (slidesChanged && mCarousel.isGrid())
+		mCarousel.asGrid()->updateTileBindings();
 
 	activateExtras(mCarousel.getCursorIndex());
 

@@ -746,10 +746,14 @@ separated by `,`:
 * X continues the selected system's game, `{system:continue}`: the one played last, else the suggested game
   (below), else its best-rated favorite; with none, and on tools, emulators and screenshots
   (`{system:hasContinue}` false), X does nothing. B does not open the navigation bar, which lists every system.
-* On a system never played, `{system:continue}` is a suggestion: a random favorite with a preview video, each
-  favorite once before any repeats (without favorites, one of the 12 best-rated games with a video). A system
-  view `<video>` whose path is `{system:continue:video}` plays it once and the view moves on to the next
-  suggestion, so the panel's other bindings follow the video; the last game's video loops.
+* Suggestions, only when the system view has a `<video>` whose path is `{system:continue:video}` (any other
+  theme keeps `{system:continue}`, `{system:hasContinue}` and X as above): on a system never played,
+  `{system:continue}` is a random favorite with a preview video, each once before any repeats. A system with
+  favorites but none with a video gets no suggestion (its best-rated favorite, as above); only a system with no
+  favorite at all suggests its 12 best-rated games with a video. Games of tools, emulators and screenshots and
+  videos under 1 KB are left out. The video plays once (each suggestion stays at least 5 seconds) and the view
+  moves on to the next one, binding the panel again, so the other bindings and X follow the video; a list made
+  again (a game changed) keeps the current suggestion while it is still in it. The last game's video loops.
 * `{system:tab}` is the index of the system's tab in the list (0 for the first), -1 without tabs, so the
   theme can draw the tab row (`"./tabs/" + {system:tab} + ".png"`).
 * A tab with more systems than the grid shows at once (`autoLayout` columns × rows) uses

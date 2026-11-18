@@ -44,7 +44,7 @@ mostPlayed                  int
 gameTime                    string
 lastPlayedDate              string
 lastPlayed                  game                   The game played last ({system:lastPlayed:name}); empty if none. A collection leaves out tools, emulators and screenshots
-continue                    game                   lastPlayed, else the suggested game (THEMES.md, Tabs), else the best-rated favorite (else the best-rated game)
+continue                    game                   lastPlayed, else the suggested game (with a {system:continue:video} video in the view; THEMES.md, Tabs), else the best-rated favorite (else the best-rated game)
 hasLastPlayed               bool                   lastPlayed exists and still resolves to a game
 hasContinue                 bool                   continue resolves and is not on tools, emulators or screenshots (X does nothing there)
 slides                      string                 The captures of the system's card, one path per line: favorites with a screenshot, else the 12 best-rated games with one (THEMES.md, Slides)

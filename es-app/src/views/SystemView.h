@@ -164,7 +164,13 @@ private:
 	std::vector<SystemViewTab>			mTabs;
 	int									mActiveTab;
 	std::map<int, std::string>			mTabCursors;
-	bool								mSuggestionChanged;
+	// The panel's suggestion: the system whose video ended (update moves on), the game shown and since when,
+	// and the slides version each card was bound with
+	SystemData*							mSuggestionEnded;
+	SystemData*							mShownSystem;
+	std::string							mShownContinue;
+	unsigned int						mContinueShownAt;
+	std::map<SystemData*, int>			mSlidesBound;
 
 	static std::map<std::string, int>	sSystemTabs;
 };
