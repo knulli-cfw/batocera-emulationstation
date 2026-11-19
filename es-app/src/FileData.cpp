@@ -1965,9 +1965,10 @@ BindableProperty FileData::getProperty(const std::string& name)
 		return Utils::FileSystem::exists(getMetadata(MetaDataId::Manual)) || Utils::FileSystem::exists(getMetadata(MetaDataId::Magazine)); // ? _("YES") : _("NO");
 	}
 
-	// Whether the game's emulator keeps save states (what the game list's X opens), whether it has one or not
+	// Whether the game's own emulator and core keep save states (what the game list's X opens), whether it has
+	// one or not; false on a folder
 	if (name == "saveStatesSupported")
-		return SaveStateRepository::isEnabled(this);
+		return SaveStateRepository::isEnabledForGame(this);
 
 	if (name == "hasSaveState" || name == "hassavestate" || name == "savestate")
 	{

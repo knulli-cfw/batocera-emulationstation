@@ -199,6 +199,25 @@ bool SaveStateRepository::isEnabled(FileData* game)
 	return SaveStateConfigFile::getSaveStateConfigs(system).size() != 0;
 }
 
+bool SaveStateRepository::isEnabledForGame(FileData* game)
+{
+	if (game == nullptr || game->getType() != GAME || !isEnabled(game))
+		return false;
+
+	// Without the configuration file one default configuration serves every emulator
+	if (!SaveStateConfigFile::isEnabled())
+		return true;
+
+	std::string emulator = game->getEmulator();
+	std::string core = game->getCore();
+
+	for (auto conf : SaveStateConfigFile::getSaveStateConfigs(game->getSourceFileData()->getSystem()))
+		if (conf->emulator == emulator && (conf->core.empty() || conf->core == core))
+			return true;
+
+	return false;
+}
+
 int SaveStateRepository::getNextFreeSlot(FileData* game, std::shared_ptr<SaveStateConfig> config)
 {
 	if (!isEnabled(game))
