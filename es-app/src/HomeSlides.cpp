@@ -196,9 +196,9 @@ namespace HomeSlides
 		return ids;
 	}
 
-	void Deck::reset(const std::vector<std::string>& items, std::mt19937& rng)
+	void Deck::reset(const std::vector<std::string>& items, std::mt19937& rng, const std::string& prefer)
 	{
-		std::string keep = current();
+		std::string keep = current().empty() ? prefer : current();
 
 		mItems = items;
 		mIndex = 0;

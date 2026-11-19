@@ -122,12 +122,18 @@ public:
 	// The game played last on the console (tools and screenshots left out)
 	static FileData* getConsoleLastPlayedGame();
 
+
 	// The tabbed home. The captures the system's card slides through ({system:slides}): its favorites
 	// with one, else its best-rated games, as the theme variable "systemslides" orders and filters them
 	// (HomeSlides::Rules); none on collections and utilities.
 	const std::vector<std::string>& getSlides();
 	// Changes each time the system's slides change (to bind the cards again)
 	int getSlidesVersion();
+	// The slides and the suggestions are made off the UI thread (empty until then, the ones before them while
+	// they are made again): true when new ones arrived, to bind the cards and the panel again. SystemView calls
+	// it each frame.
+	bool pollHomeLists();
+	struct HomeJob;
 	// On a system never played, the game the panel suggests: a random favorite with a preview video, each
 	// one once before any repeats; on a system with no favorite, a best-rated game with one; nullptr without
 	// any, and unless the system view plays {system:continue:video} (setPanelVideo): any other theme keeps
@@ -308,13 +314,17 @@ private:
 	GameCountInfo* mGameCountInfo;
 	SaveStateRepository* mSaveRepository;
 
-	std::vector<HomeSlides::Candidate> getHomeCandidates(bool video);
+	void getHomeCandidates(std::vector<HomeSlides::Candidate>& images, std::vector<HomeSlides::Candidate>& videos);
+	void startHomeJob();
 
 	std::vector<std::string> mSlides;
 	bool mSlidesReady;
 	int mSlidesVersion;
 	HomeSlides::Deck mSuggestions;
 	bool mSuggestionsReady;
+	bool mHomeDirty;		// to be made (again)
+	int mHomeGeneration;	// counts the changes, so a list made before the last one is made once more
+	std::shared_ptr<HomeJob> mHomeJob;
 	std::vector<std::string> mRecent;
 	size_t mRecentCount;	// the files it was made from
 	bool mPanelVideo;

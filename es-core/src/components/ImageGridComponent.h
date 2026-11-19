@@ -107,6 +107,8 @@ public:
 
 	// Binds the items' templates again (what they show changed)
 	void updateTileBindings();
+	// Only the item of that object
+	void updateTileBindings(const T& object);
 	virtual void onHide();
 	virtual void onScreenSaverActivate();
 	virtual void onScreenSaverDeactivate();
@@ -629,6 +631,20 @@ void ImageGridComponent<T>::setOpacity(unsigned char opacity)
 	for (auto entry : mEntries)
 		if (entry.data.tile != nullptr)
 			entry.data.tile->setOpacity(opacity);
+}
+
+template<typename T>
+void ImageGridComponent<T>::updateTileBindings(const T& object)
+{
+	for (auto& entry : mEntries)
+	{
+		if (entry.data.tile == nullptr || !(entry.object == object))
+			continue;
+
+		IBindable* bindable = getBindable(entry);
+		if (bindable != nullptr)
+			entry.data.tile->updateBindings(bindable);
+	}
 }
 
 template<typename T>

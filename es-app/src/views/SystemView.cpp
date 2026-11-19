@@ -731,6 +731,24 @@ void SystemView::showNavigationBar(const std::string& title, const std::function
 
 void SystemView::update(int deltaTime)
 {
+	// A system's slides and suggestions, made off the UI thread, arrived: its card and the panel bind them
+	for (auto& entry : mEntries)
+	{
+		SystemData* system = entry.object;
+		if (!system->pollHomeLists())
+			continue;
+
+		int version = system->getSlidesVersion();
+		auto it = mSlidesBound.find(system);
+		if ((it == mSlidesBound.cend() || it->second != version) && mCarousel.isGrid())
+			mCarousel.asGrid()->updateTileBindings(system);
+
+		mSlidesBound[system] = version;
+
+		if (system == getSelected())
+			updateExtraTextBinding();
+	}
+
 	// A suggestion's video ended: the next suggestion and the panel's rebinding in one step, before the video
 	// restarts, so X never launches a game the panel does not show
 	if (mSuggestionEnded != nullptr)
@@ -1784,23 +1802,10 @@ void SystemView::onShow()
 	// What changed while hidden (a game played since, a favorite) shows at once
 	updateExtraTextBinding();
 
-	// The cards too, when a system's slides changed (a favorite added in a game list)
-	bool slidesChanged = false;
+	// The cards too, when a system's slides changed (a favorite added in a game list): those to make again are
+	// asked for now, off the UI thread, and update binds them when they arrive
 	for (auto& entry : mEntries)
-	{
-		int version = entry.object->getSlidesVersion();
-		auto it = mSlidesBound.find(entry.object);
-		if (it == mSlidesBound.cend())
-			mSlidesBound[entry.object] = version;
-		else if (it->second != version)
-		{
-			it->second = version;
-			slidesChanged = true;
-		}
-	}
-
-	if (slidesChanged && mCarousel.isGrid())
-		mCarousel.asGrid()->updateTileBindings();
+		entry.object->getSlides();
 
 	activateExtras(mCarousel.getCursorIndex());
 

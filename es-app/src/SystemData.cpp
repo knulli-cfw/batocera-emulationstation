@@ -24,6 +24,11 @@
 #include <algorithm>
 #include <functional>
 #include <random>
+#include <atomic>
+#include <condition_variable>
+#include <deque>
+#include <mutex>
+#include <thread>
 #include "SaveStateRepository.h"
 #include "Paths.h"
 #include "SystemRandomPlaylist.h"
@@ -77,6 +82,8 @@ SystemData::SystemData(const SystemMetadata& meta, SystemEnvironmentData* envDat
 	mSlidesReady = false;
 	mSlidesVersion = 0;
 	mSuggestionsReady = false;
+	mHomeDirty = true;
+	mHomeGeneration = 0;
 	mPanelVideo = false;
 	mRecentCount = (size_t)-1;
 	mSortId = Settings::getInstance()->getInt(getName() + ".sort");
@@ -1505,9 +1512,10 @@ void SystemData::updateDisplayedGameCount()
 
 	mGameCountInfo = nullptr;
 
-	// A favorite or a capture changed: the home's slides, suggestions and recent items are made again
-	mSlidesReady = false;
-	mSuggestionsReady = false;
+	// A favorite or a capture changed: the home's slides, suggestions and recent items are made again (the
+	// ones before them still show meanwhile)
+	mHomeDirty = true;
+	mHomeGeneration++;
 	mRecentCount = (size_t)-1;
 }
 
@@ -2175,14 +2183,13 @@ static std::mt19937& homeRandom()
 }
 
 // The games of the system and of the systems grouped in it, each keyed by its own system and its path
-// in that system's folder (as the gamelist and the theme variable "systemslides" write it). Games of tools,
-// emulators and screenshots are left out (a collection never offers one to X, as getGameCountInfo), and so
-// is media under 1 KB (an empty or broken file).
-std::vector<HomeSlides::Candidate> SystemData::getHomeCandidates(bool video)
+// in that system's folder (as the gamelist and the theme variable "systemslides" write it), with their
+// capture and their video. Games of tools, emulators and screenshots are left out (a collection never offers
+// one to X, as getGameCountInfo). Memory only: the worker reads the files' sizes.
+void SystemData::getHomeCandidates(std::vector<HomeSlides::Candidate>& images, std::vector<HomeSlides::Candidate>& videos)
 {
-	std::vector<HomeSlides::Candidate> candidates;
 	if (mRootFolder == nullptr)
-		return candidates;
+		return;
 
 	for (auto game : mRootFolder->getFilesRecursive(GAME, true))
 	{
@@ -2195,59 +2202,156 @@ std::vector<HomeSlides::Candidate> SystemData::getHomeCandidates(bool video)
 		candidate.key = HomeSlides::key(system->getName(), Utils::FileSystem::createRelativePath(source->getPath(), system->getRootFolder()->getPath(), false));
 		candidate.id = game->getPath();
 		candidate.name = game->getName();
-		candidate.media = video ? game->getVideoPath() : game->getImagePath();
 		candidate.rating = Utils::String::toFloat(game->getMetadata(MetaDataId::Rating));
 		candidate.favorite = game->getFavorite();
 
-		if (!candidate.media.empty() && Utils::FileSystem::getFileSize(candidate.media) < 1024)
-			candidate.media.clear();
+		candidate.media = game->getImagePath();
+		images.push_back(candidate);
 
-		candidates.push_back(candidate);
+		candidate.media = game->getVideoPath();
+		videos.push_back(candidate);
+	}
+}
+
+// The home's lists of a system, made by one worker thread so the UI thread never waits for the card: the
+// UI thread reads the candidates from memory, the worker drops media under 1 KB (an empty or broken file:
+// one stat per file, slow on a cold SD card) and orders them, and SystemView polls each frame
+// (pollHomeLists) to bind the cards and the panel when they arrive.
+struct SystemData::HomeJob
+{
+	std::vector<HomeSlides::Candidate> images, videos;
+	HomeSlides::Rules rules;
+	int generation;
+
+	std::vector<std::string> slides, pool;
+	std::atomic<bool> done;
+
+	HomeJob() : generation(0), done(false) { }
+};
+
+namespace
+{
+	// Never destroyed: the worker outlives main's statics
+	struct HomeWorker
+	{
+		std::mutex lock;
+		std::condition_variable wake;
+		std::deque<std::shared_ptr<SystemData::HomeJob>> jobs;
+		bool started = false;
+	};
+
+	HomeWorker& homeWorker()
+	{
+		static HomeWorker* worker = new HomeWorker();
+		return *worker;
 	}
 
-	return candidates;
+	void runHomeJobs()
+	{
+		HomeWorker& worker = homeWorker();
+		for (;;)
+		{
+			std::shared_ptr<SystemData::HomeJob> job;
+			{
+				std::unique_lock<std::mutex> lock(worker.lock);
+				worker.wake.wait(lock, [&worker] { return !worker.jobs.empty(); });
+
+				// The newest first: what was asked for last is what the screen shows
+				job = worker.jobs.back();
+				worker.jobs.pop_back();
+			}
+
+			for (auto list : { &job->images, &job->videos })
+				for (auto& candidate : *list)
+					if (!candidate.media.empty() && Utils::FileSystem::getFileSize(candidate.media) < 1024)
+						candidate.media.clear();
+
+			job->slides = HomeSlides::orderSlides(job->images, job->rules, 12);
+			job->pool = HomeSlides::pickPool(job->videos, job->rules, 12);
+			job->done = true;
+		}
+	}
+}
+
+void SystemData::startHomeJob()
+{
+	if (mHomeJob != nullptr || !mHomeDirty || mTheme == nullptr)
+		return;
+
+	auto job = std::make_shared<HomeJob>();
+	job->generation = mHomeGeneration;
+	job->rules = HomeSlides::parseRules(mTheme->getVariable("systemslides"));
+	if (!isCollection() && !isUtilitySystem(this))
+		getHomeCandidates(job->images, job->videos);
+
+	mHomeJob = job;
+
+	HomeWorker& worker = homeWorker();
+	std::unique_lock<std::mutex> lock(worker.lock);
+	if (!worker.started)
+	{
+		worker.started = true;
+		std::thread(runHomeJobs).detach();
+	}
+
+	worker.jobs.push_back(job);
+	worker.wake.notify_one();
+}
+
+bool SystemData::pollHomeLists()
+{
+	if (mHomeJob == nullptr || !mHomeJob->done)
+		return false;
+
+	auto job = mHomeJob;
+	mHomeJob = nullptr;
+
+	bool changed = false;
+	if (job->slides != mSlides || !mSlidesReady)
+	{
+		mSlides = job->slides;
+		mSlidesVersion++;
+		changed = true;
+	}
+
+	// The first pool starts on the game the panel shows meanwhile (the best-rated favorite) when it is in it,
+	// so the panel does not jump to another; a later one keeps the current suggestion (Deck::reset)
+	std::string shown;
+	if (mSuggestions.empty() && mGameCountInfo != nullptr)
+		shown = mGameCountInfo->chefPickPath;
+
+	auto before = mSuggestions.current();
+	mSuggestions.reset(job->pool, homeRandom(), shown);
+	if (!mSuggestionsReady || mSuggestions.current() != before)
+		changed = true;
+
+	mSlidesReady = true;
+	mSuggestionsReady = true;
+
+	// Changed again while it was being made: once more
+	if (job->generation == mHomeGeneration)
+		mHomeDirty = false;
+	else
+		startHomeJob();
+
+	return changed;
 }
 
 const std::vector<std::string>& SystemData::getSlides()
 {
-	if (mSlidesReady)
-		return mSlides;
-
 	// Without its theme yet, the list waits: it is made once the theme (and its "systemslides") is there
-	if (mTheme == nullptr)
-	{
-		mSlides.clear();
-		return mSlides;
-	}
-
-	mSlidesReady = true;
-
-	std::vector<std::string> slides;
-	if (!isCollection() && !isUtilitySystem(this))
-		slides = HomeSlides::orderSlides(getHomeCandidates(false), HomeSlides::parseRules(mTheme->getVariable("systemslides")), 12);
-
-	if (slides != mSlides)
-	{
-		mSlides = slides;
-		mSlidesVersion++;
-	}
-
+	startHomeJob();
 	return mSlides;
 }
 
 int SystemData::getSlidesVersion()
 {
-	getSlides();
 	return mSlidesVersion;
 }
 
 void SystemData::setPanelVideo(bool value)
 {
-	if (mPanelVideo == value)
-		return;
-
 	mPanelVideo = value;
-	mSuggestionsReady = false;
 }
 
 FileData* SystemData::getSuggestedGame()
@@ -2255,14 +2359,9 @@ FileData* SystemData::getSuggestedGame()
 	if (mRootFolder == nullptr || !mPanelVideo || isUtilitySystem(this))
 		return nullptr;
 
-	if (!mSuggestionsReady)
-	{
-		mSuggestionsReady = true;
-		auto rules = HomeSlides::parseRules(mTheme != nullptr ? mTheme->getVariable("systemslides") : "");
-		mSuggestions.reset(HomeSlides::pickPool(getHomeCandidates(true), rules, 12), homeRandom());
-	}
+	startHomeJob();
 
-	if (mSuggestions.empty())
+	if (!mSuggestionsReady || mSuggestions.empty())
 		return nullptr;
 
 	return mRootFolder->FindByPath(mSuggestions.current());

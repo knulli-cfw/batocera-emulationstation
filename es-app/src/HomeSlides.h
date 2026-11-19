@@ -63,13 +63,13 @@ namespace HomeSlides
 
 	// Items in a random order, each shown once before any repeats; a new round never starts with the item
 	// shown last. A reset (the list made again after a game changed) keeps the current item while it is still
-	// in the list, so the panel does not jump to another game.
+	// in the list, so the panel does not jump to another game; without one, it starts on prefer when that is in it.
 	class Deck
 	{
 	public:
 		Deck() : mIndex(0) { }
 
-		void reset(const std::vector<std::string>& items, std::mt19937& rng);
+		void reset(const std::vector<std::string>& items, std::mt19937& rng, const std::string& prefer = "");
 		bool empty() const { return mItems.empty(); }
 		size_t size() const { return mItems.size(); }
 		const std::string& current() const;
