@@ -11,6 +11,8 @@ struct libvlc_instance_t;
 struct libvlc_media_t;
 struct libvlc_media_player_t;
 
+// The frames VLC draws for one playback. Shared by the component and the player's worker (VideoVlcComponent's
+// PlayerWorker), so the buffers outlive a player that is still being stopped after the component let go.
 struct VideoContext 
 {
 	VideoContext()
@@ -24,14 +26,23 @@ struct VideoContext
 		surfaceId = 0;
 	}
 
+	~VideoContext()
+	{
+		delete[] surfaces[0];
+		delete[] surfaces[1];
+	}
+
 	int					surfaceId;
 	unsigned char*		surfaces[2];	
 	std::mutex			mutexes[2];
 	bool				hasFrame[2];
 
+	std::mutex			componentLock;	// component and valid, read by VLC's display callback
 	VideoComponent*		component;
 	bool				valid;	
 };
+
+struct PlayerStart;
 
 
 namespace VideoVlcFlags
@@ -99,6 +110,14 @@ public:
 	
 	Vector2f getSize() const override;
 
+	// What VLC read of a video's file: its first video track's size and whether it has sound
+	struct Probe
+	{
+		bool         readable;
+		unsigned int width, height;
+		bool         audio;
+	};
+
 private:
 	// Calculates the correct mSize from our resizing information (set by setResize/setMaxSize).
 	// Used internally whenever the resizing parameters or texture change.
@@ -120,13 +139,25 @@ private:
 	void setupContext();
 	void freeContext();
 
+	// startVideo asks VLC to read the file's tracks on its own thread; each frame checkParse looks whether it
+	// has, then playback starts (startPlayback). Until then the snapshot or what is under the video shows and
+	// the UI thread does not wait. A file read once is not parsed again while its size and date stay the same.
+	void checkParse();
+	void startPlayback(const Probe& probe);
+	void checkStart();
+	static bool findProbe(const std::string& path, Probe& probe);
+	static void keepProbe(const std::string& path, const Probe& probe);
+
 private:
 	void crop(float left, float top, float right, float bot);
 
 	static libvlc_instance_t*		mVLC;
 	libvlc_media_t*					mMedia;
 	libvlc_media_player_t*			mMediaPlayer;
-	VideoContext					mContext;
+	bool							mParsing;
+	unsigned int					mParseEnd;	// SDL ticks
+	std::shared_ptr<PlayerStart>	mStart;		// a player being made on the worker
+	std::shared_ptr<VideoContext>	mContext;
 	std::shared_ptr<TextureResource> mTexture;
 
 	std::string					    mSubtitlePath;
