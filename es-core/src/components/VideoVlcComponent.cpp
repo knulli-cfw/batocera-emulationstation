@@ -17,6 +17,7 @@
 #include <deque>
 #include <functional>
 #include <map>
+#include <set>
 #include <thread>
 #include "SystemConf.h"
 #include "ThemeData.h"
@@ -314,9 +315,32 @@ VideoVlcComponent::VideoVlcComponent(Window* window) : VideoComponent(window),
 	init();
 }
 
+// The videos showing their frames (main thread): a screen shows one at most, so a second one is logged
+static std::set<VideoVlcComponent*> sShownVideos;
+
+static void videoShown(VideoVlcComponent* video, bool shown)
+{
+	if (!shown)
+	{
+		sShownVideos.erase(video);
+		return;
+	}
+
+	sShownVideos.insert(video);
+	if (sShownVideos.size() < 2)
+		return;
+
+	std::string paths;
+	for (auto v : sShownVideos)
+		paths += (paths.empty() ? "" : ", ") + v->getVideoPath();
+
+	LOG(LogWarning) << "VideoCheck: " << sShownVideos.size() << " videos play at once: " << paths;
+}
+
 VideoVlcComponent::~VideoVlcComponent()
 {
 	stopVideo();
+	videoShown(this, false);
 }
 
 Vector2f VideoVlcComponent::getSize() const
@@ -386,6 +410,7 @@ void VideoVlcComponent::onVideoStarted()
 {
 	VideoComponent::onVideoStarted();
 	resize();
+	videoShown(this, true);
 }
 
 void VideoVlcComponent::crop(float left, float top, float right, float bot)
@@ -1292,6 +1317,8 @@ void VideoVlcComponent::checkStart()
 
 void VideoVlcComponent::stopVideo()
 {
+	videoShown(this, false);
+
 	mIsPlaying = false;
 	mIsWaitingForVideoToStart = false;
 	mStartDelayed = false;
@@ -1479,6 +1506,7 @@ void VideoVlcComponent::pauseVideo()
 	mIsPlaying = false;
 	mIsWaitingForVideoToStart = false;
 	mStartDelayed = false;
+	videoShown(this, false);
 
 	if (mMediaPlayer == NULL)
 		stopVideo();
