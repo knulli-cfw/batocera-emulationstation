@@ -153,6 +153,7 @@ private:
 	void startPlayback(const Probe& probe);
 	void checkStart();
 	void checkDisplayed();
+	bool uploadFrame();
 	static bool findProbe(const std::string& path, Probe& probe);
 	static void keepProbe(const std::string& path, const Probe& probe);
 

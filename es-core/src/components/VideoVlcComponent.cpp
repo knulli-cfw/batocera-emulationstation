@@ -687,28 +687,18 @@ void VideoVlcComponent::render(const Transform4x4f& parentTrans)
 
 	// Build a texture for the video frame
 	if (initFromPixels)
-	{		
-		int frame = mContext->surfaceId;
-		if (mContext->hasFrame[frame])
-		{
-			if (mTexture == nullptr)
-			{
-				mTexture = TextureResource::get("", false, mLinearSmooth);
-
-				resize();
-				trans = parentTrans * getTransform();
-			}
-
+	{
 #ifdef _RPI_
-			// Rpi : A lot of videos are encoded in 60fps on screenscraper
-			// Try to limit transfert to opengl textures to 30fps to save CPU
-			if (!Settings::getInstance()->getBool("OptimizeVideo") || mElapsed >= 40) // 40ms = 25fps, 33.33 = 30 fps
+		// Rpi : A lot of videos are encoded in 60fps on screenscraper
+		// Try to limit transfert to opengl textures to 30fps to save CPU
+		if (!Settings::getInstance()->getBool("OptimizeVideo") || mElapsed >= 40) // 40ms = 25fps, 33.33 = 30 fps
 #endif
+		{
+			bool created = (mTexture == nullptr);
+			if (uploadFrame())
 			{
-				mContext->mutexes[frame].lock();
-				mTexture->updateFromExternalPixels(mContext->surfaces[frame], mVideoWidth, mVideoHeight);
-				mContext->hasFrame[frame] = false;
-				mContext->mutexes[frame].unlock();
+				if (created)
+					trans = parentTrans * getTransform();
 
 				mElapsed = 0;
 			}
@@ -922,11 +912,43 @@ bool VideoVlcComponent::waitForPlayers(int ms)
 	return done;
 }
 
-// The first frame VLC displayed: the video shows from now on
+// Copies the newest whole frame into the texture, under that frame's lock: the player writes into a buffer only
+// while it holds its lock, so the texture never gets a frame half written. False when there was no new frame.
+bool VideoVlcComponent::uploadFrame()
+{
+	if (mContext == nullptr || !mContext->valid)
+		return false;
+
+	int frame = mContext->surfaceId;
+	if (!mContext->hasFrame[frame])
+		return false;
+
+	std::unique_lock<std::mutex> lock(mContext->mutexes[frame]);
+	if (!mContext->hasFrame[frame])
+		return false;
+
+	if (mTexture == nullptr)
+	{
+		mTexture = TextureResource::get("", false, mLinearSmooth);
+		resize();
+	}
+
+	mTexture->updateFromExternalPixels(mContext->surfaces[frame], mVideoWidth, mVideoHeight);
+	mContext->hasFrame[frame] = false;
+	return true;
+}
+
+// The first frame VLC displayed: the video shows from now on, once that frame is whole in the texture (until
+// then the snapshot, or what is under the video, stays)
 void VideoVlcComponent::checkDisplayed()
 {
-	if (mContext != nullptr && mContext->valid && mContext->displayed && !mIsPlaying && mIsWaitingForVideoToStart)
-		onVideoStarted();
+	if (mContext == nullptr || !mContext->valid || !mContext->displayed || mIsPlaying || !mIsWaitingForVideoToStart)
+		return;
+
+	if (!uploadFrame() && (mTexture == nullptr || !mTexture->isLoaded()))
+		return;
+
+	onVideoStarted();
 }
 
 void VideoVlcComponent::handleLooping()

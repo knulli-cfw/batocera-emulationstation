@@ -221,22 +221,31 @@ bool TextureData::initFromRGBA(unsigned char* dataRGBA, size_t width, size_t hei
 
 bool TextureData::updateFromExternalRGBA(unsigned char* dataRGBA, size_t width, size_t height)
 {
-	// If already initialised then don't read again
+	// The pixels are read now, while the caller holds them (a video's frame buffer, written again by its
+	// player once let go): no pointer to them is kept for a later upload
 	std::unique_lock<std::mutex> lock(mMutex);
 
 	if (!mIsExternalDataRGBA && mDataRGBA != nullptr)
 		delete[] mDataRGBA;
 
-	mIsExternalDataRGBA = true;
-	mDataRGBA = dataRGBA;
+	mIsExternalDataRGBA = false;
+	mDataRGBA = nullptr;
+
+	if (mTextureID != 0 && (mSize.x() != (int)width || mSize.y() != (int)height))
+	{
+		Renderer::destroyTexture(mTextureID);
+		mTextureID = 0;
+	}
 
 	mSize = Vector2i(width, height);
 	mPhysicalSize = Vector2f(width, height);
 
 	if (mTextureID != 0)
-		Renderer::updateTexture(mTextureID, Renderer::Texture::RGBA, 0, 0, width, height, mDataRGBA);
+		Renderer::updateTexture(mTextureID, Renderer::Texture::RGBA, 0, 0, width, height, dataRGBA);
+	else
+		mTextureID = Renderer::createTexture(Renderer::Texture::RGBA, mLinear, mTile, width, height, dataRGBA);
 
-	return true;
+	return mTextureID != 0;
 }
 
 // Avoid multiple extraction in the same file at the same time
