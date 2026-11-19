@@ -728,6 +728,8 @@ int main(int argc, char* argv[])
 		  //	ps_time = SDL_GetTicks();
 		}
 
+		window.checkSystemResume();
+
 		if (window.isSleeping())
 		{
 			lastTime = SDL_GetTicks();

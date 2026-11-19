@@ -17,6 +17,7 @@
 #include <SDL_events.h>
 #include "ThemeData.h"
 #include <mutex>
+#include <time.h>
 #include "components/AsyncNotificationComponent.h"
 #include "components/PostProcessShaderComponent.h"
 #include "components/ControllerActivityComponent.h"
@@ -33,7 +34,7 @@
 #endif
 
 Window::Window() : mNormalizeNextUpdate(false), mFrameTimeElapsed(0), mFrameCountElapsed(0), mFrameDrawnStart(0), mAverageDeltaTime(10),
-  mAllowSleep(true), mSleeping(false), mTimeSinceLastInput(0), mIdleVideo(false), mIdleSlides(false), mScreenSaver(NULL), mRenderScreenSaver(false), mClockElapsed(0), mMouseCapture(nullptr), mMenuBackgroundShaderTextureCache(-1)
+  mAllowSleep(true), mSleeping(false), mTimeSinceLastInput(0), mIdleVideo(false), mIdleSlides(false), mSuspendedMs(-1), mScreenSaver(NULL), mRenderScreenSaver(false), mClockElapsed(0), mMouseCapture(nullptr), mMenuBackgroundShaderTextureCache(-1)
 {			
 	mTransitionOffset = 0;
 
@@ -930,6 +931,27 @@ void Window::render()
 
 		Renderer::setScreenMargin(margin.x(), margin.y());
 	}
+}
+
+void Window::checkSystemResume()
+{
+#ifndef WIN32
+	struct timespec boot, mono;
+	if (clock_gettime(CLOCK_BOOTTIME, &boot) != 0 || clock_gettime(CLOCK_MONOTONIC, &mono) != 0)
+		return;
+
+	long long suspended = ((long long)boot.tv_sec - mono.tv_sec) * 1000 + (boot.tv_nsec - mono.tv_nsec) / 1000000;
+	bool resumed = mSuspendedMs >= 0 && suspended - mSuspendedMs > 1000;
+	mSuspendedMs = suspended;
+
+	if (!resumed)
+		return;
+
+	LOG(LogInfo) << "Window: back from a system suspend; the screen saver stops";
+	cancelScreenSaver();
+	updateIdlePause();
+	Renderer::invalidateFrame();
+#endif
 }
 
 bool Window::drawsOnlyChanges()

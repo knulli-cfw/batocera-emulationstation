@@ -97,6 +97,11 @@ public:
 	bool cancelScreenSaver();
 	void renderScreenSaver();
 
+	// Back from a system suspend (the time asleep counts in CLOCK_BOOTTIME, not in CLOCK_MONOTONIC or SDL's
+	// ticks): the screen saver stops and the idle times start over, as on a key, so the view shows at once
+	// (the key that woke the system never reaches ES). Called on every turn of the main loop.
+	void checkSystemResume();
+
 	void postToUiThread(const std::function<void()>& func, void* data = nullptr);
 	void unregisterPostedFunctions(void* data);
 	void reactivateGui();
@@ -183,6 +188,7 @@ private:
 	unsigned int mTimeSinceLastInput;
 	bool mIdleVideo;
 	bool mIdleSlides;
+	long long mSuspendedMs;	// CLOCK_BOOTTIME less CLOCK_MONOTONIC at the last check; -1 before the first
 	void updateIdlePause();
 
 	bool mRenderedHelpPrompts;
