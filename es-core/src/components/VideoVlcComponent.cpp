@@ -65,16 +65,14 @@ static void unlock(void *data, void* /*id*/, void *const* /*p_pixels*/)
 	c->mutexes[frame].unlock();
 }
 
-// VLC wants to display a video frame.
+// VLC wants to display a video frame. This runs on VLC's thread: it only tells the UI thread
+// (VideoVlcComponent::checkDisplayed), which may be freeing the component's texture.
 static void display(void* data, void* id)
 {
 	if (data == NULL)
 		return;
 
-	struct VideoContext *c = (struct VideoContext *)data;
-	std::unique_lock<std::mutex> component(c->componentLock);
-	if (c->valid && c->component != NULL && !c->component->isPlaying() && c->component->isWaitingForVideoToStart())
-		c->component->onVideoStarted();
+	((struct VideoContext *)data)->displayed = true;
 }
 
 // The players start and stop on one worker thread: making a VLC player opens its audio output (ALSA reads its
@@ -737,8 +735,7 @@ void VideoVlcComponent::setupContext()
 	mContext = std::make_shared<VideoContext>();
 	mContext->surfaces[0] = new unsigned char[mVideoWidth * mVideoHeight * 4];
 	mContext->surfaces[1] = new unsigned char[mVideoWidth * mVideoHeight * 4];
-	mContext->component = this;
-	mContext->valid = true;	
+	mContext->valid = true;
 	resize();	
 }
 
@@ -753,13 +750,8 @@ void VideoVlcComponent::freeContext()
 		mTexture = nullptr;
 	}
 
-	// The player may still draw into its buffers until the worker stopped it: only the link to this goes
-	{
-		std::unique_lock<std::mutex> lock(mContext->componentLock);
-		mContext->component = NULL;
-		mContext->valid = false;
-	}
-
+	// The player may still draw into its buffers until the worker stopped it: they go with the last of them
+	mContext->valid = false;
 	mContext = nullptr;
 }
 
@@ -848,10 +840,18 @@ void VideoVlcComponent::init()
 	delete[] theArgs;
 }
 
+// The first frame VLC displayed: the video shows from now on
+void VideoVlcComponent::checkDisplayed()
+{
+	if (mContext != nullptr && mContext->valid && mContext->displayed && !mIsPlaying && mIsWaitingForVideoToStart)
+		onVideoStarted();
+}
+
 void VideoVlcComponent::handleLooping()
 {
 	checkParse();
 	checkStart();
+	checkDisplayed();
 
 	if (mIsPlaying && mMediaPlayer)
 	{
@@ -1262,7 +1262,8 @@ void VideoVlcComponent::update(int deltaTime)
 	if (mConfig.showSnapshotNoVideo || mConfig.showSnapshotDelay)
 		mStaticImage.update(deltaTime);
 
-	VideoComponent::update(deltaTime);	
+	checkDisplayed();
+	VideoComponent::update(deltaTime);
 }
 
 void VideoVlcComponent::onShow()

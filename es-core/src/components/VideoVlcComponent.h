@@ -5,6 +5,7 @@
 #include "VideoComponent.h"
 #include "ThemeData.h"
 #include "renderers/Renderer.h"
+#include <atomic>
 #include <mutex>
 
 struct libvlc_instance_t;
@@ -19,8 +20,8 @@ struct VideoContext
 	{
 		surfaces[0] = nullptr;
 		surfaces[1] = nullptr;
-		component = nullptr;
 		valid = false;
+		displayed = false;
 		hasFrame[0] = false;
 		hasFrame[1] = false;
 		surfaceId = 0;
@@ -37,9 +38,9 @@ struct VideoContext
 	std::mutex			mutexes[2];
 	bool				hasFrame[2];
 
-	std::mutex			componentLock;	// component and valid, read by VLC's display callback
-	VideoComponent*		component;
-	bool				valid;	
+	bool				valid;
+	// Set by VLC's display callback; the UI thread starts showing the video (VideoVlcComponent::checkDisplayed)
+	std::atomic<bool>	displayed;
 };
 
 struct PlayerStart;
@@ -145,6 +146,7 @@ private:
 	void checkParse();
 	void startPlayback(const Probe& probe);
 	void checkStart();
+	void checkDisplayed();
 	static bool findProbe(const std::string& path, Probe& probe);
 	static void keepProbe(const std::string& path, const Probe& probe);
 
