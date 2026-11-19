@@ -30,8 +30,15 @@
 
 libvlc_instance_t* VideoVlcComponent::mVLC = NULL;
 
-// How long VLC may take to read a video's tracks before the file counts as no video
+// How long VLC may take to read a video's tracks; VLC counts it from when its reader takes the file, which
+// may wait behind others
 static const int PARSE_TIMEOUT_MS = 2000;
+// How long ES waits for an answer, counted from the request (VLC never answering)
+static const unsigned int PARSE_WAIT_MS = 10000;
+// A file that timed out is not read again for a while, and counts as no video after this many timeouts: a
+// timeout may come from a busy system, not from the file
+static const unsigned int PARSE_RETRY_MS = 30000;
+static const int PARSE_TIMEOUTS = 3;
 
 // VLC prepares to render a video frame.
 static void *lock(void *data, void **p_pixels) 
@@ -149,6 +156,25 @@ namespace
 	void releaseOnWorker(libvlc_media_t* media)
 	{
 		PlayerWorker::post([media] { libvlc_media_release(media); });
+	}
+
+	// Stopping a parse waits for VLC's reader
+	void stopParseOnWorker(libvlc_media_t* media)
+	{
+		PlayerWorker::post([media]
+		{
+			libvlc_media_parse_stop(media);
+			libvlc_media_release(media);
+		});
+	}
+
+	// Files whose parse timed out: how many times, and when they may be read again (SDL ticks). UI thread.
+	std::map<std::string, std::pair<int, unsigned int>> sParseTimeouts;
+
+	bool waitsAfterTimeout(const std::string& path)
+	{
+		auto it = sParseTimeouts.find(path);
+		return it != sParseTimeouts.cend() && (int)(it->second.second - SDL_GetTicks()) > 0;
 	}
 
 	void startOnWorker(std::shared_ptr<PlayerStart> start)
@@ -910,7 +936,7 @@ void VideoVlcComponent::startVideo()
 	std::string path(mVideoPath);
 #endif
 	// Make sure we have a video path, and not one VLC could not read before
-	if (mVLC && (path.size() > 0) && !isUnplayable(mVideoPath))
+	if (mVLC && (path.size() > 0) && !isUnplayable(mVideoPath) && !waitsAfterTimeout(mVideoPath))
 	{
 		// Set the video that we are going to be playing so we don't attempt to restart it
 		mPlayingVideoPath = mVideoPath;
@@ -953,7 +979,7 @@ void VideoVlcComponent::startVideo()
 			// VLC cannot read (empty, truncated, not a video) fails, is skipped or times out
 			libvlc_media_parse_with_options(mMedia, libvlc_media_parse_local, PARSE_TIMEOUT_MS);
 			mParsing = true;
-			mParseEnd = SDL_GetTicks() + PARSE_TIMEOUT_MS + 500;
+			mParseEnd = SDL_GetTicks() + PARSE_WAIT_MS;
 #endif
 		}
 	}
@@ -989,8 +1015,10 @@ void VideoVlcComponent::checkParse()
 
 	libvlc_media_parsed_status_t parsed = libvlc_media_get_parsed_status(mMedia);
 #ifndef WIN32
-	if (parsed != libvlc_media_parsed_status_done && parsed != libvlc_media_parsed_status_failed &&
-		parsed != libvlc_media_parsed_status_timeout && parsed != libvlc_media_parsed_status_skipped && SDL_GetTicks() < mParseEnd)
+	bool answered = parsed == libvlc_media_parsed_status_done || parsed == libvlc_media_parsed_status_failed ||
+		parsed == libvlc_media_parsed_status_timeout || parsed == libvlc_media_parsed_status_skipped;
+
+	if (!answered && (int)(mParseEnd - SDL_GetTicks()) > 0)
 		return;
 #endif
 
@@ -998,16 +1026,35 @@ void VideoVlcComponent::checkParse()
 
 	Probe probe = { false, 0, 0, false };
 #ifndef WIN32
-	// Anything but a parsed file is no video: the snapshot shows, and this file is not tried again (while it
-	// keeps its size), so there is no restart loop
+	// Anything but a parsed file is no video now: the snapshot shows. A file VLC failed on is not tried again
+	// (while it keeps its size), so there is no restart loop; one that timed out waits PARSE_RETRY_MS, and
+	// counts as no video only after PARSE_TIMEOUTS timeouts
 	if (parsed != libvlc_media_parsed_status_done)
 	{
-		LOG(LogWarning) << "VideoVlcComponent: cannot read " << mPlayingVideoPath << " (parse status " << (int)parsed << ")";
-		markUnplayable(mPlayingVideoPath);
-		releaseOnWorker(mMedia);
+		bool timedOut = !answered || parsed == libvlc_media_parsed_status_timeout;
+		LOG(LogWarning) << "VideoVlcComponent: cannot read " << mPlayingVideoPath << " (parse status " << (int)parsed << (answered ? "" : ", no answer") << ")";
+
+		if (timedOut)
+		{
+			auto& timeouts = sParseTimeouts[mPlayingVideoPath];
+			timeouts.first++;
+			timeouts.second = SDL_GetTicks() + PARSE_RETRY_MS;
+			if (timeouts.first >= PARSE_TIMEOUTS)
+				markUnplayable(mPlayingVideoPath);
+		}
+		else
+			markUnplayable(mPlayingVideoPath);
+
+		if (answered)
+			releaseOnWorker(mMedia);
+		else
+			stopParseOnWorker(mMedia);
+
 		mMedia = NULL;
 		return;
 	}
+
+	sParseTimeouts.erase(mPlayingVideoPath);
 #endif
 
 	probe.readable = true;
@@ -1113,9 +1160,12 @@ void VideoVlcComponent::checkStart()
 
 void VideoVlcComponent::stopVideo()
 {
-	// A parse under way is dropped with the media
+	// A parse under way is dropped with the media (on the worker: stopping it waits for VLC's reader)
 	if (mParsing && mMedia)
-		libvlc_media_parse_stop(mMedia);
+	{
+		stopParseOnWorker(mMedia);
+		mMedia = NULL;
+	}
 
 	mParsing = false;
 
