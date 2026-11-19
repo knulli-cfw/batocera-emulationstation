@@ -31,15 +31,36 @@ namespace
 		bool audio = false;
 	};
 
-	std::mutex sLock;
-	std::condition_variable sWake;
-	std::map<std::string, Known> sKnown;
-	std::deque<std::string> sWaiting;
-	std::set<std::string> sWaitingSet;
-	bool sLoaded = false;
-	bool sStarted = false;
-	bool sPaused = false;
-	int sAvailable = -1;
+	struct State
+	{
+		std::mutex lock;
+		std::condition_variable wake;
+		std::map<std::string, Known> known;
+		std::deque<std::string> waiting;
+		std::set<std::string> waitingSet;
+		bool loaded = false;
+		bool started = false;
+		bool paused = false;
+		int available = -1;
+	};
+
+	// Never destroyed: the worker waits on it until the process ends (a condition variable destroyed at exit with
+	// a thread waiting on it hangs the exit, and ES would not quit)
+	State& state()
+	{
+		static State* s = new State();
+		return *s;
+	}
+
+	std::mutex& sLock = state().lock;
+	std::condition_variable& sWake = state().wake;
+	std::map<std::string, Known>& sKnown = state().known;
+	std::deque<std::string>& sWaiting = state().waiting;
+	std::set<std::string>& sWaitingSet = state().waitingSet;
+	bool& sLoaded = state().loaded;
+	bool& sStarted = state().started;
+	bool& sPaused = state().paused;
+	int& sAvailable = state().available;
 
 	std::string cachePath()
 	{
