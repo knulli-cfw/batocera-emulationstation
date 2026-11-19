@@ -8,6 +8,7 @@
 #include "math/Misc.h"
 #include "math/Transform4x4f.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <memory>
 #include <string>
@@ -80,7 +81,7 @@ struct ColumnLayout
 		if (role == SLIDES || (role == BACKGROUND && !fadeBackground))
 			return 255;
 
-		return (unsigned char)(Math::clamp(fade, 0.0f, 1.0f) * 255.0f);
+		return (unsigned char)(std::max(0.0f, std::min(1.0f, fade)) * 255.0f);
 	}
 
 	// Draws an element at an opacity, its own one kept

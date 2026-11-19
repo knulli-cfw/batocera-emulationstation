@@ -28,6 +28,7 @@
 #include "guis/GuiMsgBox.h"
 #include "utils/ThreadPool.h"
 #include <SDL_timer.h>
+#include <algorithm>
 #include "TextToSpeech.h"
 #include "VolumeControl.h"
 
@@ -368,9 +369,10 @@ void ViewController::goToGameList(SystemData* system, bool forceImmediate)
 // over the first 35 % of the way, the coming one's from 30 to 70 %), as the theme's design does
 static const int COLUMN_SLIDE_MS = 360;
 
+// (Math::clamp takes its bounds first in its definition, not as declared: not used here)
 static float smoothStep(float a, float b, float t)
 {
-	float x = Math::clamp((t - a) / (b - a), 0.0f, 1.0f);
+	float x = std::max(0.0f, std::min(1.0f, (t - a) / (b - a)));
 	return x * x * (3.0f - 2.0f * x);
 }
 
