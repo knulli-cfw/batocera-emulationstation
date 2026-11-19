@@ -269,8 +269,11 @@ bool ISimpleGameListView::input(InputConfig* config, Input input)
 	{
 		if (Settings::getInstance()->getBool("GameOptionsAtNorth"))
 			showSelectedGameOptions();
-		else
+		else if (cursorHasSaveStatesEnabled())
 			showSelectedGameSaveSnapshots();
+		else if (!UIModeController::getInstance()->isUIModeKid() && getCursor() != nullptr && getCursor()->getType() == GAME &&
+			(mRoot->getSystem()->isGameSystem() || mRoot->getSystem()->isGroupSystem()))
+			CollectionSystemManager::get()->toggleGameInCollection(getCursor(), "Favorites");	// what its prompt says
 
 		return true;
 	}	
@@ -347,13 +350,11 @@ void ISimpleGameListView::showSelectedGameOptions()
 	mWindow->pushGui(new GuiGameOptions(mWindow, cursor));
 }
 
+// The save states of the emulator and core the game runs with ({game:saveStatesSupported}): another emulator's
+// would start the game with that emulator
 bool ISimpleGameListView::cursorHasSaveStatesEnabled()
 {
-	FileData* cursor = getCursor();
-	if (cursor == nullptr || cursor->getType() != GAME)
-		return false;
-
-	return SaveStateRepository::isEnabled(cursor);
+	return SaveStateRepository::isEnabledForGame(getCursor());
 }
 
 void ISimpleGameListView::showSelectedGameSaveSnapshots()
@@ -362,7 +363,7 @@ void ISimpleGameListView::showSelectedGameSaveSnapshots()
 	if (cursor == nullptr || cursor->getType() != GAME)
 		return;
 
-	if (SaveStateRepository::isEnabled(cursor))
+	if (SaveStateRepository::isEnabledForGame(cursor))
 	{
 		Sound::getFromTheme(mTheme, getName(), "menuOpen")->play();
 
