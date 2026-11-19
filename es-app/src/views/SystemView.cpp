@@ -231,6 +231,7 @@ void SystemView::loadExtras(SystemData* system)
 		it->backgroundExtras = extras;
 
 	SystemRandomPlaylist::resetCache();
+	showColumnVideos();
 }
 
 static const unsigned int PREPARE_AFTER_IDLE_MS = 1500;
@@ -1356,7 +1357,31 @@ void SystemView::showColumnLevel(int level)
 	if (grid != nullptr)
 		grid->setCursorShown(level == 2);
 
+	showColumnVideos();
 	updateExtraTextBinding();
+}
+
+void SystemView::showColumnVideos()
+{
+	bool inView = !hasColumns() || mColumnLevel == 2;
+
+	std::function<void(GuiComponent*)> mark = [&mark, inView](GuiComponent* component)
+	{
+		VideoComponent* video = dynamic_cast<VideoComponent*>(component);
+		if (video != nullptr)
+			video->setInView(inView);
+
+		for (unsigned int i = 0; i < component->getChildCount(); i++)
+			mark(component->getChild(i));
+	};
+
+	for (auto& entry : mEntries)
+		for (auto extra : entry.backgroundExtras)
+			mark(extra);
+
+	for (auto& parked : mParkedExtras)
+		for (auto extra : parked.second)
+			mark(extra);
 }
 
 std::vector<HelpPrompt> SystemView::getHelpPrompts()

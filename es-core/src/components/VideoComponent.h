@@ -93,6 +93,10 @@ public:
 	// (ScreenShape::fit)
 	void setKeepOrientation(bool keep) { mKeepOrientation = keep; }
 
+	// Off the screen though its view shows (a column panned away): it stops, sound and all, as when hidden
+	void setInView(bool inView) { mInView = inView; }
+	bool isInView() const { return mInView; }
+
 	// Resize the video to be as large as possible but fit within a box of this size.
 	// Can be set before or after a video is loaded.
 	// Never breaks the aspect ratio. setMaxSize() and setResize() are mutually exclusive.
@@ -225,6 +229,7 @@ protected:
 	bool							mTargetIsMax;
 	bool							mTargetIsMin;
 	bool							mKeepOrientation;
+	bool							mInView = true;
 
 	bool							mIsWaitingForVideoToStart;
 

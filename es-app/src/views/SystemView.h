@@ -137,6 +137,8 @@ private:
 	void	 moveTab(int direction, bool wrap = true);
 
 	void	 showColumnLevel(int level);
+	// The extras' videos play at level 2 only: at level 1 the system's column is off the screen
+	void	 showColumnVideos();
 	void	 renderExtra(GuiComponent* extra, const Transform4x4f& trans);
 	void	 renderInPlace(const Transform4x4f& screen, ColumnLayout::Role role);
 	ColumnLayout::Role columnRole(GuiComponent* extra);

@@ -322,13 +322,18 @@ static void videoShown(VideoVlcComponent* video, bool shown)
 {
 	if (!shown)
 	{
-		sShownVideos.erase(video);
+		if (sShownVideos.erase(video) > 0)
+			LOG(LogInfo) << "VideoCheck: " << sShownVideos.size() << (sShownVideos.size() == 1 ? " video plays" : " videos play");
 		return;
 	}
 
-	sShownVideos.insert(video);
+	bool added = sShownVideos.insert(video).second;
 	if (sShownVideos.size() < 2)
+	{
+		if (added)
+			LOG(LogInfo) << "VideoCheck: 1 video plays: " << video->getVideoPath();
 		return;
+	}
 
 	std::string paths;
 	for (auto v : sShownVideos)
@@ -689,8 +694,8 @@ void VideoVlcComponent::render(const Transform4x4f& parentTrans)
 	if (!isVisible())
 		return;
 
-	// Out of view but drawn (a view sliding away or in): its snapshot, not the stopped player
-	if (!isShowing())
+	// Out of view but drawn (a view sliding away or in, a column panning away): its snapshot, not the stopped player
+	if (!isShowing() || !mInView)
 	{
 		VideoComponent::render(parentTrans);
 		return;
