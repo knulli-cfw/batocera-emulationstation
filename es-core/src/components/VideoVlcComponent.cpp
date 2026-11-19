@@ -72,8 +72,10 @@ static void display(void* data, void* id)
 
 // The players start and stop on one worker thread: making a VLC player opens its audio output (ALSA reads its
 // configuration and probes every card, hundreds of ms on a handheld) and stopping one waits for its threads,
-// so the UI thread only hands them over. A start sets the frame callbacks before it plays; a player whose
-// component stopped meanwhile is stopped at once. The context goes with the player until it is released.
+// so the UI thread only hands them over. A start sets the frame callbacks before it plays; a start its
+// component gave up on before its turn (it stopped, or started another video) makes no player, and a player
+// whose component stopped while it was made is stopped at once. The context goes with the player until it is
+// released. The worker also releases every media: the last release of one VLC still reads waits for it.
 struct PlayerStart
 {
 	libvlc_media_t*					media;
@@ -144,10 +146,26 @@ namespace
 		});
 	}
 
+	void releaseOnWorker(libvlc_media_t* media)
+	{
+		PlayerWorker::post([media] { libvlc_media_release(media); });
+	}
+
 	void startOnWorker(std::shared_ptr<PlayerStart> start)
 	{
 		PlayerWorker::post([start]
 		{
+			{
+				std::unique_lock<std::mutex> lock(start->lock);
+				if (start->cancelled)
+				{
+					libvlc_media_release(start->media);
+					start->media = nullptr;
+					start->context = nullptr;
+					return;
+				}
+			}
+
 			libvlc_media_player_t* player = libvlc_media_player_new_from_media(start->media);
 			libvlc_media_release(start->media);
 			start->media = nullptr;
@@ -986,7 +1004,7 @@ void VideoVlcComponent::checkParse()
 	{
 		LOG(LogWarning) << "VideoVlcComponent: cannot read " << mPlayingVideoPath << " (parse status " << (int)parsed << ")";
 		markUnplayable(mPlayingVideoPath);
-		libvlc_media_release(mMedia);
+		releaseOnWorker(mMedia);
 		mMedia = NULL;
 		return;
 	}
@@ -1128,9 +1146,9 @@ void VideoVlcComponent::stopVideo()
 	// Release the media
 	if (mMedia)
 	{
-		libvlc_media_release(mMedia); 
+		releaseOnWorker(mMedia);
 		mMedia = NULL;
-	}		
+	}
 		
 	freeContext();
 	PowerSaver::resume();	
