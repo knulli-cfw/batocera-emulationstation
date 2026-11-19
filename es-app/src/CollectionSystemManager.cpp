@@ -498,7 +498,7 @@ void CollectionSystemManager::updateCollectionSystem(FileData* file, const Colle
 	else
 	{
 		// we didn't find it here - we need to check if we should add it
-		if (name == "recent" && file->getMetadata(MetaDataId::PlayCount) > "0" && includeFileInAutoCollections(file) ||
+		if (name == "recent" && isPlayedGame(file) && includeFileInAutoCollections(file) ||
 			name == "favorites" && file->getFavorite())
 		{
 			auto newGame = new CollectionFileData(file, curSys);
@@ -1028,7 +1028,7 @@ void CollectionSystemManager::populateAutoCollection(CollectionSystemData* sysDa
 				include = game->hasCheevos();
 				break;
 			case AUTO_LAST_PLAYED:
-				include = game->getMetadata(MetaDataId::PlayCount) > "0";
+				include = isPlayedGame(game);
 				break;
 			case AUTO_NEVER_PLAYED:
 				include = !(game->getMetadata(MetaDataId::PlayCount) > "0");
@@ -1480,6 +1480,13 @@ std::vector<std::string> CollectionSystemManager::getUserCollectionThemeFolders(
 bool CollectionSystemManager::themeFolderExists(std::string folder)
 {
 	return std::find(mSystemsFromTheme.cbegin(), mSystemsFromTheme.cend(), folder) != mSystemsFromTheme.cend();
+}
+
+// The last played list holds games only: what a tool, an emulator or the screenshot viewer ran is left out, by
+// the rule the systems' counts and {global:lastPlayed} follow (SystemData::isUtilitySystem)
+bool CollectionSystemManager::isPlayedGame(FileData* file)
+{
+	return file->getMetadata(MetaDataId::PlayCount) > "0" && !SystemData::isUtilitySystem(file->getSourceFileData()->getSystem());
 }
 
 bool CollectionSystemManager::includeFileInAutoCollections(FileData* file)

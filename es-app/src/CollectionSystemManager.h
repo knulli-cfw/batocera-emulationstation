@@ -133,6 +133,7 @@ private:
 	bool themeFolderExists(std::string folder);
 
 	bool includeFileInAutoCollections(FileData* file);
+	static bool isPlayedGame(FileData* file);
 
 	void updateSystemsFromTheme();	
 	std::vector<std::string> mSystemsFromTheme;

@@ -2496,7 +2496,8 @@ FileData* SystemData::getConsoleLastPlayedGame()
 
 	for (auto system : sSystemVector)
 	{
-		if (system->isCollection() || !system->isGameSystem() || system->getName() == "tools" || system->getName() == "imageviewer")
+		// Games only, as the last played list and the systems' counts (tools, emulators, the screenshot viewer)
+		if (system->isCollection() || !system->isGameSystem() || isUtilitySystem(system))
 			continue;
 
 		FileData* game = system->getLastPlayedGame();
