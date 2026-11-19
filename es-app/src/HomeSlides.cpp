@@ -68,7 +68,7 @@ namespace HomeSlides
 			std::string line = trim(definition.substr(start, end - start));
 			start = end + 1;
 
-			if (line.size() < 4 || (line[0] != '+' && line[0] != '-'))
+			if (line.size() < 4 || (line[0] != '+' && line[0] != '-' && line[0] != '~'))
 				continue;
 
 			size_t space = line.find(' ');
@@ -82,8 +82,10 @@ namespace HomeSlides
 
 			if (line[0] == '+')
 				rules.representatives.insert(key(system, path));
-			else
+			else if (line[0] == '-')
 				rules.excluded.insert(key(system, path));
+			else
+				rules.noVideo.insert(key(system, path));
 		}
 
 		return rules;
@@ -148,9 +150,13 @@ namespace HomeSlides
 		return slides;
 	}
 
-	std::vector<std::string> pickPool(std::vector<Candidate> candidates, size_t fallbackCount)
+	std::vector<std::string> pickPool(std::vector<Candidate> candidates, const Rules& rules, size_t fallbackCount)
 	{
 		std::vector<std::string> ids;
+
+		for (auto& candidate : candidates)
+			if (rules.noVideo.find(candidate.key) != rules.noVideo.cend())
+				candidate.media.clear();
 
 		// Favorites without a video: no suggestion rather than games that are not favorites
 		bool favorites = std::any_of(candidates.cbegin(), candidates.cend(), [](const Candidate& c) { return c.favorite; });

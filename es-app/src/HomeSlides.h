@@ -12,8 +12,9 @@
 namespace HomeSlides
 {
 	// The theme variable "systemslides": one game per line, "+" for the capture a card shows first, "-" for
-	// one it leaves out (a title screen, a menu, a duplicate), then the game's own system, a space and its
-	// path as the gamelist writes it. "%", "=", "<", ">" and "$" in a path are written as %25, %3D, %3C, %3E
+	// one it leaves out (a title screen, a menu, a duplicate), "~" for a video the panel never suggests (one
+	// in black and white on a colour console), then the game's own system, a space and its path as the
+	// gamelist writes it. "%", "=", "<", ">" and "$" in a path are written as %25, %3D, %3C, %3E
 	// and %24 (a theme variable with "=" or "<" is read as an expression):
 	//   +snes ./Some Game.sfc
 	//   -snes ./Some Title Screen.sfc
@@ -21,6 +22,7 @@ namespace HomeSlides
 	{
 		std::set<std::string> representatives;
 		std::set<std::string> excluded;
+		std::set<std::string> noVideo;
 	};
 
 	Rules parseRules(const std::string& definition);
@@ -44,8 +46,9 @@ namespace HomeSlides
 
 	// The panel's pool, as ids: the favorites with a video; none when there are favorites but none has one
 	// (the panel then shows the best-rated favorite); only a system with no favorite at all uses its best-rated
-	// games with a video (at most fallbackCount). Exclusions are about captures, so they do not apply.
-	std::vector<std::string> pickPool(std::vector<Candidate> candidates, size_t fallbackCount);
+	// games with a video (at most fallbackCount). A "~" video counts as none; "-" is about captures, so it
+	// does not apply.
+	std::vector<std::string> pickPool(std::vector<Candidate> candidates, const Rules& rules, size_t fallbackCount);
 
 	// Items in a random order, each shown once before any repeats; a new round never starts with the item
 	// shown last. A reset (the list made again after a game changed) keeps the current item while it is still

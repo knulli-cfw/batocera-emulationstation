@@ -772,13 +772,15 @@ separated by `,`:
 grouped in it included, by rating. Collections, tools, emulators and screenshots have none. The theme variable
 `systemslides` picks the capture each card shows first and leaves out the ones that do not fit (title screens,
 menus, duplicates), one game per line: `+` (first) or `-` (left out), the game's own system, a space and its
-path as the gamelist writes it; `%`, `=`, `<`, `>` and `$` written as `%25`, `%3D`, `%3C`, `%3E` and `%24`:
+path as the gamelist writes it; `%`, `=`, `<`, `>` and `$` written as `%25`, `%3D`, `%3C`, `%3E` and `%24`.
+`~` leaves a game's video out of the panel's suggestions (a black and white recording on a colour console):
 
 ```xml
 <variables>
 	<systemslides>
 		+snes ./Some Game.sfc
 		-snes ./Some Title Screen.sfc
+		~gbc ./Some Game Recorded On A Game Boy.zip
 	</systemslides>
 </variables>
 ```

@@ -2256,7 +2256,8 @@ FileData* SystemData::getSuggestedGame()
 	if (!mSuggestionsReady)
 	{
 		mSuggestionsReady = true;
-		mSuggestions.reset(HomeSlides::pickPool(getHomeCandidates(true), 12), homeRandom());
+		auto rules = HomeSlides::parseRules(mTheme != nullptr ? mTheme->getVariable("systemslides") : "");
+		mSuggestions.reset(HomeSlides::pickPool(getHomeCandidates(true), rules, 12), homeRandom());
 	}
 
 	if (mSuggestions.empty())
