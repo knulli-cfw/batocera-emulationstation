@@ -248,6 +248,21 @@ bool VideoComponent::isUnplayable(const std::string& path)
 
 void VideoComponent::renderSnapshot(const Transform4x4f& parentTrans)
 {
+	// Out of view (a view still drawn while it slides away, or before it is shown), the stopped video leaves its
+	// snapshot in its place instead of a hole
+	if (!isShowing() && !mIsPlaying && !mIsWaitingForVideoToStart && !isPaused() && (mConfig.showSnapshotNoVideo || mConfig.showSnapshotDelay))
+	{
+		if (!mStaticImage.isStoryBoardRunning("snapshot"))
+		{
+			mStaticImage.setOpacity(getOpacity());
+			if (!currentStoryBoardHasProperty("scale"))
+				mStaticImage.setScale(getScale());
+		}
+
+		mStaticImage.render(parentTrans);
+		return;
+	}
+
 	// This is the case where the video is not currently being displayed. Work out
 	// if we need to display a static image
 	if ((mConfig.showSnapshotNoVideo && (mVideoPath.empty() || isUnplayable(mVideoPath) || mIdleStopped)) || ((mStartDelayed || mFadeIn < 1.0 || mIdleStopped) && mConfig.showSnapshotDelay))

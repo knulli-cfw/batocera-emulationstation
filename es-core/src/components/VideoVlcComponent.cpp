@@ -652,8 +652,15 @@ void VideoVlcComponent::updateRoundCorners()
 
 void VideoVlcComponent::render(const Transform4x4f& parentTrans)
 {
-	if (!isShowing() || !isVisible())
+	if (!isVisible())
 		return;
+
+	// Out of view but drawn (a view sliding away or in): its snapshot, not the stopped player
+	if (!isShowing())
+	{
+		VideoComponent::render(parentTrans);
+		return;
+	}
 
 	VideoComponent::render(parentTrans);
 
