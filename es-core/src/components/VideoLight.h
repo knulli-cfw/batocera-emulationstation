@@ -3,6 +3,8 @@
 #define ES_CORE_COMPONENTS_VIDEO_LIGHT_H
 
 #include <algorithm>
+#include <cctype>
+#include <cstdio>
 #include <utility>
 #include <vector>
 
@@ -62,6 +64,31 @@ namespace VideoLight
 	{
 		int light = (int)((y - 16.0f) * 255.0f / 219.0f + 0.5f);
 		return std::max(0, std::min(255, light));
+	}
+
+	// "..., 320x240 [SAR 1:1 DAR 4:3], ..." in ffmpeg's line for a video stream: its size
+	inline bool streamSize(const char* line, unsigned int& width, unsigned int& height)
+	{
+		for (const char* p = line; *p; p++)
+		{
+			if ((*p != ' ' && *p != ',') || !isdigit((unsigned char)p[1]))
+				continue;
+
+			unsigned int w = 0, h = 0;
+			int used = 0;
+			if (sscanf(p + 1, "%ux%u%n", &w, &h, &used) == 2 && w >= 16 && h >= 16 && w <= 8192 && h <= 8192)
+			{
+				char after = p[1 + used];
+				if (after == ' ' || after == ',' || after == '\0' || after == '\n')
+				{
+					width = w;
+					height = h;
+					return true;
+				}
+			}
+		}
+
+		return false;
 	}
 
 	// Where a video's picture is in after its fade from black, from its first frames (time in ms, light): the

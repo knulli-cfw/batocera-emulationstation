@@ -1223,7 +1223,20 @@ bool VideoVlcComponent::findProbe(const std::string& path, Probe& probe)
 {
 	auto it = sProbes.find(path);
 	if (it == sProbes.cend() || it->second.first != fileStamp(path))
-		return false;
+	{
+		// read already by the lead-in's measure (its streams): no parse to wait for
+		unsigned int width = 0, height = 0;
+		bool audio = false;
+		if (!VideoLeadIn::findStreams(path, width, height, audio))
+			return false;
+
+		probe.readable = true;
+		probe.width = width;
+		probe.height = height;
+		probe.audio = audio;
+		keepProbe(path, probe);
+		return true;
+	}
 
 	probe = it->second.second;
 	return true;
