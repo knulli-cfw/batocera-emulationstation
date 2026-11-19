@@ -13,6 +13,7 @@
 #include "utils/StringUtil.h"
 
 #include <SDL.h>
+#include <atomic>
 #include <mutex>
 #include <set>
 #include <stack>
@@ -415,7 +416,8 @@ namespace Renderer
 
 	// GL and the frame cache live on the thread that made the window. A texture freed on another thread (the
 	// last reference to an image dropped by a loader) waits for it.
-	static std::thread::id           renderThread;
+	// Written at each window's start, read by loader threads freeing a texture
+	static std::atomic<std::thread::id> renderThread;
 	static std::mutex                pendingLock;
 	static std::vector<unsigned int> pendingTextures;
 
@@ -423,7 +425,7 @@ namespace Renderer
 
 	bool init()
 	{
-		renderThread = std::this_thread::get_id();
+		renderThread.store(std::this_thread::get_id());
 		{
 			// The textures of an earlier window went with its context
 			std::unique_lock<std::mutex> lock(pendingLock);
@@ -1189,7 +1191,7 @@ namespace Renderer
 
 	void  destroyTexture(const unsigned int _texture)
 	{
-		if (std::this_thread::get_id() != renderThread)
+		if (std::this_thread::get_id() != renderThread.load())
 		{
 			std::unique_lock<std::mutex> lock(pendingLock);
 			pendingTextures.push_back(_texture);
