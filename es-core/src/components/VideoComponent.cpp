@@ -599,6 +599,11 @@ void VideoComponent::manageState()
 			}
 		}
 	}
+	// A video paused under a menu whose view is hidden (a game starts from that menu) stops: a paused player
+	// keeps its sound and video outputs, and the wait before the game (Window::deinit) waits for it too
+	if (!show && !isShowing() && isPaused())
+		stopVideo();
+
 	// Need to recheck variable rather than 'else' because it may be modified above
 	if (!mIsPlaying)
 	{
