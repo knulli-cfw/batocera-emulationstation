@@ -1036,6 +1036,8 @@ snapshot shows, and the file is not tried again until its size changes.
 	- The video will be resized as large as possible so that it fits within this size and maintains its aspect ratio.  Use this instead of `size` when you don't know what kind of video you're using so it doesn't get grossly oversized on one axis (e.g. with a game's video metadata).
 * `keepOrientation` - type: BOOLEAN.
 	- With `size`: a video (and its snapshot) turned the other way than the size keeps its orientation: it takes the size's shape turned (a TV game's 4:3, an upright one's 3:4), centred.  Default is false.
+* `fadeTime` - type: FLOAT.
+	- Seconds the video takes to come in over its snapshot (with `effect` none, a crossfade in place; on a grid tile's `gridtile.video` too).  Default is 0.4.
 * `origin` - type: NORMALIZED_PAIR.
 	- Where on the image `pos` refers to.  For example, an origin of `0.5 0.5` and a `pos` of `0.5 0.5` would place the image exactly in the middle of the screen.  If the "POSITION" and "SIZE" attributes are themable, "ORIGIN" is implied.
 * `rotation` - type: FLOAT.

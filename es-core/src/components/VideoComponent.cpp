@@ -1,4 +1,5 @@
 #include "components/VideoComponent.h"
+#include <algorithm>
 
 #include "resources/ResourceManager.h"
 #include "utils/FileSystemUtil.h"
@@ -313,7 +314,12 @@ void VideoComponent::applyTheme(const std::shared_ptr<ThemeData>& theme, const s
 		Vector2f scale = Vector2f(clientRectangle.z(), clientRectangle.w());
 
 		// A size's shape, turned to the video's (or the snapshot's) orientation (a TV game's 4:3, 3:4 upright)
-		setKeepOrientation(elem->has("keepOrientation") && elem->get<bool>("keepOrientation"));
+		if (elem->has("keepOrientation"))
+			setKeepOrientation(elem->get<bool>("keepOrientation"));
+
+		// How long the video takes to come in over its snapshot, a crossfade
+		if (elem->has("fadeTime"))
+			mFadeTimeMs = std::max(1, (int)(elem->get<float>("fadeTime") * 1000.0f));
 
 		if (elem->has("size"))
 		{
@@ -511,9 +517,9 @@ void VideoComponent::update(int deltaTime)
 			if (mStartTime > ticks)
 			{
 				Uint32 diff = mStartTime - ticks;
-				if (diff < FADE_TIME_MS)
+				if (diff < (Uint32)mFadeTimeMs)
 				{
-					mFadeIn = (float)diff / (float)FADE_TIME_MS;
+					mFadeIn = (float)diff / (float)mFadeTimeMs;
 					return;
 				}
 			}
@@ -522,7 +528,7 @@ void VideoComponent::update(int deltaTime)
 		// If the fade in is less than 1 then increment it
 		if (mFadeIn < 1.0f)
 		{
-			mFadeIn += deltaTime / (float)FADE_TIME_MS;
+			mFadeIn += deltaTime / (float)mFadeTimeMs;
 			if (mFadeIn > 1.0f)
 				mFadeIn = 1.0f;
 		}

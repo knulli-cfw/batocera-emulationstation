@@ -584,6 +584,7 @@ std::map<std::string, std::map<std::string, ThemeData::ElementPropertyType>> The
 		{ "maxSize", NORMALIZED_PAIR },
 		{ "minSize", NORMALIZED_PAIR },
 		{ "keepOrientation", BOOLEAN },			// with size: a video or snapshot turned the other way keeps its orientation
+		{ "fadeTime", FLOAT },					// seconds the video takes to come in over its snapshot (0.4)
 		{ "default", PATH },
 		{ "path", PATH },
 		{ "delay", FLOAT },
