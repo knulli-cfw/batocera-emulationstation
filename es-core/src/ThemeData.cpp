@@ -638,6 +638,7 @@ std::map<std::string, std::map<std::string, ThemeData::ElementPropertyType>> The
 		{ "rowPadding", FLOAT },
 		{ "iconSize", FLOAT },
 		{ "fullRows", BOOLEAN },
+		{ "valueSpacing", FLOAT },
 		{ "atBottom", BOOLEAN },
 		{ "separatorColor", COLOR },
 		{ "selectorColor", COLOR },
@@ -2341,6 +2342,8 @@ std::string ThemeData::getThemeFromCurrentSet(const std::string& system)
 
 ThemeData::ThemeMenu::ThemeMenu(ThemeData* theme)
 {
+	Row.valueSpacing = Renderer::getScreenWidth() * 0.005f;
+
 	Title.font = Font::get(FONT_SIZE_LARGE, Font::getDefaultPath(), true);
 	Footer.font = Font::get(FONT_SIZE_SMALL, Font::getDefaultPath(), true);
 	Text.font = Font::get(FONT_SIZE_MEDIUM, Font::getDefaultPath(), true);
@@ -2468,6 +2471,8 @@ ThemeData::ThemeMenu::ThemeMenu(ThemeData* theme)
 			Row.iconSize = elem->get<float>("iconSize") * Renderer::getScreenHeight();
 		if (elem->has("fullRows"))
 			Row.fullRows = elem->get<bool>("fullRows");
+		if (elem->has("valueSpacing"))
+			Row.valueSpacing = elem->get<float>("valueSpacing") * Renderer::getScreenWidth();
 	}
 
 	elem = theme->getElement("menu", "menuprompt", "menuPrompt");

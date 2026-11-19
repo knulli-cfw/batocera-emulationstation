@@ -841,7 +841,7 @@ ES versions with slides support the feature `slideshow`.
 	- The tiles of a menu's image grid (the save states)
 * `menuKeyboard name="menukeyboard"` - PATH | FOCUSEDPATH | ACTIVEPATH | CORNERSIZE | SPACING | FONTPATH | FONTSIZE | COLOR | SELECTEDCOLOR | WORDKEYS | FOCUSKEYS
 	- The on-screen keyboard's keys
-* `menuText name="menutext"` - FONTPATH | FONTSIZE | COLOR | ROWHEIGHT | ROWPADDING | ICONSIZE | FULLROWS
+* `menuText name="menutext"` - FONTPATH | FONTSIZE | COLOR | ROWHEIGHT | ROWPADDING | ICONSIZE | FULLROWS | VALUESPACING
 	- text for all menu entries
 * `menuText name="menutitle"` - FONTPATH | FONTSIZE | COLOR
 	- text for menu titles
@@ -1447,6 +1447,8 @@ BATOCERA 5.24
 	- The height of the rows' icons (menuIcons), as a fraction of the screen height. Default: 1.25 times the text's letter height.
 * `fullRows` - type: BOOLEAN. (`menutext` only)
 	- Lists show whole rows only: they scroll by rows and leave out a row they cannot show whole. Default is false.
+* `valueSpacing` - type: FLOAT. (`menutext` only)
+	- The space between a row's value and its chevron, as a fraction of the screen width. Default is 0.005.
 	
 
 #### menuSwitch

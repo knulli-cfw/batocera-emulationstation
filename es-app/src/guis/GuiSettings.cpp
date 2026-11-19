@@ -177,7 +177,7 @@ void GuiSettings::addInputTextRow(const std::string& title, const std::string& s
 	row.addElement(ed, false);
 
 	auto spacer = std::make_shared<GuiComponent>(mWindow);
-	spacer->setSize(Renderer::getScreenWidth() * 0.005f, 0);
+	spacer->setSize(ThemeData::getMenuTheme()->Row.valueSpacing, 0);
 	row.addElement(spacer, false);
 
 	auto bracket = std::make_shared<ImageComponent>(mWindow);
@@ -248,7 +248,7 @@ void GuiSettings::addFileBrowser(const std::string& title, const std::string& se
 	row.addElement(ed, true);
 
 	auto spacer = std::make_shared<GuiComponent>(window);
-	spacer->setSize(Renderer::getScreenWidth() * 0.005f, 0);
+	spacer->setSize(ThemeData::getMenuTheme()->Row.valueSpacing, 0);
 	row.addElement(spacer, false);
 
 	auto bracket = std::make_shared<ImageComponent>(window);
