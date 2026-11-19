@@ -169,6 +169,33 @@ namespace HomeSlides
 		return ids;
 	}
 
+	static std::string lower(const std::string& text)
+	{
+		std::string out = text;
+		for (auto& c : out)
+			if (c >= 'A' && c <= 'Z')
+				c = c - 'A' + 'a';
+
+		return out;
+	}
+
+	std::vector<std::string> newestFirst(std::vector<Dated> items, size_t count)
+	{
+		std::stable_sort(items.begin(), items.end(), [](const Dated& a, const Dated& b)
+		{
+			if (a.date != b.date)
+				return a.date > b.date;
+
+			return lower(a.name) < lower(b.name);
+		});
+
+		std::vector<std::string> ids;
+		for (size_t i = 0; i < items.size() && i < count; i++)
+			ids.push_back(items[i].id);
+
+		return ids;
+	}
+
 	void Deck::reset(const std::vector<std::string>& items, std::mt19937& rng)
 	{
 		std::string keep = current();

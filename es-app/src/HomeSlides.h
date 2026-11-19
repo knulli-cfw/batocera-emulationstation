@@ -50,6 +50,17 @@ namespace HomeSlides
 	// does not apply.
 	std::vector<std::string> pickPool(std::vector<Candidate> candidates, const Rules& rules, size_t fallbackCount);
 
+	// A utility's items for the home's panel (tools and emulators by last run, screenshots by file date):
+	// the newest first, then the never dated by name; at most count ids
+	struct Dated
+	{
+		std::string id;
+		std::string name;
+		std::string date;	// sortable (as a gamelist's "lastplayed"); empty when never
+	};
+
+	std::vector<std::string> newestFirst(std::vector<Dated> items, size_t count);
+
 	// Items in a random order, each shown once before any repeats; a new round never starts with the item
 	// shown last. A reset (the list made again after a game changed) keeps the current item while it is still
 	// in the list, so the panel does not jump to another game.

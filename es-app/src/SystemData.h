@@ -134,6 +134,9 @@ public:
 	// {system:continue} on the best-rated favorite
 	FileData* getSuggestedGame();
 	void setPanelVideo(bool value);
+	// A utility's items for the home's panel ({system:recent1} to {system:recent8}): tools and emulators by
+	// last run, screenshots newest first, the never run by name; none on other systems
+	FileData* getRecentItem(size_t index);
 	// More than one suggestion to move on to
 	bool hasOtherSuggestion();
 	// The next suggestion (when its video ends); false when there is no other one
@@ -312,6 +315,8 @@ private:
 	int mSlidesVersion;
 	HomeSlides::Deck mSuggestions;
 	bool mSuggestionsReady;
+	std::vector<std::string> mRecent;
+	size_t mRecentCount;	// the files it was made from
 	bool mPanelVideo;
 
 	bool mHidden;

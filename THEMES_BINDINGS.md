@@ -48,6 +48,7 @@ continue                    game                   lastPlayed, else the suggeste
 hasLastPlayed               bool                   lastPlayed exists and still resolves to a game
 hasContinue                 bool                   continue resolves and is not on tools, emulators or screenshots (X does nothing there)
 slides                      string                 The captures of the system's card, one path per line: favorites with a screenshot, else the 12 best-rated games with one (THEMES.md, Slides)
+recent1 ... recent8         game                   On tools, emulators and screenshots only: their items, tools and emulators by last run, screenshots newest first (by file date), then the never run by name ({system:recent1:name}, {system:recent1:image})
 image                       path
 showManual                  bool
 showSaveStates              bool

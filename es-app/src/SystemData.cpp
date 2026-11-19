@@ -78,6 +78,7 @@ SystemData::SystemData(const SystemMetadata& meta, SystemEnvironmentData* envDat
 	mSlidesVersion = 0;
 	mSuggestionsReady = false;
 	mPanelVideo = false;
+	mRecentCount = (size_t)-1;
 	mSortId = Settings::getInstance()->getInt(getName() + ".sort");
 	mUnlimitedRecursiveDepth = Settings::getInstance()->getBool(getName() + ".unlimited_recursive_depth");
 	int depth;
@@ -1504,9 +1505,10 @@ void SystemData::updateDisplayedGameCount()
 
 	mGameCountInfo = nullptr;
 
-	// A favorite or a capture changed: the home's slides and suggestions are made again
+	// A favorite or a capture changed: the home's slides, suggestions and recent items are made again
 	mSlidesReady = false;
 	mSuggestionsReady = false;
+	mRecentCount = (size_t)-1;
 }
 
 void SystemData::loadTheme()
@@ -2266,6 +2268,50 @@ FileData* SystemData::getSuggestedGame()
 	return mRootFolder->FindByPath(mSuggestions.current());
 }
 
+FileData* SystemData::getRecentItem(size_t index)
+{
+	if (mRootFolder == nullptr || !isUtilitySystem(this))
+		return nullptr;
+
+	// Made again when the files change (a new screenshot, a tool run: updateDisplayedGameCount)
+	auto files = mRootFolder->getFilesRecursive(GAME, true);
+	if (files.size() != mRecentCount)
+	{
+		bool screenshots = hasPlatformId(PlatformIds::IMAGEVIEWER) || getName() == "imageviewer";
+
+		std::vector<HomeSlides::Dated> items;
+		for (auto file : files)
+		{
+			HomeSlides::Dated item;
+			item.id = file->getPath();
+			item.name = file->getName();
+
+			if (screenshots)
+			{
+				auto date = Utils::FileSystem::getFileModificationDate(file->getPath());
+				if (date.getTime() > 0)
+					item.date = date.getIsoString();
+			}
+			else
+			{
+				item.date = file->getMetadata(MetaDataId::LastPlayed);
+				if (item.date.size() < 15)	// "0" or unset: never run
+					item.date.clear();
+			}
+
+			items.push_back(item);
+		}
+
+		mRecent = HomeSlides::newestFirst(items, 8);
+		mRecentCount = files.size();
+	}
+
+	if (index >= mRecent.size())
+		return nullptr;
+
+	return mRootFolder->FindByPath(mRecent[index]);
+}
+
 bool SystemData::hasOtherSuggestion()
 {
 	return getSuggestedGame() != nullptr && mSuggestions.size() > 1;
@@ -2421,6 +2467,12 @@ BindableProperty SystemData::getProperty(const std::string& name)
 
 	if (name == "slides")
 		return Utils::String::join(getSlides(), "\n");
+
+	if (name.size() == 7 && Utils::String::startsWith(name, "recent") && name[6] >= '1' && name[6] <= '8')
+	{
+		FileData* item = getRecentItem(name[6] - '1');
+		return item != nullptr ? BindableProperty((IBindable*)item) : BindableProperty::Null;
+	}
 
 	if (name == "lastPlayed" || name == "continue")
 	{
