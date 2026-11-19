@@ -67,6 +67,7 @@ public:
 	void normalizeNextUpdate();
 
 	inline bool isSleeping() const { return mSleeping; }
+	unsigned int getTimeSinceLastInput() const { return mTimeSinceLastInput; }
 
 	// The home and the game lists, with nothing over them, draw a frame only when it changes
 	// (Settings "RenderOnChange")

@@ -78,20 +78,43 @@ SystemView::~SystemView()
 	clearEntries();
 }
 
-void SystemView::clearEntries()
+void SystemView::clearEntries(bool keepExtras)
 {
+	if (!keepExtras)
+		clearParkedExtras();
+
 	for (auto& entry : mEntries)
 	{
 		setExtraRequired(entry, false);
 
-		for (auto extra : entry.backgroundExtras)
-			delete extra;
+		if (keepExtras)
+		{
+			// Hidden (videos stop, slideshows go back to their first capture) until the tab shows again
+			for (auto extra : entry.backgroundExtras)
+				extra->onHide();
+
+			mParkedExtras[entry.object] = entry.backgroundExtras;
+		}
+		else
+		{
+			for (auto extra : entry.backgroundExtras)
+				delete extra;
+		}
 
 		entry.backgroundExtras.clear();
 	}
 
 	mEntries.clear();
 	mCarousel.clear();
+}
+
+void SystemView::clearParkedExtras()
+{
+	for (auto& parked : mParkedExtras)
+		for (auto extra : parked.second)
+			delete extra;
+
+	mParkedExtras.clear();
 }
 
 void SystemView::reloadTheme(SystemData* system)
@@ -148,6 +171,30 @@ static void forEachVideo(GuiComponent* comp, const std::function<void(VideoCompo
 void SystemView::loadExtras(SystemData* system)
 {
 	auto it = std::find_if(mEntries.begin(), mEntries.end(), [system](const SystemViewData& ss) { return ss.object == system; });
+
+	// Back to a tab shown before: its extras as they were (making them from the theme again takes long)
+	auto parked = mParkedExtras.find(system);
+	if (parked != mParkedExtras.cend())
+	{
+		if (it != mEntries.cend())
+		{
+			for (auto extra : it->backgroundExtras)
+				delete extra;
+
+			it->backgroundExtras = parked->second;
+		}
+		else
+		{
+			SystemViewData data;
+			data.object = system;
+			data.backgroundExtras = parked->second;
+			mEntries.push_back(data);
+		}
+
+		mParkedExtras.erase(parked);
+		return;
+	}
+
 	if (it != mEntries.cend())
 	{
 		// delete any existing extras
@@ -156,7 +203,52 @@ void SystemView::loadExtras(SystemData* system)
 
 		it->backgroundExtras.clear();
 	}
-	
+
+	auto extras = makeExtras(system, true);
+
+	if (it == mEntries.cend())
+	{
+		SystemViewData data;
+		data.object = system;
+		data.backgroundExtras = extras;
+		mEntries.push_back(data);
+	}
+	else
+		it->backgroundExtras = extras;
+
+	SystemRandomPlaylist::resetCache();
+}
+
+static const unsigned int PREPARE_AFTER_IDLE_MS = 1500;
+
+// Tabs: once the home is idle (no input for a while), the extras of the other tabs' systems are made ahead,
+// one system per frame, and kept for their tab (mParkedExtras): a tab then shows without making them
+void SystemView::prepareOtherTabs()
+{
+	if (!hasTabs() || mViewNeedsReload || mWindow->getTimeSinceLastInput() < PREPARE_AFTER_IDLE_MS || mWindow->peekGui() != ViewController::get())
+		return;
+
+	for (auto& tab : mTabs)
+	{
+		for (auto system : tab.systems)
+		{
+			if (system->getTheme() == nullptr || mParkedExtras.find(system) != mParkedExtras.cend())
+				continue;
+
+			if (std::find_if(mEntries.cbegin(), mEntries.cend(), [system](const SystemViewData& e) { return e.object == system; }) != mEntries.cend())
+				continue;
+
+			mParkedExtras[system] = makeExtras(system, false);
+			return;
+		}
+	}
+}
+
+std::vector<GuiComponent*> SystemView::makeExtras(SystemData* system, bool preload)
+{
+	// The same files for every system's elements: checked once
+	Utils::FileSystem::FileSystemCacheActivator fsc;
+
 	size_t vram = Settings::getInstance()->getInt("MaxVRAM") * 1024 * 1024;
 	size_t size = TextureResource::getTotalMemUsage();
 
@@ -179,7 +271,7 @@ void SystemView::loadExtras(SystemData* system)
 		{
 			// Preload image if there's enough VRAM space				
 			auto tex = ((ImageComponent*)extra)->getTexture();
-			if (tex && !tex->isLoaded())
+			if (preload && tex && !tex->isLoaded())
 			{
 				auto texSize = tex->getEstimatedVRAMUsage();
 				if (size + texSize < vram)
@@ -231,26 +323,15 @@ void SystemView::loadExtras(SystemData* system)
 
 	// sort the extras by z-index
 	std::stable_sort(extras.begin(), extras.end(), [](GuiComponent* a, GuiComponent* b) { return b->getZIndex() > a->getZIndex(); });
-
-	if (it == mEntries.cend())
-	{
-		SystemViewData data;
-		data.object = system;
-		data.backgroundExtras = extras;
-		mEntries.push_back(data);
-	}
-	else
-		it->backgroundExtras = extras;
-
-	SystemRandomPlaylist::resetCache();
+	return extras;
 }
 
 
-void SystemView::populate()
+void SystemView::populate(bool keepExtras)
 {
 	TextureLoader::paused = true;
 
-	clearEntries();
+	clearEntries(keepExtras && !mViewNeedsReload);
 
 	// The view's elements come from the first system with a theme
 	if (mViewNeedsReload)
@@ -731,6 +812,8 @@ void SystemView::showNavigationBar(const std::string& title, const std::function
 
 void SystemView::update(int deltaTime)
 {
+	prepareOtherTabs();
+
 	// A system's slides and suggestions, made off the UI thread, arrived: its card and the panel bind them
 	for (auto& entry : mEntries)
 	{
@@ -1399,7 +1482,7 @@ void SystemView::moveTab(int direction)
 				select = system;
 
 	mActiveTab = tab;
-	populate();
+	populate(true);
 	goToSystem(select, false);
 }
 

@@ -89,6 +89,8 @@ protected:
 
 private:
 	void	 loadExtras(SystemData* system);
+	std::vector<GuiComponent*> makeExtras(SystemData* system, bool preload);
+	void	 prepareOtherTabs();
 	void	 ensureTexture(GuiComponent* extra, bool reload);
 
 	void	 updateExtraTextBinding();
@@ -99,7 +101,10 @@ private:
 
 	void	 activateExtras(int cursor, bool activate = true);	
 	void	 updateExtras(const std::function<void(GuiComponent*)>& func);
-	void	 clearEntries();
+	// keepExtras (a tab switch): the systems' extras are kept for their next show (mParkedExtras) instead of
+	// made again from the theme
+	void	 clearEntries(bool keepExtras = false);
+	void	 clearParkedExtras();
 
 	int		 moveCursorFast(bool forward = true);
 
@@ -107,7 +112,7 @@ private:
 	bool	 showNavigationBar();
 	void	 showNavigationBar(const std::string& title, const std::function<std::string(SystemData* system)>& selector);
 
-	void	 populate();
+	void	 populate(bool keepExtras = false);
 	void	 getViewElements(const std::shared_ptr<ThemeData>& theme);
 	void	 getDefaultElements(void);
 	void	 getCarouselFromTheme(const ThemeData::ThemeElement* elem);
@@ -171,6 +176,7 @@ private:
 	std::string							mShownContinue;
 	unsigned int						mContinueShownAt;
 	std::map<SystemData*, int>			mSlidesBound;
+	std::map<SystemData*, std::vector<GuiComponent*>> mParkedExtras;
 
 	static std::map<std::string, int>	sSystemTabs;
 };
