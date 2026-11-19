@@ -2,6 +2,7 @@
 
 #include "components/GridTileComponent.h"
 #include "components/SlideLayout.h"
+#include "components/ImageAspectCheck.h"
 #include "renderers/Renderer.h"
 #include "resources/TextureResource.h"
 #include "utils/StringUtil.h"
@@ -129,6 +130,7 @@ void SlideshowComponent::drawSlide(const std::shared_ptr<TextureResource>& textu
 	vertices[3] = { { r, b }, { 1.0f, 0.0f }, color };
 	vertices[0].saturation = mSaturation;
 
+	ImageAspectCheck::check(this, "slide", vertices, Vector2i((int)size.x(), (int)size.y()), trans);
 	Renderer::setMatrix(trans);
 	Renderer::drawTriangleStrips(&vertices[0], 4);
 }

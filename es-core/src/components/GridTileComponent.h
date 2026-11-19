@@ -25,6 +25,7 @@ public:
 		origin = Vector2f(0.5f, 0.5f);
 		color = colorEnd = 0xFFFFFFFF;		
 		sizeMode = "maxSize";
+		keepOrientation = false;
 		roundCorners = 0;
 	}
 
@@ -38,6 +39,8 @@ public:
 
 		image->setPosition(offsetPos.x() + pos.x() * parentSize.x(), offsetPos.y() + pos.y() * parentSize.y());
 		
+		image->setKeepOrientation(keepOrientation);
+
 		if (!disableSize && sizeMode == "size")
 			image->setSize(size.x() * parentSize.x(), size.y() * parentSize.y());
 		else if (sizeMode == "minSize")
@@ -65,6 +68,9 @@ public:
 	unsigned int colorEnd;
 
 	std::string  sizeMode;
+	// imageSizeMode "screen": "size" (the picture takes the tile's shape, a screen's), but a picture turned the
+	// other way keeps its orientation (ScreenShape::fit)
+	bool         keepOrientation;
 
 	Renderer::ShaderInfo customShader;
 

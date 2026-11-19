@@ -89,6 +89,9 @@ public:
 	// setMaxSize() and setResize() are mutually exclusive.
 	virtual void setResize(float width, float height) = 0;
 	inline void setResize(const Vector2f& size) { setResize(size.x(), size.y()); }
+	// With setResize (both sides): a video turned the other way than the size keeps its orientation
+	// (ScreenShape::fit)
+	void setKeepOrientation(bool keep) { mKeepOrientation = keep; }
 
 	// Resize the video to be as large as possible but fit within a box of this size.
 	// Can be set before or after a video is loaded.
@@ -221,6 +224,7 @@ protected:
 	bool							mIdleStopped;	// stopped by it at the end of a loop, until input
 	bool							mTargetIsMax;
 	bool							mTargetIsMin;
+	bool							mKeepOrientation;
 
 	bool							mIsWaitingForVideoToStart;
 

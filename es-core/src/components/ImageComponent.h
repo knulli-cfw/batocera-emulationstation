@@ -47,6 +47,9 @@ public:
 	// Can be set before or after an image is loaded.
 	// setMaxSize() and setResize() are mutually exclusive.
 	void setResize(float width, float height);
+	// With setResize (both sides): a picture turned the other way than the size keeps its orientation
+	// (ScreenShape::fit)
+	void setKeepOrientation(bool keep);
 	inline void setResize(const Vector2f& size) { setResize(size.x(), size.y()); }
 
 	// Resize the image to be as large as possible but fit within a box of this size.
@@ -140,6 +143,7 @@ protected:
 
 private:
 	bool mFlipX, mFlipY, mTargetIsMax, mTargetIsMin;
+	bool mKeepOrientation;
 
 	// Calculates the correct mSize from our resizing information (set by setResize/setMaxSize).
 	// Used internally whenever the resizing parameters or texture change.

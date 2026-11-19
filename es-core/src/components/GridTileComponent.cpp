@@ -255,7 +255,12 @@ void GridTileComponent::resize()
 			mVideo->setOrigin(0.5f, 0.5f);
 			mVideo->setPosition(size.x() / 2.0f, (size.y() - height) / 2.0f);
 
-			if (currentProperties.Image.sizeMode == "size")
+			mVideo->setKeepOrientation(currentProperties.Image.keepOrientation);
+
+			// A screen's shape that keeps the video's orientation is worked out from the video's size (resize)
+			if (currentProperties.Image.sizeMode == "size" && currentProperties.Image.keepOrientation)
+				mVideo->setResize(imageSize.x(), size.y() - topPadding - bottomPadding);
+			else if (currentProperties.Image.sizeMode == "size")
 				mVideo->setSize(imageSize.x(), size.y() - topPadding - bottomPadding);
 			else
 				mVideo->setMaxSize(imageSize.x(), size.y() - topPadding - bottomPadding);
@@ -583,7 +588,12 @@ void GridTileComponent::applyThemeToProperties(const ThemeData::ThemeElement* el
 		properties.Image.color = properties.Image.colorEnd = elem->get<unsigned int>("imageColor");
 
 	if (elem && elem->has("imageSizeMode"))
+	{
 		properties.Image.sizeMode = elem->get<std::string>("imageSizeMode");
+		properties.Image.keepOrientation = properties.Image.sizeMode == "screen";
+		if (properties.Image.keepOrientation)
+			properties.Image.sizeMode = "size";
+	}
 }
 
 bool GridImageProperties::applyTheme(const ThemeData::ThemeElement* elem)
@@ -1208,6 +1218,8 @@ void GridTileComponent::startVideo()
 	if (mVideo != nullptr)
 	{
 		// Inform video component about size before staring in order to be able to use OptimizeVideo parameter
+		mVideo->setKeepOrientation(mSelectedProperties.Image.keepOrientation);
+
 		if (mSelectedProperties.Image.sizeMode == "minSize")
 			mVideo->setMinSize(mSelectedProperties.Size);
 		else
@@ -1409,6 +1421,7 @@ void GridImageProperties::mixProperties(GridImageProperties& def, GridImagePrope
 	colorEnd = mixColors(def.colorEnd, sel.colorEnd, percent);
 	reflexion = mixVectors(def.reflexion, sel.reflexion, percent);
 	roundCorners = mixFloat(def.roundCorners, sel.roundCorners, percent);
+	keepOrientation = def.keepOrientation || sel.keepOrientation;
 
 	customShader = percent >= 0.02f ? sel.customShader : def.customShader;
 }

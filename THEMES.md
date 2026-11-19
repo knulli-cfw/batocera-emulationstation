@@ -1008,6 +1008,9 @@ Can be created as an extra.
     - BATOCERA 5.24: Selects if the background is over the full tile or only the image. `full` by default, can also be set to `image`. 
 * `imageSizeMode` - type: STRING.
     - BATOCERA 5.24: Selects the image sizing mode. `maxSize` by default, can also be set to `minSize` (outer zoom) or `size` (stretch). 
+      `screen` stretches like `size` (a capture at its screen's shape: a TV game's at 4:3), but a picture turned the
+      other way than the tile (an upright game's capture in a landscape tile) keeps its orientation: it takes the
+      tile's shape turned, as tall (or as wide) as the tile, centred. The selected tile's video too.
 * `reflexion` - type: NORMALIZED_PAIR.
 	- BATOCERA 5.24: table reflexion effect. First item is top position alpha, second is bottom alpha.
     

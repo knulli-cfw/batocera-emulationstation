@@ -1,4 +1,6 @@
 #include "components/VideoVlcComponent.h"
+#include "components/ImageAspectCheck.h"
+#include "components/ScreenShape.h"
 
 #include "renderers/Renderer.h"
 #include "resources/TextureResource.h"
@@ -457,6 +459,9 @@ void VideoVlcComponent::resize()
 		// if no components are set, we don't resize at all
 		mSize = targetSize == Vector2f::Zero() ? textureSize : targetSize;
 
+		if (mKeepOrientation && targetSize.x() > 0 && targetSize.y() > 0)
+			mSize = ScreenShape::fit(targetSize, textureSize);
+
 		// if only one component is set, we resize in a way that maintains aspect ratio
 		// for SVG rasterization, we always calculate width from rounded height (see comment above)
 		if (!targetSize.x() && targetSize.y())
@@ -753,6 +758,7 @@ void VideoVlcComponent::render(const Transform4x4f& parentTrans)
 	
 	if (mTexture->bind())
 	{
+		ImageAspectCheck::check(this, mVideoPath, mVertices, mTexture->getSize(), trans);
 		Renderer::setMatrix(trans);
 
 		beginCustomClipRect();
