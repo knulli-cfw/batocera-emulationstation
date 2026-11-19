@@ -245,7 +245,13 @@ void GridTileComponent::resize()
 		{
 			mVideo->setOrigin(0.5, 0.5);			
 			mVideo->setPosition(imageOffset.x() + imageSize.x() / 2.0f, imageOffset.y() + imageSize.y() / 2.0f);
-			mVideo->setMinSize(imageSize.x(), imageSize.y());
+
+			// A picture fitted in the tile (maxSize) keeps its own place: the video fills that place, cut to it, so
+			// the swap from the picture to the video moves nothing
+			if (currentProperties.Image.sizeMode == "maxSize" && mImage != nullptr && mImage->getSize().x() > 0 && mImage->getSize().y() > 0)
+				mVideo->setMinSize(mImage->getSize().x(), mImage->getSize().y());
+			else
+				mVideo->setMinSize(imageSize.x(), imageSize.y());
 
 			if (mImage != nullptr)
 				mVideo->setRoundCorners(mImage->getRoundCorners());
