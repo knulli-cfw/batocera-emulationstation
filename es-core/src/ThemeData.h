@@ -172,6 +172,28 @@ struct ButtonElement
 	Vector2f	cornerSize;
 };
 
+// The text field of the on-screen keyboard and of other text popups (menuTextEdit)
+struct TextEditElement
+{
+	std::shared_ptr<Font> font;	// nullptr: ES's own
+	unsigned int caretColor;	// 0: the menu text's colour, dimmed while the field is not edited
+};
+
+// The on-screen keyboard's keys (menuKeyboard); the stock look while path is empty
+struct KeyboardElement
+{
+	std::string path;			// a key
+	std::string focusedPath;	// the focused key
+	std::string activePath;		// SHIFT or ALT while on
+	Vector2f	cornerSize;
+	float		spacing;		// pixels between two keys
+	unsigned int color;
+	unsigned int selectedColor;
+	std::shared_ptr<Font> font;	// the letters; words take the menu's small text font
+	bool		wordKeys;		// delete, space and accept as words
+	bool		focusKeys;		// open on the first letter key instead of the text field
+};
+
 class ThemeData
 {
 	friend class GuiComponent;
@@ -190,6 +212,8 @@ public:
 		MenuGroupElement Group{ 0x777777FF, 0x00000010, 0xC6C7C6FF, 2.0, "", nullptr, 0 /*ALIGN_LEFT*/, false };
 		IconElement Icons { ":/on.svg", ":/off.svg", ":/auto.svg", ":/option_arrow.svg", ":/arrow.svg", ":/slider_knob.svg", ":/textinput_ninepatch.png", ":/textinput_ninepatch_active.png" };
 		ButtonElement Button { ":/button.png", ":/button_filled.png", Vector2f(16,16) };
+		TextEditElement TextEdit { nullptr, 0 };
+		KeyboardElement Keyboard { "", "", "", Vector2f(16, 16), 0.0f, 0xFFFFFFFF, 0xFFFFFFFF, nullptr, false, false };
 
 		std::string getMenuIcon(const std::string name)
 		{

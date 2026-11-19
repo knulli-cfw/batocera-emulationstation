@@ -96,6 +96,37 @@ std::vector<std::vector<const char*>> kbKr{
 	{ "SHIFT", "-colspan-", "SPACE", "-colspan-", "-colspan-", "-colspan-", "-colspan-", "-colspan-", "-colspan-", "RESET", "-colspan-", "CANCEL", "-colspan-" }
 };
 
+// A word as a key shows it: its first letter a capital
+static std::string capitalize(const std::string& text)
+{
+	std::string lower = Utils::String::toLower(text);
+	if (lower.empty())
+		return lower;
+
+	size_t next = Utils::String::nextCursor(lower, 0);
+	return Utils::String::toUpper(lower.substr(0, next)) + lower.substr(next);
+}
+
+// What a key shows. The theme's word keys (menuKeyboard wordKeys) name delete, space and accept instead of
+// their glyphs (a blank for space), and write every word key as a word.
+static std::string keyLabel(const std::string& key)
+{
+	auto theme = ThemeData::getMenuTheme();
+	if (theme->Keyboard.path.empty() || !theme->Keyboard.wordKeys)
+		return key;
+
+	if (key == _U("\uF177"))
+		return capitalize(_("DELETE"));
+	if (key == _U("\uF058"))
+		return capitalize(_("ACCEPT"));
+	if (key == " " || key == "SPACE")
+		return capitalize(_("SPACE"));
+	if (key == _("RESET") || key == _("CANCEL"))
+		return capitalize(key);
+
+	return key;
+}
+
 GuiTextEditPopupKeyboard::GuiTextEditPopupKeyboard(Window* window, const std::string& title, const std::string& initValue,
 	const std::function<void(const std::string&)>& okCallback, bool multiLine, const std::string acceptBtnText)
 	: GuiComponent(window), mBackground(window, ":/frame.png"), mGrid(window, Vector2i(1, 6)), mMultiLine(multiLine)
@@ -217,8 +248,14 @@ GuiTextEditPopupKeyboard::GuiTextEditPopupKeyboard(Window* window, const std::st
 				else
 					button = makeButton(lower, upper, lowerAlted, upperAlted);
 
-				button->setPadding(Vector4f(BUTTON_GRID_HORIZ_PADDING / 4.0f, BUTTON_GRID_HORIZ_PADDING / 4.0f, BUTTON_GRID_HORIZ_PADDING / 4.0f, BUTTON_GRID_HORIZ_PADDING / 4.0f));
-				button->setRenderNonFocusedBackground(false);
+				if (theme->Keyboard.path.empty())
+				{
+					button->setPadding(Vector4f(BUTTON_GRID_HORIZ_PADDING / 4.0f, BUTTON_GRID_HORIZ_PADDING / 4.0f, BUTTON_GRID_HORIZ_PADDING / 4.0f, BUTTON_GRID_HORIZ_PADDING / 4.0f));
+					button->setRenderNonFocusedBackground(false);
+				}
+				else
+					styleKey(button, button->getText());
+
 				buttons.push_back(button);
 
 				int colSpan = 1;
@@ -249,6 +286,13 @@ GuiTextEditPopupKeyboard::GuiTextEditPopupKeyboard(Window* window, const std::st
 
 	// Add keyboard keys
 	mGrid.setEntry(mKeyboardGrid, Vector2i(0, 2), true, true, Vector2i(2, 4));
+
+	// A pad has no use for the text field: open on the first letter key, the caret still in the field
+	if (!theme->Keyboard.path.empty() && theme->Keyboard.focusKeys)
+	{
+		mGrid.setCursorTo(mKeyboardGrid);
+		mKeyboardGrid->setCursorTo(Vector2i(0, 1));
+	}
 
 	// Determine size from text size
 	float textHeight = mText->getFont()->getHeight();
@@ -426,10 +470,42 @@ void GuiTextEditPopupKeyboard::updateKeyboardButtons()
 			: (mShift) ? kb.shiftedKey
 			: kb.key;
 
+		if (!ThemeData::getMenuTheme()->Keyboard.path.empty())
+		{
+			setKeyLabel(kb.button, text);
+			continue;
+		}
+
 		auto sz = kb.button->getSize();
 		kb.button->setText(text, text, false);
 		kb.button->setSize(sz);
 	}
+}
+
+// The theme's key (menuKeyboard): its images untinted, the spacing as padding, its label colours and font
+void GuiTextEditPopupKeyboard::styleKey(const std::shared_ptr<ButtonComponent>& button, const std::string& key)
+{
+	auto& keyboard = ThemeData::getMenuTheme()->Keyboard;
+
+	float pad = keyboard.spacing / 2.0f;
+	button->setPadding(Vector4f(pad, pad, pad, pad));
+	button->setImages(keyboard.path, keyboard.focusedPath, keyboard.activePath, keyboard.cornerSize);
+	button->setTextColors(keyboard.color, keyboard.selectedColor);
+	setKeyLabel(button, key);
+}
+
+// A key's label: one character in the keyboard's font, a word in the menu's small text font
+void GuiTextEditPopupKeyboard::setKeyLabel(const std::shared_ptr<ButtonComponent>& button, const std::string& key)
+{
+	auto theme = ThemeData::getMenuTheme();
+
+	std::string label = keyLabel(key);
+	bool word = !label.empty() && Utils::String::nextCursor(label, 0) < label.size();
+
+	auto sz = button->getSize();
+	button->setFont(word ? theme->TextSmall.font : theme->Keyboard.font);
+	button->setText(label, label, false);
+	button->setSize(sz);
 }
 
 // Shifts the keys when user hits the shift button.

@@ -833,6 +833,10 @@ ES versions with slides support the feature `slideshow`.
 	- Image for the slider knob in menus
 * `menuButton name="menubutton"` - PATH | FILLEDPATH
 	- Images for menu buttons
+* `menuTextEdit name="menutextedit"` - ACTIVE | INACTIVE | FONTPATH | FONTSIZE | CARETCOLOR
+	- The text field of the on-screen keyboard and other text popups
+* `menuKeyboard name="menukeyboard"` - PATH | FOCUSEDPATH | ACTIVEPATH | CORNERSIZE | SPACING | FONTPATH | FONTSIZE | COLOR | SELECTEDCOLOR | WORDKEYS | FOCUSKEYS
+	- The on-screen keyboard's keys
 * `menuText name="menutext"` - FONTPATH | FONTSIZE | COLOR
 	- text for all menu entries
 * `menuText name="menutitle"` - FONTPATH | FONTSIZE | COLOR
@@ -1456,6 +1460,41 @@ BATOCERA 5.24 - replace the textbox background images in OSK
   - Image path when the textbox is not selected
 * `active` - type: PATH. 
   - Image path when the textbox is selected.
+* `fontPath` - type: PATH.
+  - The text's font. Default is ES's light font.
+* `fontSize` - type: FLOAT.
+  - The text's size, as a fraction of the screen height.
+* `caretColor` - type: COLOR.
+  - The caret's colour, kept at full strength while the field is not edited (the on-screen keyboard types into
+    it from its keys). Default: the menu text's colour, dimmed while the field is not edited.
+
+#### menuKeyboard
+
+The on-screen keyboard's keys (`menuKeyboard name="menukeyboard"`). Without `path` and `focusedPath` the keyboard
+keeps its stock look. The images are ninepatches drawn as they are, with no tint.
+
+* `path` - type: PATH.
+  - A key.
+* `focusedPath` - type: PATH.
+  - The focused key.
+* `activePath` - type: PATH.
+  - SHIFT or ALT while on. Default: `path` tinted.
+* `cornerSize` - type: NORMALIZED_PAIR.
+  - The images' corner size, in pixels. Default is `16 16`.
+* `spacing` - type: FLOAT.
+  - The space between two keys, as a fraction of the screen width.
+* `fontPath` - type: PATH.
+* `fontSize` - type: FLOAT.
+  - The letters' font. Words (below, RESET and CANCEL) take the `menutextsmall` font. Default: `menutext`'s.
+* `color` - type: COLOR.
+  - The labels' colour. Default: `menutext`'s colour.
+* `selectedColor` - type: COLOR.
+  - The focused key's label colour. Default: `menutext`'s `selectedColor`.
+* `wordKeys` - type: BOOLEAN.
+  - Name the delete, space and accept keys (`DELETE`, `SPACE`, `ACCEPT` in the catalogue) instead of their glyphs,
+    and write every word key with a first capital. Default is false.
+* `focusKeys` - type: BOOLEAN.
+  - Open the keyboard on its first letter key instead of the text field, for pads. Default is false.
 
 #### menuIcons
 

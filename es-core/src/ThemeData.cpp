@@ -679,7 +679,22 @@ std::map<std::string, std::map<std::string, ThemeData::ElementPropertyType>> The
 		{ "pathOff", PATH } } },
 	{ "menuTextEdit",{
 		{ "active", PATH },
-		{ "inactive", PATH } } },
+		{ "inactive", PATH },
+		{ "fontPath", PATH },
+		{ "fontSize", FLOAT },
+		{ "caretColor", COLOR } } },
+	{ "menuKeyboard",{
+		{ "path", PATH },
+		{ "focusedPath", PATH },
+		{ "activePath", PATH },
+		{ "cornerSize", NORMALIZED_PAIR },
+		{ "spacing", FLOAT },
+		{ "fontPath", PATH },
+		{ "fontSize", FLOAT },
+		{ "color", COLOR },
+		{ "selectedColor", COLOR },
+		{ "wordKeys", BOOLEAN },
+		{ "focusKeys", BOOLEAN } } },
 	{ "menuSlider",{
 		{ "path", PATH } } },
 	{ "menuButton",{
@@ -2479,6 +2494,32 @@ ThemeData::ThemeMenu::ThemeMenu(ThemeData* theme)
 			Icons.textinput_ninepatch_active = elem->get<std::string>("active");
 		if (elem->has("inactive") && ResourceManager::getInstance()->fileExists(elem->get<std::string>("inactive")))
 			Icons.textinput_ninepatch = elem->get<std::string>("inactive");
+		if (elem->has("fontPath") || elem->has("fontSize"))
+			TextEdit.font = Font::getFromTheme(elem, ThemeFlags::ALL, Font::get(FONT_SIZE_MEDIUM), true);
+		if (elem->has("caretColor"))
+			TextEdit.caretColor = elem->get<unsigned int>("caretColor");
+	}
+
+	elem = theme->getElement("menu", "menukeyboard", "menuKeyboard");
+	if (elem && elem->has("path") && elem->has("focusedPath") &&
+		ResourceManager::getInstance()->fileExists(elem->get<std::string>("path")) &&
+		ResourceManager::getInstance()->fileExists(elem->get<std::string>("focusedPath")))
+	{
+		Keyboard.path = elem->get<std::string>("path");
+		Keyboard.focusedPath = elem->get<std::string>("focusedPath");
+		if (elem->has("activePath") && ResourceManager::getInstance()->fileExists(elem->get<std::string>("activePath")))
+			Keyboard.activePath = elem->get<std::string>("activePath");
+		if (elem->has("cornerSize"))
+			Keyboard.cornerSize = elem->get<Vector2f>("cornerSize");
+		if (elem->has("spacing"))
+			Keyboard.spacing = elem->get<float>("spacing") * Renderer::getScreenWidth();
+		Keyboard.color = elem->has("color") ? elem->get<unsigned int>("color") : Text.color;
+		Keyboard.selectedColor = elem->has("selectedColor") ? elem->get<unsigned int>("selectedColor") : Text.selectedColor;
+		Keyboard.font = (elem->has("fontPath") || elem->has("fontSize")) ? Font::getFromTheme(elem, ThemeFlags::ALL, Font::get(FONT_SIZE_MEDIUM), true) : Text.font;
+		if (elem->has("wordKeys"))
+			Keyboard.wordKeys = elem->get<bool>("wordKeys");
+		if (elem->has("focusKeys"))
+			Keyboard.focusKeys = elem->get<bool>("focusKeys");
 	}
 
 	elem = theme->getElement("menu", "menuswitch", "menuSwitch");

@@ -24,6 +24,9 @@ TextEditComponent::TextEditComponent(Window* window) : GuiComponent(window),
 	auto theme = ThemeData::getMenuTheme();
 	mBox.setImagePath(ThemeData::getMenuTheme()->Icons.textinput_ninepatch);
 
+	if (theme->TextEdit.font != nullptr)
+		mFont = theme->TextEdit.font;
+
 	addChild(&mBox);
 	
 	onFocusLost();
@@ -363,8 +366,13 @@ void TextEditComponent::render(const Transform4x4f& parentTrans)
 		{
 			float cursorHeight = mFont->getHeight() * 0.8f;
 
+			// A theme's caret colour is kept while the field is not edited: the on-screen keyboard types into it
+			// from its keys, so the caret shows where the next letter goes
+			auto caretColor = ThemeData::getMenuTheme()->TextEdit.caretColor;
 			auto cursorColor = (ThemeData::getMenuTheme()->Text.color & 0xFFFFFF00) | getOpacity();
-			if (!mEditing)
+			if (caretColor != 0)
+				cursorColor = (caretColor & 0xFFFFFF00) | (unsigned char)((caretColor & 0xFF) * getOpacity() / 255.0f);
+			else if (!mEditing)
 				cursorColor = (ThemeData::getMenuTheme()->Text.color & 0xFFFFFF00) | (unsigned char) (getOpacity() * 0.25f);
 
 			Renderer::drawRect(cursorPos.x(), cursorPos.y() + (mFont->getHeight() - cursorHeight) / 2, 2.0f, cursorHeight, cursorColor, cursorColor); // 0x000000FF

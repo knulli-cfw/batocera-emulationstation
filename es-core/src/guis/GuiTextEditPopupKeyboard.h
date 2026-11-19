@@ -36,6 +36,9 @@ private:
 	std::shared_ptr<ButtonComponent> mShiftButton;	
 	std::shared_ptr<ButtonComponent> mAltButton;
 
+	void styleKey(const std::shared_ptr<ButtonComponent>& button, const std::string& key);
+	void setKeyLabel(const std::shared_ptr<ButtonComponent>& button, const std::string& key);
+
 	void toggleKeyState(bool& state, std::shared_ptr<ButtonComponent>& button);
 	void updateKeyboardButtons();
 	void shiftKeys();

@@ -36,6 +36,12 @@ public:
 
 	void setRenderNonFocusedBackground(bool value) { mRenderNonFocusedBackground = value; }
 
+	// Draws the button with these images as they are (no tint): path, focusedPath when focused and
+	// activePath under a colour shift (a toggled key), instead of the menu theme's button
+	void setImages(const std::string& path, const std::string& focusedPath, const std::string& activePath, const Vector2f& cornerSize);
+	void setFont(const std::shared_ptr<Font>& font);
+	void setTextColors(unsigned int color, unsigned int focusedColor);
+
 	void onPaddingChanged();
 
 	bool hasFocus() { return mFocused; }
@@ -68,6 +74,10 @@ private:
 
 	bool mRenderNonFocusedBackground;
 	bool mMousePressed;
+
+	std::string mImagePath;
+	std::string mFocusedImagePath;
+	std::string mActiveImagePath;
 };
 
 #endif // ES_CORE_COMPONENTS_BUTTON_COMPONENT_H
