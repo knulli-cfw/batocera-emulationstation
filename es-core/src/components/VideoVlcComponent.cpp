@@ -103,28 +103,45 @@ namespace
 	class PlayerWorker
 	{
 	public:
-		static void post(const std::function<void()>& task)
+		// The players' worker, and the one that drops parses VLC never answered: stopping such a parse waits
+		// for VLC's reader, maybe for long, and must not hold the players' starts and stops. Never destroyed:
+		// the workers outlive main's statics.
+		static PlayerWorker* players()
 		{
-			PlayerWorker* worker = get();
+			static PlayerWorker* worker = new PlayerWorker();
+			return worker;
+		}
 
-			std::unique_lock<std::mutex> lock(worker->mLock);
-			if (!worker->mStarted)
+		static PlayerWorker* parses()
+		{
+			static PlayerWorker* worker = new PlayerWorker();
+			return worker;
+		}
+
+		// false when the worker already has max tasks waiting (one stuck): the task is not taken
+		bool post(const std::function<void()>& task, size_t max = 0)
+		{
+			std::unique_lock<std::mutex> lock(mLock);
+			if (max > 0 && mTasks.size() >= max)
+				return false;
+
+			if (!mStarted)
 			{
-				worker->mStarted = true;
-				std::thread([worker] { worker->run(); }).detach();
+				mStarted = true;
+				std::thread([this] { run(); }).detach();
 			}
 
-			worker->mTasks.push_back(task);
-			worker->mWake.notify_one();
+			mTasks.push_back(task);
+			mWake.notify_one();
+			return true;
 		}
 
 		// Waits until the tasks handed over so far ran, at most ms: false when some still run
-		static bool drain(int ms)
+		bool drain(int ms)
 		{
-			PlayerWorker* worker = get();
 			{
-				std::unique_lock<std::mutex> lock(worker->mLock);
-				if (!worker->mStarted)
+				std::unique_lock<std::mutex> lock(mLock);
+				if (!mStarted)
 					return true;
 			}
 
@@ -149,13 +166,6 @@ namespace
 
 	private:
 		PlayerWorker() : mStarted(false) { }
-
-		static PlayerWorker* get()
-		{
-			// Never destroyed: the worker outlives main's statics
-			static PlayerWorker* worker = new PlayerWorker();
-			return worker;
-		}
 
 		void run()
 		{
@@ -190,7 +200,7 @@ namespace
 
 	void stopOnWorker(libvlc_media_player_t* player, std::shared_ptr<VideoContext> context)
 	{
-		PlayerWorker::post([player, context]
+		PlayerWorker::players()->post([player, context]
 		{
 			libvlc_media_player_stop(player);
 			libvlc_media_player_release(player);
@@ -200,17 +210,21 @@ namespace
 
 	void releaseOnWorker(libvlc_media_t* media)
 	{
-		PlayerWorker::post([media] { libvlc_media_release(media); });
+		PlayerWorker::players()->post([media] { libvlc_media_release(media); });
 	}
 
-	// Stopping a parse waits for VLC's reader
+	// Stopping a parse waits for VLC's reader: on the parses' worker. Should VLC never let go of one, at most 16
+	// wait behind it; any more are left to VLC as they are (not stopped, not released)
 	void stopParseOnWorker(libvlc_media_t* media)
 	{
-		PlayerWorker::post([media]
+		bool taken = PlayerWorker::parses()->post([media]
 		{
 			libvlc_media_parse_stop(media);
 			libvlc_media_release(media);
-		});
+		}, 16);
+
+		if (!taken)
+			LOG(LogWarning) << "VideoVlcComponent: VLC's reader does not stop; a parse is left to it";
 	}
 
 	// Files whose parse timed out: how many times, and when they may be read again (SDL ticks). UI thread.
@@ -224,7 +238,7 @@ namespace
 
 	void startOnWorker(std::shared_ptr<PlayerStart> start)
 	{
-		PlayerWorker::post([start]
+		PlayerWorker::players()->post([start]
 		{
 			{
 				std::unique_lock<std::mutex> lock(start->lock);
@@ -899,7 +913,7 @@ void VideoVlcComponent::init()
 bool VideoVlcComponent::waitForPlayers(int ms)
 {
 	int start = SDL_GetTicks();
-	bool done = PlayerWorker::drain(ms);
+	bool done = PlayerWorker::players()->drain(ms);
 	if (done)
 		LOG(LogDebug) << "VideoVlcComponent: players stopped in " << (SDL_GetTicks() - start) << " ms";
 	else
