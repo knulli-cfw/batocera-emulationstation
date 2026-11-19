@@ -122,6 +122,15 @@ public:
 	// The game played last on the console (tools and screenshots left out)
 	static FileData* getConsoleLastPlayedGame();
 
+	// A game by its path. While a FindPass lives (a view binding its elements: a panel asks for
+	// {system:continue:...} and {global:lastPlayed:...} dozens of times), each one is searched for once
+	FileData* findByPath(const std::string& path);
+	class FindPass
+	{
+	public:
+		FindPass();
+		~FindPass();
+	};
 
 	// The tabbed home. The captures the system's card slides through ({system:slides}): its favorites
 	// with one, else its best-rated games, as the theme variable "systemslides" orders and filters them
@@ -325,6 +334,7 @@ private:
 	bool mHomeDirty;		// to be made (again)
 	int mHomeGeneration;	// counts the changes, so a list made before the last one is made once more
 	std::shared_ptr<HomeJob> mHomeJob;
+	std::unordered_map<std::string, FileData*> mFound;	// FindPass
 	std::vector<std::string> mRecent;
 	size_t mRecentCount;	// the files it was made from
 	bool mPanelVideo;

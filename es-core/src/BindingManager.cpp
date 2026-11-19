@@ -3,6 +3,7 @@
 #include "LocaleES.h"
 #include <time.h>
 #include <map>
+#include <typeinfo>
 
 #include "components/TextComponent.h"
 #include "components/ImageComponent.h"
@@ -339,6 +340,11 @@ void BindingManager::updateBindings(GuiComponent* comp, IBindable* bindable, boo
 
 	if (recursive)
 	{
+		// A hidden container's elements are bound when it shows (its own visibility is bound first, above): a
+		// view can hold the layouts and parts of other cases without binding all of them each time
+		if (!comp->isVisible() && typeid(*comp) == typeid(GuiComponent))
+			return;
+
 		for (int i = 0; i < comp->getChildCount(); i++)
 			updateBindings(comp->getChild(i), bindable, recursive);
 

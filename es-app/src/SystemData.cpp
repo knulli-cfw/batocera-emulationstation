@@ -2166,11 +2166,11 @@ FileData* SystemData::getLastPlayedGame(bool orChefPick)
 	if (info == nullptr || mRootFolder == nullptr)
 		return nullptr;
 
-	FileData* game = info->lastPlayedPath.empty() ? nullptr : mRootFolder->FindByPath(info->lastPlayedPath);
+	FileData* game = info->lastPlayedPath.empty() ? nullptr : findByPath(info->lastPlayedPath);
 	if (game == nullptr && orChefPick && mPanelVideo)
 		game = getSuggestedGame();
 	if (game == nullptr && orChefPick && !info->chefPickPath.empty())
-		game = mRootFolder->FindByPath(info->chefPickPath);
+		game = findByPath(info->chefPickPath);
 
 	return game;
 }
@@ -2364,7 +2364,7 @@ FileData* SystemData::getSuggestedGame()
 	if (!mSuggestionsReady || mSuggestions.empty())
 		return nullptr;
 
-	return mRootFolder->FindByPath(mSuggestions.current());
+	return findByPath(mSuggestions.current());
 }
 
 FileData* SystemData::getRecentItem(size_t index)
@@ -2408,7 +2408,7 @@ FileData* SystemData::getRecentItem(size_t index)
 	if (index >= mRecent.size())
 		return nullptr;
 
-	return mRootFolder->FindByPath(mRecent[index]);
+	return findByPath(mRecent[index]);
 }
 
 bool SystemData::hasOtherSuggestion()
@@ -2448,6 +2448,45 @@ bool SystemData::isUtilitySystem(SystemData* system)
 	}
 
 	return false;
+}
+
+static int sFindPasses = 0;
+static std::vector<SystemData*> sFoundIn;
+
+SystemData::FindPass::FindPass()
+{
+	sFindPasses++;
+}
+
+SystemData::FindPass::~FindPass()
+{
+	if (--sFindPasses > 0)
+		return;
+
+	for (auto system : sFoundIn)
+		system->mFound.clear();
+
+	sFoundIn.clear();
+}
+
+FileData* SystemData::findByPath(const std::string& path)
+{
+	if (mRootFolder == nullptr)
+		return nullptr;
+
+	if (sFindPasses == 0)
+		return mRootFolder->FindByPath(path);
+
+	auto it = mFound.find(path);
+	if (it != mFound.cend())
+		return it->second;
+
+	if (mFound.empty())
+		sFoundIn.push_back(this);
+
+	FileData* found = mRootFolder->FindByPath(path);
+	mFound[path] = found;
+	return found;
 }
 
 FileData* SystemData::getConsoleLastPlayedGame()

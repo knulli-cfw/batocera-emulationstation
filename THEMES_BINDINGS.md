@@ -14,6 +14,10 @@ They can't be use in "if" attributes which requires static theme variables.
 
 You can also use dynamic variables in the "enabled" attribute in the storyboards animation element ( <animation enabled="{global:cheevos}" [...] /> ).
 
+A hidden container's elements are not bound while it is hidden: its own visibility is bound first, and its
+elements when it shows. A view can hold the layouts and parts of other cases in containers without binding all
+of them each time (a video keeps its own visibility: one in a hidden container would still play).
+
 The Binding engine supports standard operators evaluation ( +, -, *, /, &&, ||, ! ) and also simple evaluation methods.
 
 Be careful : Dynamic variables  should not be confused with static variables. Static Variables use the $ sign ( ${variableName} ). Static variables are evaluated when the theme loads only.

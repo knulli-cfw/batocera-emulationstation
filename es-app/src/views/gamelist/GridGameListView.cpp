@@ -225,6 +225,9 @@ void GridGameListView::updateInfoPanel()
 	if (mRoot->getSystem()->isCollection())
 		updateHelpPrompts();
 
+	// The details check the same files again and again (firstfile(), each image's path): once is enough
+	Utils::FileSystem::FileSystemCacheActivator fsc;
+
 	updateThemeExtrasBindings();
 
 	FileData* file = (mGrid.size() == 0 || mGrid.isScrolling()) ? NULL : mGrid.getSelected();

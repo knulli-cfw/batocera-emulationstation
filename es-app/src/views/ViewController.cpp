@@ -681,6 +681,9 @@ std::shared_ptr<IGameListView> ViewController::getGameListView(SystemData* syste
 		if (!loadIfnull)
 			return nullptr;
 
+		// The view's elements and its games' media check the same files again and again: once each
+		Utils::FileSystem::FileSystemCacheActivator fsc;
+
 		system->setUIModeFilters();
 		system->updateDisplayedGameCount();
 	}

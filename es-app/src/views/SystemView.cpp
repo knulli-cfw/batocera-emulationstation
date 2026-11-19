@@ -331,6 +331,9 @@ void SystemView::populate(bool keepExtras)
 {
 	TextureLoader::paused = true;
 
+	// The systems' elements check the same files: once each
+	Utils::FileSystem::FileSystemCacheActivator fsc;
+
 	clearEntries(keepExtras && !mViewNeedsReload);
 
 	// The view's elements come from the first system with a theme
@@ -891,6 +894,11 @@ void SystemView::updateExtraTextBinding()
 	auto system = getSelected();
 	if (system == nullptr)
 		return;
+
+	// The extras check the same files again and again (firstfile(), each image's path) and look for the same
+	// games ({system:continue:...}, {global:lastPlayed:...}): once is enough
+	Utils::FileSystem::FileSystemCacheActivator fsc;
+	SystemData::FindPass findPass;
 
 	for (auto extra : mEntries[mCursor].backgroundExtras)
 		BindingManager::updateBindings(extra, system);
