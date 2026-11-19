@@ -48,6 +48,12 @@ GuiSaveState::GuiSaveState(Window* window, FileData* game, const std::function<v
 	auto& tile = theme->Tile;
 	bool themedTiles = !tile.path.empty();
 
+	// The labels at the small text's own size: ES scales a theme's font size by the screen's font scale, and
+	// the small text's size is already scaled
+	float fontScale = Renderer::ScreenSettings::fontScale();
+	if (themedTiles && fontScale > 0.0f && fontScale != 1.0f)
+		sh = (std::ceil(theme->TextSmall.font->getSize() / fontScale) + 0.25f) / (float)Math::min(Renderer::getScreenHeight(), Renderer::getScreenWidth());
+
 	std::string gridSpacing = themedTiles ? "  <margin>8 0</margin>  <padding>4 6 4 6</padding>" : "  <margin>0.01 0.02</margin>  <padding>0 0</padding>";
 	std::string tileBackground = themedTiles ?
 		"  <backgroundImage>" + tile.path + "</backgroundImage>"
