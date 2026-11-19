@@ -379,6 +379,20 @@ void VideoComponent::applyTheme(const std::shared_ptr<ThemeData>& theme, const s
 	if (elem->has("defaultSnapshot"))
 		mStaticImage.setDefaultImage(elem->get<std::string>("defaultSnapshot"));
 
+	// The theme's snapshot (a capture, usually bound to the game): shown until the video plays, and in its
+	// place when there is none, with the video's colour and saturation; once the video plays it replaces it
+	if (elem->has("snapshot"))
+	{
+		if (!elem->has("snapshot_binding"))
+			setImage(elem->get<std::string>("snapshot"));
+
+		if (elem->has("color"))
+			mStaticImage.setColorShift(elem->get<unsigned int>("color"));
+
+		if (elem->has("saturation"))
+			mStaticImage.setSaturation(Math::clamp(elem->get<float>("saturation"), 0.0f, 1.0f));
+	}
+
 	mStaticImage.applyStoryboard(elem, "snapshot");
 }
 
@@ -619,6 +633,9 @@ ThemeData::ThemeElement::Property VideoComponent::getProperty(const std::string 
 	if (name == "path")
 		return mVideoPath;
 
+	if (name == "snapshot")
+		return mStaticImagePath;
+
 	if (name == "enabled")
 		return mEnabled;
 
@@ -641,6 +658,12 @@ void VideoComponent::setProperty(const std::string name, const ThemeData::ThemeE
 			setVideo(mConfig.defaultVideoPath);		
 
 		mThemedPath = mVideoPath;
+	}
+	else if (value.type == ThemeData::ThemeElement::Property::PropertyType::String && name == "snapshot")
+	{
+		// The same picture bound again (the cursor moved, the game stayed) keeps the video as it plays
+		if (value.s != mStaticImagePath)
+			setImage(value.s);
 	}
 	else if (value.type == ThemeData::ThemeElement::Property::PropertyType::Bool && name == "enabled")
 	{

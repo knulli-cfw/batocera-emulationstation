@@ -575,6 +575,7 @@ std::map<std::string, std::map<std::string, ThemeData::ElementPropertyType>> The
 		{ "color", COLOR },
 		{ "snapshotSource", STRING },			// image, thumbnail, marquee
 		{ "defaultSnapshot", PATH },
+		{ "snapshot", PATH },					// the picture shown until the video plays (a bound capture)
 		{ "loops", FLOAT },						// Number of loops to do -1 (default) is infinite 
 		{ "audio", BOOLEAN },
 		{ "linearSmooth", BOOLEAN },
