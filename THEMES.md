@@ -835,6 +835,8 @@ ES versions with slides support the feature `slideshow`.
 	- Images for menu buttons
 * `menuTextEdit name="menutextedit"` - ACTIVE | INACTIVE | FONTPATH | FONTSIZE | CARETCOLOR
 	- The text field of the on-screen keyboard and other text popups
+* `menuPrompt name="menuprompt"` - PATH | FONTPATH | FONTSIZE | COLOR
+	- The back prompt right of a menu's title, instead of a BACK button
 * `menuTile name="menutile"` - PATH | SELECTEDPATH | CORNERSIZE
 	- The tiles of a menu's image grid (the save states)
 * `menuKeyboard name="menukeyboard"` - PATH | FOCUSEDPATH | ACTIVEPATH | CORNERSIZE | SPACING | FONTPATH | FONTSIZE | COLOR | SELECTEDCOLOR | WORDKEYS | FOCUSKEYS
@@ -1480,6 +1482,19 @@ BATOCERA 5.24 - replace the textbox background images in OSK
 * `caretColor` - type: COLOR.
   - The caret's colour, kept at full strength while the field is not edited (the on-screen keyboard types into
     it from its keys). Default: the menu text's colour, dimmed while the field is not edited.
+
+#### menuPrompt
+
+A back prompt right of a menu's title (`menuPrompt name="menuprompt"`), instead of the BACK button at its bottom:
+the image and BACK in the catalogue, written with a first capital. Without `path` menus keep their BACK button.
+
+* `path` - type: PATH.
+  - The back button's image, as high as 1.6 times the text's letter height.
+* `fontPath` - type: PATH.
+* `fontSize` - type: FLOAT.
+  - Default: `menutextsmall`'s font.
+* `color` - type: COLOR.
+  - Default: `menutextsmall`'s colour.
 
 #### menuTile
 

@@ -357,6 +357,53 @@ void MenuComponent::setFooter(const std::string& text)
 	onSizeChanged();
 }
 
+// The back prompt right of the menu's title (menuPrompt): the theme's button image and BACK as a word
+void MenuComponent::showBackPrompt()
+{
+	auto theme = ThemeData::getMenuTheme();
+	if (mBackIcon != nullptr)
+		return;
+
+	std::string label = Utils::String::toLower(_("BACK"));
+	if (!label.empty())
+	{
+		size_t next = Utils::String::nextCursor(label, 0);
+		label = Utils::String::toUpper(label.substr(0, next)) + label.substr(next);
+	}
+
+	mBackIcon = std::make_shared<ImageComponent>(mWindow, true);
+	mBackIcon->setImage(theme->Prompt.path);
+	mBackIcon->setIsLinear(true);
+
+	mBackLabel = std::make_shared<TextComponent>(mWindow, label, theme->Prompt.font, theme->Prompt.color, ALIGN_LEFT);
+
+	addChild(mBackIcon.get());
+	addChild(mBackLabel.get());
+	mBackIcon->setZIndex(20);
+	mBackLabel->setZIndex(20);
+
+	updateBackPrompt();
+}
+
+void MenuComponent::updateBackPrompt()
+{
+	if (mBackIcon == nullptr || mBackLabel == nullptr)
+		return;
+
+	auto font = mBackLabel->getFont();
+	float iconHeight = Math::round(font->getLetterHeight() * 1.6f);
+	float gap = Math::round(font->getLetterHeight() * 0.5f);
+	float right = mSize.x() - ThemeData::getMenuTheme()->Row.padding;
+	float middle = Math::round(getHeaderGridHeight() / 2.0f);
+
+	mBackLabel->setSize(0, 0);
+	auto labelSize = mBackLabel->getSize();
+	mBackLabel->setPosition(right - labelSize.x(), Math::round(middle - labelSize.y() / 2.0f));
+
+	mBackIcon->setResize(0, iconHeight);
+	mBackIcon->setPosition(right - labelSize.x() - gap - mBackIcon->getSize().x(), Math::round(middle - iconHeight / 2.0f));
+}
+
 void MenuComponent::updateSize()
 {
 	// GPI
@@ -421,6 +468,8 @@ void MenuComponent::onSizeChanged()
 		mTitleImage->setPosition(getPosition().x() + mSize.x() / 2.0f, getPosition().y() + TITLE_HEIGHT / 2.0f);
 		mTitleImage->setMaxSize(mSize.x() * 0.85f, TITLE_HEIGHT);
 	}
+
+	updateBackPrompt();
 }
 
 void MenuComponent::clearButtons()
@@ -432,6 +481,14 @@ void MenuComponent::clearButtons()
 
 void MenuComponent::addButton(const std::string& name, const std::string& helpText, const std::function<void()>& callback)
 {
+	// A theme's back prompt in the header (menuPrompt) stands for the BACK button: every menu already goes
+	// back with the pad's back button
+	if (!ThemeData::getMenuTheme()->Prompt.path.empty() && name == _("BACK"))
+	{
+		showBackPrompt();
+		return;
+	}
+
 	mButtons.push_back(std::make_shared<ButtonComponent>(mWindow, Utils::String::toUpper(name), helpText, callback));
 	updateGrid();
 	updateSize();

@@ -84,6 +84,8 @@ public:
 
 private:
 	void updateGrid();
+	void showBackPrompt();
+	void updateBackPrompt();
 
 	NinePatchComponent mBackground;
 	ComponentGrid mGrid;
@@ -97,6 +99,8 @@ private:
 	std::vector< std::shared_ptr<ButtonComponent> > mButtons;
 
 	std::shared_ptr<TextComponent> mFooter;
+	std::shared_ptr<ImageComponent> mBackIcon;
+	std::shared_ptr<TextComponent> mBackLabel;
 
 	float mMaxHeight;
 };

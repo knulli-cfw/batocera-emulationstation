@@ -181,6 +181,14 @@ struct MenuRowElement
 	bool fullRows;	// lists show whole rows only
 };
 
+// A prompt in a menu's header (menuPrompt): back, instead of a BACK button
+struct PromptElement
+{
+	std::string path;			// the back button's image
+	std::shared_ptr<Font> font;
+	unsigned int color;
+};
+
 // The text field of the on-screen keyboard and of other text popups (menuTextEdit)
 struct TextEditElement
 {
@@ -231,6 +239,7 @@ public:
 		ButtonElement Button { ":/button.png", ":/button_filled.png", Vector2f(16,16) };
 		TextEditElement TextEdit { nullptr, 0 };
 		MenuRowElement Row { 0.0f, 10.0f, 0.0f, false };
+		PromptElement Prompt { "", nullptr, 0 };
 		bool FooterAtBottom = false;	// menufooter atBottom
 		TileElement Tile { "", "", Vector2f(16, 16) };
 		KeyboardElement Keyboard { "", "", "", Vector2f(16, 16), 0.0f, 0xFFFFFFFF, 0xFFFFFFFF, nullptr, false, false };

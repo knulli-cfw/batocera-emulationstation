@@ -688,6 +688,11 @@ std::map<std::string, std::map<std::string, ThemeData::ElementPropertyType>> The
 		{ "fontPath", PATH },
 		{ "fontSize", FLOAT },
 		{ "caretColor", COLOR } } },
+	{ "menuPrompt",{
+		{ "path", PATH },
+		{ "fontPath", PATH },
+		{ "fontSize", FLOAT },
+		{ "color", COLOR } } },
 	{ "menuTile",{
 		{ "path", PATH },
 		{ "selectedPath", PATH },
@@ -2463,6 +2468,14 @@ ThemeData::ThemeMenu::ThemeMenu(ThemeData* theme)
 			Row.iconSize = elem->get<float>("iconSize") * Renderer::getScreenHeight();
 		if (elem->has("fullRows"))
 			Row.fullRows = elem->get<bool>("fullRows");
+	}
+
+	elem = theme->getElement("menu", "menuprompt", "menuPrompt");
+	if (elem && elem->has("path") && ResourceManager::getInstance()->fileExists(elem->get<std::string>("path")))
+	{
+		Prompt.path = elem->get<std::string>("path");
+		Prompt.font = (elem->has("fontPath") || elem->has("fontSize")) ? Font::getFromTheme(elem, ThemeFlags::ALL, Font::get(FONT_SIZE_SMALL), true) : TextSmall.font;
+		Prompt.color = elem->has("color") ? elem->get<unsigned int>("color") : TextSmall.color;
 	}
 
 
