@@ -25,6 +25,7 @@
 #include "guis/GuiMsgBox.h"
 #include "components/VolumeInfoComponent.h"
 #include "components/VideoVlcComponent.h"
+#include "components/VideoLeadIn.h"
 #include "components/BrightnessInfoComponent.h"
 #include "Splash.h"
 #include "PowerSaver.h"
@@ -117,6 +118,8 @@ GuiComponent* Window::peekGui()
 bool Window::init(bool initRenderer, bool initInputManager)
 {
 	LOG(LogInfo) << "Window::init";
+
+	VideoLeadIn::pause(false);
 
 	if (initRenderer)
 	{
@@ -220,6 +223,9 @@ void Window::deinit(bool deinitRenderer)
 
 	// Their videos stop on a worker: a game run now could find the sound output still held
 	VideoVlcComponent::waitForPlayers(1500);
+
+	// no video measured while a game runs
+	VideoLeadIn::pause(true);
 
 	if (deinitRenderer)
 		InputManager::getInstance()->deinit();

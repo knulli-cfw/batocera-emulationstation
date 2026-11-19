@@ -1,4 +1,5 @@
 #include "GridTileComponent.h"
+#include "components/VideoLeadIn.h"
 
 #include "resources/TextureResource.h"
 #include "ThemeData.h"
@@ -1103,6 +1104,10 @@ void GridTileComponent::setVideo(const std::string& path, float defaultDelay)
 		return;
 
 	mVideoPath = path;
+
+	// the cards shown and those loaded around them: their videos' fades from black measured ahead
+	if (mVideo != nullptr && !mVideoPath.empty())
+		VideoLeadIn::request(mVideoPath, false);
 
 	if (mVideo != nullptr)
 	{

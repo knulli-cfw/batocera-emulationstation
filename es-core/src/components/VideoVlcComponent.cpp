@@ -2,6 +2,7 @@
 #include "components/ImageAspectCheck.h"
 #include "components/ScreenShape.h"
 #include "components/VideoLight.h"
+#include "components/VideoLeadIn.h"
 
 #include "renderers/Renderer.h"
 #include "resources/TextureResource.h"
@@ -1169,6 +1170,22 @@ void VideoVlcComponent::startVideo()
 			// If we have a playlist : most videos have a fader, skip it 1 second
 			if (mPlaylist != nullptr && mConfig.startDelay == 0 && !mConfig.showSnapshotDelay && !mConfig.showSnapshotNoVideo)
 				libvlc_media_add_option(mMedia, ":start-time=0.7");			
+
+			// A video that comes in over its snapshot starts after its fade from black, measured once
+			// (VideoLeadIn): its first frame is lit and the crossfade can start at once. Not measured yet, it
+			// is measured now for the next time, and this time the snapshot waits for the light (checkDisplayed)
+			if (mPlaylist == nullptr && waitsForLight())
+			{
+				int leadIn = VideoLeadIn::find(mVideoPath);
+				if (leadIn > 0)
+				{
+					char option[32];
+					snprintf(option, sizeof(option), ":start-time=%.3f", leadIn / 1000.0f);
+					libvlc_media_add_option(mMedia, option);
+				}
+				else if (leadIn < 0)
+					VideoLeadIn::request(mVideoPath, true);
+			}
 
 			Probe probe;
 			if (findProbe(mVideoPath, probe))

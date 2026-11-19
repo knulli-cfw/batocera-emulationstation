@@ -1,4 +1,5 @@
 #include "views/SystemView.h"
+#include "components/VideoLeadIn.h"
 
 #include "animations/LambdaAnimation.h"
 #include "guis/GuiMsgBox.h"
@@ -1016,6 +1017,11 @@ void SystemView::onCursorChanged(const CursorState& state)
 		AudioManager::getInstance()->changePlaylist(getSelected()->getTheme());
 
 	Utils::FileSystem::preloadFileSystemCache(mEntries.at(mCursor).object->getRootFolder()->getPath(), true);
+
+	// the card's last played game's video: its fade from black measured first, if not known yet (VideoLeadIn)
+	FileData* played = mEntries.at(mCursor).object->getLastPlayedGame();
+	if (played != nullptr)
+		VideoLeadIn::request(played->getVideoPath(), true);
 
 	// update help style
 	updateHelpPrompts();
@@ -2123,6 +2129,14 @@ void SystemView::onShow()
 	// asked for now, off the UI thread, and update binds them when they arrive
 	for (auto& entry : mEntries)
 		entry.object->getSlides();
+
+	// every card's last played game's video: their fades from black measured ahead (VideoLeadIn)
+	for (auto& entry : mEntries)
+	{
+		FileData* played = entry.object->getLastPlayedGame();
+		if (played != nullptr)
+			VideoLeadIn::request(played->getVideoPath(), false);
+	}
 
 	activateExtras(mCarousel.getCursorIndex());
 

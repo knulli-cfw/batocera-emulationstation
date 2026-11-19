@@ -2,6 +2,10 @@
 #ifndef ES_CORE_COMPONENTS_VIDEO_LIGHT_H
 #define ES_CORE_COMPONENTS_VIDEO_LIGHT_H
 
+#include <algorithm>
+#include <utility>
+#include <vector>
+
 // When a video that replaces its snapshot may show. Most videos open on a fade from black (picture and sound), and a
 // crossfade into that dips the picture to black: the snapshot stays until the video's frames are lit and the fade is
 // over (a frame no brighter than the one before), or until VIDEO_LIGHT_WAIT_MS after the first frame.
@@ -48,6 +52,63 @@ namespace VideoLight
 
 		// still coming in from black: brighter than the frame before
 		return light <= lastLight + 1;
+	}
+
+	// How much of a video's first frames is measured for its fade from black (VideoLeadIn)
+	static const int VIDEO_LEAD_IN_MEASURED_MS = 1500;
+
+	// The light (0-255) of a frame whose luma is in video range (black 16, white 235)
+	inline int videoRangeLight(float y)
+	{
+		int light = (int)((y - 16.0f) * 255.0f / 219.0f + 0.5f);
+		return std::max(0, std::min(255, light));
+	}
+
+	// Where a video's picture is in after its fade from black, from its first frames (time in ms, light): the
+	// first frame lit to 80 % of the light after the fade (the median of the frames from 1 s on, else of the last
+	// third), and at least VIDEO_LIT. 0 when the video starts lit, stays dark, or darkens on the way (not a fade:
+	// then up to its first lit frame only).
+	inline int leadInMs(const std::vector<std::pair<int, int>>& frames)
+	{
+		if (frames.empty())
+			return 0;
+
+		std::vector<int> after;
+		for (auto& frame : frames)
+			if (frame.first >= 1000)
+				after.push_back(frame.second);
+
+		if (after.size() < 3)
+		{
+			after.clear();
+			for (size_t i = frames.size() - frames.size() / 3 - 1; i < frames.size(); i++)
+				after.push_back(frames[i].second);
+		}
+
+		std::sort(after.begin(), after.end());
+		int reference = after[after.size() / 2];
+		if (reference < VIDEO_LIT)
+			return 0;
+
+		int target = std::max(VIDEO_LIT, reference * 8 / 10);
+		int brightest = 0, firstLit = -1;
+		for (size_t i = 0; i < frames.size(); i++)
+		{
+			int light = frames[i].second;
+			if (light >= target)
+				return i == 0 ? 0 : frames[i].first;
+
+			if (firstLit < 0 && light >= VIDEO_LIT)
+				firstLit = (int)i;
+
+			// darker than before by more than noise: a scene, not a fade
+			if (light + 8 < brightest)
+				return firstLit <= 0 ? 0 : frames[firstLit].first;
+
+			brightest = std::max(brightest, light);
+		}
+
+		return 0;
 	}
 }
 
