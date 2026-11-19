@@ -312,6 +312,9 @@ void VideoComponent::applyTheme(const std::shared_ptr<ThemeData>& theme, const s
 		Vector4f clientRectangle = getParent() ? getParent()->getClientRect() : Vector4f(0, 0, (float)Renderer::getScreenWidth(), (float)Renderer::getScreenHeight());
 		Vector2f scale = Vector2f(clientRectangle.z(), clientRectangle.w());
 
+		// A size's shape, turned to the video's (or the snapshot's) orientation (a TV game's 4:3, 3:4 upright)
+		setKeepOrientation(elem->has("keepOrientation") && elem->get<bool>("keepOrientation"));
+
 		if (elem->has("size"))
 		{
 			auto sz = mSourceBounds.zw() = elem->get<Vector2f>("size");

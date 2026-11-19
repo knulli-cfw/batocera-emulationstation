@@ -583,6 +583,7 @@ std::map<std::string, std::map<std::string, ThemeData::ElementPropertyType>> The
 		// video properties
 		{ "maxSize", NORMALIZED_PAIR },
 		{ "minSize", NORMALIZED_PAIR },
+		{ "keepOrientation", BOOLEAN },			// with size: a video or snapshot turned the other way keeps its orientation
 		{ "default", PATH },
 		{ "path", PATH },
 		{ "delay", FLOAT },

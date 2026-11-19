@@ -343,7 +343,16 @@ void VideoVlcComponent::setResize(float width, float height)
 	mSize = mTargetSize;
 	mTargetIsMax = false;
 	mTargetIsMin = false;
-	mStaticImage.setMaxSize(width, height);
+
+	// the snapshot takes the same shape as the video: the size's, turned to its own orientation
+	if (mKeepOrientation)
+	{
+		mStaticImage.setKeepOrientation(true);
+		mStaticImage.setResize(width, height);
+	}
+	else
+		mStaticImage.setMaxSize(width, height);
+
 	resize();
 }
 
