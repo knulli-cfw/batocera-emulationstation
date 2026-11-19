@@ -191,6 +191,21 @@ void Window::reactivateGui()
 		peekGui()->updateHelpPrompts();
 }
 
+// A GUI drawn over the whole screen: as large as the screen, and so is one of its children (its menu, or
+// its background); a dialog is smaller, and so is a menu that is not full screen
+static bool coversScreen(GuiComponent* gui)
+{
+	auto covers = [](GuiComponent* comp) { return comp->getSize().x() >= Renderer::getScreenWidth() && comp->getSize().y() >= Renderer::getScreenHeight(); };
+	if (gui == nullptr || !covers(gui))
+		return false;
+
+	for (int i = 0; i < gui->getChildCount(); i++)
+		if (covers(gui->getChild(i)))
+			return true;
+
+	return false;
+}
+
 void Window::deinit(bool deinitRenderer)
 {
 	resetMenuBackgroundShader();
@@ -786,9 +801,12 @@ void Window::render()
 
 	if (!mRenderScreenSaver)
 	{
-		// A full-screen menu covers the screen's extras (a status bar), as ES's own clock and battery; a
-		// screen shader still applies
-		bool menuOver = mGuiStack.size() > 1 && Renderer::ScreenSettings::fullScreenMenus();
+		// A full-screen menu covers the screen's extras (a status bar); a dialog does not, and a screen shader
+		// still applies
+		bool menuOver = false;
+		if (Renderer::ScreenSettings::fullScreenMenus())
+			for (size_t i = 1; i < mGuiStack.size() && !menuOver; i++)
+				menuOver = coversScreen(mGuiStack[i]);
 
 		for (auto extra : mScreenExtras)
 			if (!menuOver || extra->isKindOf<PostProcessShaderComponent>())
