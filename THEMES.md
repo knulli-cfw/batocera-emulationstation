@@ -843,7 +843,7 @@ ES versions with slides support the feature `slideshow`.
 	- text for all menu entries
 * `menuText name="menutitle"` - FONTPATH | FONTSIZE | COLOR
 	- text for menu titles
-* `menuText name="menufooter"` - FONTPATH | FONTSIZE | COLOR
+* `menuText name="menufooter"` - FONTPATH | FONTSIZE | COLOR | ATBOTTOM
 	- text for menu footers or subtitles
 * `menuTextSmall name="menutextsmall"` - FONTPATH | FONTSIZE | COLOR
 	- text for menu entries in smallerfont
@@ -1434,6 +1434,9 @@ BATOCERA 5.24
 	- Default is 878787FF. Color of the selector bar.
 * `selectorColorEnd` - type: NORMALIZED_PAIR. 
     - Bottom color for the gradient of the "selector bar."
+* `atBottom` - type: BOOLEAN. (`menufooter` only)
+	- Full-screen menus show the main menu's version line at their bottom, short (name, version, board), instead of
+	  under the title. Default is false.
 * `rowHeight` - type: FLOAT. (`menutext` only)
 	- A list row's least height, as a fraction of the screen height (groups keep their own). Default: the row's content.
 * `rowPadding` - type: FLOAT. (`menutext` only)

@@ -41,6 +41,9 @@ public:
 
 	void addButton(const std::string& label, const std::string& helpText, const std::function<void()>& callback);
 
+	// A line at the menu's bottom, under the list and the buttons (menufooter atBottom)
+	void setFooter(const std::string& text);
+
 	void setTitle(const std::string& title, const std::shared_ptr<Font>& font = nullptr);
 	void setSubTitle(const std::string& text);
 	void setTitleImage(std::shared_ptr<ImageComponent> titleImage, bool replaceTitle = false);
@@ -61,6 +64,7 @@ public:
 	float getHeaderGridHeight() const;
 	float getTitleHeight() const;
 	float getButtonGridHeight() const;
+	float getFooterHeight() const;
 
 	void setMaxHeight(float maxHeight) 
 	{ 
@@ -91,6 +95,8 @@ private:
 	std::shared_ptr<ComponentList> mList;
 	std::shared_ptr<ComponentGrid> mButtonGrid;
 	std::vector< std::shared_ptr<ButtonComponent> > mButtons;
+
+	std::shared_ptr<TextComponent> mFooter;
 
 	float mMaxHeight;
 };

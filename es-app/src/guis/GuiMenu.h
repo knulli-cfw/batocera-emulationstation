@@ -44,6 +44,7 @@ public:
 private:
         void addEntry(const std::string& name, bool add_arrow, const std::function<void()>& func, const std::string iconName = "");
         void addVersionInfo();
+        std::string getShortVersionLabel();
         void openCollectionSystemSettings();
         void openConfigInput(); 
         void openScraperSettings();

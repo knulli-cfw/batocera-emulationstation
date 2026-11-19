@@ -12,7 +12,7 @@ MenuComponent::MenuComponent(Window* window,
 	const std::string& title, const std::shared_ptr<Font>& titleFont,
 	const std::string& subTitle) 
 	: GuiComponent(window),
-	mBackground(window), mGrid(window, Vector2i(1, 3))
+	mBackground(window), mGrid(window, Vector2i(1, 4))
 {
 	mMaxHeight = 0;
 
@@ -328,7 +328,33 @@ float MenuComponent::getHeaderGridHeight() const
 float MenuComponent::getButtonGridHeight() const
 {
 	auto menuTheme = ThemeData::getMenuTheme();
+
+	// A footer under no buttons takes their band
+	if (mFooter && !mButtonGrid)
+		return 0;
+
 	return (mButtonGrid ? mButtonGrid->getSize().y() : menuTheme->Text.font->getHeight() + BUTTON_GRID_VERT_PADDING);	
+}
+
+float MenuComponent::getFooterHeight() const
+{
+	return mFooter ? mFooter->getFont()->getHeight() + BUTTON_GRID_VERT_PADDING : 0;
+}
+
+void MenuComponent::setFooter(const std::string& text)
+{
+	auto theme = ThemeData::getMenuTheme();
+
+	if (mFooter == nullptr)
+	{
+		mFooter = std::make_shared<TextComponent>(mWindow, text, theme->Footer.font, theme->Footer.color, ALIGN_CENTER);
+		mGrid.setEntry(mFooter, Vector2i(0, 3), false, true);
+	}
+	else
+		mFooter->setText(text);
+
+	updateSize();
+	onSizeChanged();
 }
 
 void MenuComponent::updateSize()
@@ -342,10 +368,10 @@ void MenuComponent::updateSize()
 
 	const float maxHeight = mMaxHeight <= 0 ? Renderer::getScreenHeight() * 0.75f : mMaxHeight;
 
-	float height = TITLE_HEIGHT + mList->getTotalRowHeight() + getButtonGridHeight() + 2;
+	float height = TITLE_HEIGHT + mList->getTotalRowHeight() + getButtonGridHeight() + getFooterHeight() + 2;
 	if(height > maxHeight)
 	{
-		height = TITLE_HEIGHT + getButtonGridHeight();
+		height = TITLE_HEIGHT + getButtonGridHeight() + getFooterHeight();
 		int i = 0;
 		while(i < mList->size())
 		{
@@ -384,6 +410,7 @@ void MenuComponent::onSizeChanged()
 	// update grid row/col sizes
 	mGrid.setRowHeight(0, TITLE_HEIGHT, false);
 	mGrid.setRowHeight(2, getButtonGridHeight(), false);
+	mGrid.setRowHeight(3, getFooterHeight(), false);
 
 	mGrid.setSize(mSize);
 

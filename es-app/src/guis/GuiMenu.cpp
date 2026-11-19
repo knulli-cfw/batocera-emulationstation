@@ -253,6 +253,28 @@ void GuiMenu::openConfigInput()
 	);
 }
 
+// The system's name, its version without the build time or tags, and the board, in capitals and apart:
+// "KNULLI - SCARAB 2026/05/11 - RG35XX-H", with middle dots
+std::string GuiMenu::getShortVersionLabel()
+{
+	static std::string board = ApiSystem::getInstance()->getRunningBoard();
+
+	std::vector<std::string> version;
+	for (auto word : Utils::String::split(ApiSystem::getInstance()->getVersion(), ' ', true))
+	{
+		bool time = word.size() == 5 && word[2] == ':' && isdigit(word[0]) && isdigit(word[1]) && isdigit(word[3]) && isdigit(word[4]);
+		if (!time && word[0] != '[' && word[0] != '(')
+			version.push_back(word);
+	}
+
+	std::vector<std::string> parts;
+	for (auto part : { ApiSystem::getInstance()->getApplicationName(), Utils::String::join(version, " "), board })
+		if (!Utils::String::trim(part).empty())
+			parts.push_back(Utils::String::toUpper(Utils::String::trim(part)));
+
+	return Utils::String::join(parts, _U(" \u00B7 "));
+}
+
 void GuiMenu::addVersionInfo()
 {
 	std::string  buildDate = (Settings::getInstance()->getBool("Debug") ? std::string( "   (" + Utils::String::toUpper(PROGRAM_BUILT_STRING) + ")") : (""));
@@ -279,7 +301,13 @@ void GuiMenu::addVersionInfo()
 
 	if (!label.empty())
 	{
-		if (Renderer::ScreenSettings::fullScreenMenus())
+		if (Renderer::ScreenSettings::fullScreenMenus() && theme->FooterAtBottom)
+		{
+			// At the menu's bottom (menufooter atBottom), short
+			mMenu.addButton(_("BACK"), _("go back"), [&] { delete this; });
+			mMenu.setFooter(getShortVersionLabel());
+		}
+		else if (Renderer::ScreenSettings::fullScreenMenus())
 		{
 			mMenu.setSubTitle(label);
 			mMenu.addButton(_("BACK"), _("go back"), [&] { delete this; });

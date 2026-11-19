@@ -231,6 +231,7 @@ public:
 		ButtonElement Button { ":/button.png", ":/button_filled.png", Vector2f(16,16) };
 		TextEditElement TextEdit { nullptr, 0 };
 		MenuRowElement Row { 0.0f, 10.0f, 0.0f, false };
+		bool FooterAtBottom = false;	// menufooter atBottom
 		TileElement Tile { "", "", Vector2f(16, 16) };
 		KeyboardElement Keyboard { "", "", "", Vector2f(16, 16), 0.0f, 0xFFFFFFFF, 0xFFFFFFFF, nullptr, false, false };
 

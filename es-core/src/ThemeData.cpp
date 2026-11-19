@@ -638,6 +638,7 @@ std::map<std::string, std::map<std::string, ThemeData::ElementPropertyType>> The
 		{ "rowPadding", FLOAT },
 		{ "iconSize", FLOAT },
 		{ "fullRows", BOOLEAN },
+		{ "atBottom", BOOLEAN },
 		{ "separatorColor", COLOR },
 		{ "selectorColor", COLOR },
 		{ "selectorColorEnd", COLOR },
@@ -2402,6 +2403,8 @@ ThemeData::ThemeMenu::ThemeMenu(ThemeData* theme)
 			Footer.color = elem->get<unsigned int>("color");
 		if (elem->has("selectorColor"))
 			Footer.selectorColor = elem->get<unsigned int>("selectorColor");
+		if (elem->has("atBottom"))
+			FooterAtBottom = elem->get<bool>("atBottom");
 	}
 
 	elem = theme->getElement("menu", "menutextsmall", "menuTextSmall");
