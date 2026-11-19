@@ -181,6 +181,7 @@ private:
 	bool mAnimateSelection;
 	Vector2f mAutoLayout;
 	float mAutoLayoutZoom;
+	float mPeekSize;	// screen fraction the grid draws past its far edge (the next row peeking in)
 	Vector4f mPadding;
 	Vector2f mMargin;
 	Vector2f mTileSize;
@@ -458,6 +459,7 @@ ImageGridComponent<T>::ImageGridComponent(Window* window) : IList<ImageGridData,
 	mGridSizeOverride = Vector2f::Zero();
 	mAutoLayout = Vector2f::Zero();
 	mAutoLayoutZoom = 1.0;
+	mPeekSize = 0.0f;
 
 	mVideoDelay = 750;
 	mAllowVideo = false;
@@ -778,6 +780,17 @@ void ImageGridComponent<T>::render(const Transform4x4f& parentTrans)
 	if (mAutoLayout == Vector2f::Zero() && mLastRowPartial) // If the last row is partial in Retropie, extend clip to show the entire last row 
 		size.y() = (mTileSize + mMargin).y() * (mGridDimension.y() - 2 * EXTRAITEMS);
 
+	// The row after the last whole one peeks in past the grid's far edge, cut there (it is one of the rows kept
+	// on each side for the scroll, so a row scrolling in comes from that place); the cursor still scrolls by
+	// whole rows
+	if (mPeekSize > 0.0f)
+	{
+		if (isVertical())
+			size.y() += (int)Math::round(mPeekSize * Renderer::getScreenHeight());
+		else
+			size.x() += (int)Math::round(mPeekSize * Renderer::getScreenWidth());
+	}
+
 	Renderer::pushClipRect(pos, size);
 
 	float dimScrollable = isVertical() ? mGridDimension.y() - 2 * EXTRAITEMS : mGridDimension.x() - 2 * EXTRAITEMS;
@@ -908,6 +921,9 @@ void ImageGridComponent<T>::applyTheme(const std::shared_ptr<ThemeData>& theme, 
 
 		if (elem->has("autoLayoutSelectedZoom"))
 			mAutoLayoutZoom = elem->get<float>("autoLayoutSelectedZoom");
+
+		if (elem->has("peekSize"))
+			mPeekSize = Math::max(0.0f, elem->get<float>("peekSize"));
 
 		if (elem->has("imageSource"))
 		{

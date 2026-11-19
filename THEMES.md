@@ -979,6 +979,8 @@ Can be created as an extra.
     - BATOCERA 5.24 : Number of column and rows in the grid (integer values).
 * `autoLayoutSelectedZoom` - type: FLOAT. 
     - BATOCERA 5.24: Zoom factor to apply when a tile is selected.    
+* `peekSize` - type: FLOAT.
+    - How far past its bottom edge (its right edge when it scrolls horizontally) the grid draws, in screen height (width): the row after the last whole one peeks in, cut there. The cursor still scrolls by whole rows, and a row scrolling in comes from that place.
 * `imageSource` - type: STRING.
     - BATOCERA 5.24: Selects the image to display. `thumbnail` by default, can also be set to `image` or `marquee`. 
 * `showVideoAtDelay` - type: FLOAT.
