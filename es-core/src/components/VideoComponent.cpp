@@ -272,6 +272,10 @@ void VideoComponent::renderSnapshot(const Transform4x4f& parentTrans)
 		t -= 1; // cubic ease out
 		t = Math::lerp(0, 1, t*t*t + 1);
 
+		// a crossfade: the video comes in over the whole snapshot, which goes only once the video is in
+		if (mIsPlaying && coversSnapshot())
+			t = 1.0f;
+
 		if (hasStoryBoard())
 			t = (t * 255.0f);
 		else

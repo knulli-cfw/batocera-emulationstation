@@ -1,6 +1,7 @@
 #include "components/VideoVlcComponent.h"
 #include "components/ImageAspectCheck.h"
 #include "components/ScreenShape.h"
+#include "components/VideoLight.h"
 
 #include "renderers/Renderer.h"
 #include "resources/TextureResource.h"
@@ -416,6 +417,7 @@ void VideoVlcComponent::onVideoStarted()
 	VideoComponent::onVideoStarted();
 	resize();
 	videoShown(this, true);
+	releaseHeldAudio();
 }
 
 void VideoVlcComponent::crop(float left, float top, float right, float bot)
@@ -987,20 +989,65 @@ bool VideoVlcComponent::uploadFrame()
 
 	mTexture->updateFromExternalPixels(mContext->surfaces[frame], mVideoWidth, mVideoHeight);
 	mContext->hasFrame[frame] = false;
+
+	// While the video waits to show (checkDisplayed): how lit this frame is
+	if (mIsWaitingForVideoToStart)
+	{
+		mContext->lastLight = mContext->light;
+		mContext->light = VideoLight::frameLight(mContext->surfaces[frame], mVideoWidth, mVideoHeight);
+	}
+
 	return true;
 }
 
 // The first frame VLC displayed: the video shows from now on, once that frame is whole in the texture (until
-// then the snapshot, or what is under the video, stays)
+// then the snapshot, or what is under the video, stays). A video that comes in over its snapshot waits for its
+// picture to be lit (VideoLight), its sound with it.
 void VideoVlcComponent::checkDisplayed()
 {
 	if (mContext == nullptr || !mContext->valid || !mContext->displayed || mIsPlaying || !mIsWaitingForVideoToStart)
 		return;
 
-	if (!uploadFrame() && (mTexture == nullptr || !mTexture->isLoaded()))
+	bool fresh = uploadFrame();
+	if (!fresh && (mTexture == nullptr || !mTexture->isLoaded()))
 		return;
 
+	if (mAudioHeld || waitsForLight())
+	{
+		// its player taken first: the sound held back is let go when the video shows
+		if (mMediaPlayer == nullptr)
+			return;
+
+		Uint32 now = SDL_GetTicks();
+		if (!mContext->firstShown)
+		{
+			mContext->firstShown = true;
+			mContext->firstShownTicks = now;
+		}
+
+		unsigned int since = now - mContext->firstShownTicks;
+		if (since < VideoLight::VIDEO_LIGHT_WAIT_MS && (!fresh || !VideoLight::mayShow(mContext->light, mContext->lastLight, since)))
+			return;
+	}
+
 	onVideoStarted();
+}
+
+// A video that replaces its snapshot in place (no effect) after a delay waits for its picture's light
+bool VideoVlcComponent::waitsForLight()
+{
+	return mEffect == VideoVlcFlags::VideoVlcEffect::NONE && mConfig.startDelay > 0 && !mScreensaverMode && PowerSaver::getMode() != PowerSaver::INSTANT;
+}
+
+// The sound held back while the video waited for its light plays from now on
+void VideoVlcComponent::releaseHeldAudio()
+{
+	if (!mAudioHeld)
+		return;
+
+	mAudioHeld = false;
+	if (mMediaPlayer != nullptr)
+		libvlc_audio_set_mute(mMediaPlayer, 0);
 }
 
 void VideoVlcComponent::handleLooping()
@@ -1293,12 +1340,22 @@ void VideoVlcComponent::startPlayback(const Probe& probe)
 		start->width = mVideoWidth;
 		start->height = mVideoHeight;
 
+		mAudioHeld = false;
 		if (hasAudioTrack)
 		{
 			if (!getPlayAudio() || (!mScreensaverMode && !Settings::getInstance()->getBool("VideoAudio")) || (Settings::getInstance()->getBool("ScreenSaverVideoMute") && mScreensaverMode))
 				start->mute = true;
 			else
+			{
 				AudioManager::setVideoPlaying(true);
+
+				// its sound starts with its picture (checkDisplayed)
+				if (waitsForLight())
+				{
+					start->mute = true;
+					mAudioHeld = true;
+				}
+			}
 		}
 
 		mStart = start;
@@ -1327,6 +1384,7 @@ void VideoVlcComponent::stopVideo()
 	mIsPlaying = false;
 	mIsWaitingForVideoToStart = false;
 	mStartDelayed = false;
+	mAudioHeld = false;
 
 	releasePlayback();
 	PowerSaver::resume();
@@ -1537,6 +1595,7 @@ void VideoVlcComponent::resumeVideo()
 
 	mIsPlaying = true;
 	libvlc_media_player_play(mMediaPlayer);
+	releaseHeldAudio();
 	PowerSaver::pause();
 	AudioManager::setVideoPlaying(true);
 }

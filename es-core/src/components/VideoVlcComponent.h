@@ -43,6 +43,12 @@ struct VideoContext
 	unsigned int		width, height;	// of the buffers
 	// Set by VLC's display callback; the UI thread starts showing the video (VideoVlcComponent::checkDisplayed)
 	std::atomic<bool>	displayed;
+
+	// UI thread only, while the video waits to show: the light of its newest frames (VideoLight) and when the
+	// first one came
+	int					light = -1, lastLight = -1;
+	bool				firstShown = false;
+	unsigned int		firstShownTicks = 0;
 };
 
 struct PlayerStart;
@@ -154,6 +160,10 @@ private:
 	void checkStart();
 	void checkDisplayed();
 	bool uploadFrame();
+	bool waitsForLight();
+	void releaseHeldAudio();
+	// With no effect the video comes in over its snapshot in place: the snapshot stays whole under it
+	bool coversSnapshot() override { return mEffect == VideoVlcFlags::VideoVlcEffect::NONE; }
 	static bool findProbe(const std::string& path, Probe& probe);
 	static void keepProbe(const std::string& path, const Probe& probe);
 
@@ -174,6 +184,7 @@ private:
 	Renderer::ShaderInfo			mCustomShader;
 
 	VideoVlcFlags::VideoVlcEffect	mEffect;
+	bool							mAudioHeld = false;	// its sound muted until its picture shows
 
 	unsigned int					mColorShift;
 	int								mElapsed;

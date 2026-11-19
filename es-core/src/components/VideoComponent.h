@@ -116,6 +116,9 @@ public:
 	}
 
 	virtual void onVideoStarted();
+	// Whether the video comes in over its snapshot in place, the snapshot whole under it until it is in (a
+	// crossfade); otherwise the snapshot fades out as the video comes in
+	virtual bool coversSnapshot() { return false; }
 
 	const MaxSizeInfo getMaxSizeInfo()
 	{
