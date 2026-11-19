@@ -29,13 +29,14 @@
 #include "Splash.h"
 #include "PowerSaver.h"
 #include "renderers/Renderer.h"
+#include "BindingManager.h"
 
 #if WIN32
 #include <SDL_syswm.h>
 #endif
 
 Window::Window() : mNormalizeNextUpdate(false), mFrameTimeElapsed(0), mFrameCountElapsed(0), mFrameDrawnStart(0), mAverageDeltaTime(10),
-  mAllowSleep(true), mSleeping(false), mTimeSinceLastInput(0), mIdleVideo(false), mIdleSlides(false), mSuspendedMs(-1), mScreenSaver(NULL), mRenderScreenSaver(false), mClockElapsed(0), mMouseCapture(nullptr), mMenuBackgroundShaderTextureCache(-1)
+  mAllowSleep(true), mSleeping(false), mTimeSinceLastInput(0), mIdleVideo(false), mIdleSlides(false), mRenderOnChange(false), mIdlePauseSeconds(0), mSuspendedMs(-1), mScreenSaver(NULL), mRenderScreenSaver(false), mClockElapsed(0), mMouseCapture(nullptr), mMenuBackgroundShaderTextureCache(-1)
 {			
 	mTransitionOffset = 0;
 
@@ -978,12 +979,42 @@ void Window::checkSystemResume()
 
 bool Window::drawsOnlyChanges()
 {
-	return mGuiStack.size() == 1 && !mRenderScreenSaver && !mSleeping && Settings::getInstance()->getBool("RenderOnChange");
+	return mGuiStack.size() == 1 && !mRenderScreenSaver && !mSleeping && mRenderOnChange;
+}
+
+// A setting left at "auto" follows the theme's variable; "true" or "false" holds for every theme
+static bool themeOption(const std::shared_ptr<ThemeData>& theme, const std::string& setting, const std::string& variable)
+{
+	std::string value = Settings::getInstance()->getString(setting);
+	if (value == "true" || value == "1")
+		return true;
+
+	if (value != "auto" && !value.empty())
+		return false;
+
+	if (theme == nullptr)
+		return false;
+
+	value = theme->getVariable(variable);
+	return value == "true" || value == "1";
+}
+
+void Window::applyThemeOptions(const std::shared_ptr<ThemeData>& theme)
+{
+	mRenderOnChange = themeOption(theme, "RenderOnChange", "esRenderOnChange");
+	BindingManager::setBindShownOnly(themeOption(theme, "BindShownOnly", "esBindShownOnly"));
+
+	mIdlePauseSeconds = Settings::getInstance()->getInt("IdlePause");
+	if (mIdlePauseSeconds < 0)
+		mIdlePauseSeconds = theme == nullptr ? 0 : Math::max(0, atoi(theme->getVariable("esIdlePause").c_str()));
+
+	LOG(LogInfo) << "Window: draws only changes " << (mRenderOnChange ? "yes" : "no") << ", idle pause " << mIdlePauseSeconds << " s, binds only shown containers " << (BindingManager::bindsShownOnly() ? "yes" : "no");
+	updateIdlePause();
 }
 
 void Window::updateIdlePause()
 {
-	int seconds = Settings::getInstance()->getInt("IdlePause");
+	int seconds = mIdlePauseSeconds;
 	bool idle = seconds > 0 && mTimeSinceLastInput >= (unsigned int)seconds * 1000;
 
 	mIdleVideo = idle && Settings::getInstance()->getBool("IdlePauseVideo");
@@ -1331,6 +1362,8 @@ void Window::processPostedFunctions()
 
 void Window::onThemeChanged(const std::shared_ptr<ThemeData>& theme)
 {
+	applyThemeOptions(theme);
+
 	for (auto extra : mScreenExtras)
 		delete extra;
 

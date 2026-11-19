@@ -19,6 +19,21 @@ BindableProperty BindableProperty::EmptyString("", BindablePropertyType::String)
 
 static std::map<std::string, std::function<BindableProperty()>> sGlobalProperties;
 
+bool BindingManager::mBindShownOnly = false;
+
+// The videos under a container left unbound: a video keeps playing what it was bound to, shown or not
+void BindingManager::bindVideos(GuiComponent* comp, IBindable* bindable)
+{
+	for (int i = 0; i < comp->getChildCount(); i++)
+	{
+		auto child = comp->getChild(i);
+		if (child->isKindOf<VideoComponent>())
+			updateBindings(child, bindable, true);
+		else
+			bindVideos(child, bindable);
+	}
+}
+
 class GlobalBinding : public IBindable
 {
 	BindableProperty getProperty(const std::string& name) override
@@ -341,9 +356,13 @@ void BindingManager::updateBindings(GuiComponent* comp, IBindable* bindable, boo
 	if (recursive)
 	{
 		// A hidden container's elements are bound when it shows (its own visibility is bound first, above): a
-		// view can hold the layouts and parts of other cases without binding all of them each time
-		if (!comp->isVisible() && typeid(*comp) == typeid(GuiComponent))
+		// view can hold the layouts and parts of other cases without binding all of them each time. Its videos
+		// are bound now.
+		if (mBindShownOnly && !comp->isVisible() && typeid(*comp) == typeid(GuiComponent))
+		{
+			bindVideos(comp, bindable);
 			return;
+		}
 
 		for (int i = 0; i < comp->getChildCount(); i++)
 			updateBindings(comp->getChild(i), bindable, recursive);

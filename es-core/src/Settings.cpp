@@ -121,11 +121,14 @@ void Settings::setDefaults()
 	mBoolMap["IgnoreLeadingArticles"] = Settings::_IgnoreLeadingArticles;
 	mBoolMap["ShowFoldersFirst"] = Settings::_ShowFoldersFirst;
 	mBoolMap["DrawFramerate"] = false;
-	mBoolMap["RenderOnChange"] = true;
+	// "auto": as the theme asks (Window::onThemeChanged), "true" or "false" for every theme
+	mStringMap["RenderOnChange"] = "auto";
 	mBoolMap["RenderOnChangeVerify"] = false;
-	mIntMap["IdlePause"] = 60;
+	// Seconds; -1: as the theme asks
+	mIntMap["IdlePause"] = -1;
 	mBoolMap["IdlePauseVideo"] = true;
 	mBoolMap["IdlePauseSlides"] = true;
+	mStringMap["BindShownOnly"] = "auto";
 	mBoolMap["ScrollLoadMedias"] = false;	
 	mBoolMap["ShowExit"] = true;
 	mBoolMap["ExitOnRebootRequired"] = false;

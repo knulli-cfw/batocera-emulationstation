@@ -75,6 +75,10 @@ public:
 
 	// Idle pause: after "IdlePause" seconds without input (0: never), the views' videos stop at the end of
 	// their loop ("IdlePauseVideo") and their slideshows stop moving ("IdlePauseSlides"); input resumes them
+	//
+	// A theme asks for these with its variables (Settings left at "auto", or -1 for IdlePause):
+	// esRenderOnChange (true), esIdlePause (seconds) and esBindShownOnly (true, BindingManager); without
+	// them ES draws every frame, has no idle pause and binds every element.
 	enum IdlePart { IDLE_VIDEO, IDLE_SLIDES };
 	bool isIdlePaused(IdlePart part) const { return part == IDLE_VIDEO ? mIdleVideo : mIdleSlides; }
 	bool getAllowSleep();
@@ -189,8 +193,11 @@ private:
 	unsigned int mTimeSinceLastInput;
 	bool mIdleVideo;
 	bool mIdleSlides;
+	bool mRenderOnChange;	// the setting, or the theme's choice
+	int  mIdlePauseSeconds;
 	long long mSuspendedMs;	// CLOCK_BOOTTIME less CLOCK_MONOTONIC at the last check; -1 before the first
 	void updateIdlePause();
+	void applyThemeOptions(const std::shared_ptr<ThemeData>& theme);
 
 	bool mRenderedHelpPrompts;
 
