@@ -2430,7 +2430,9 @@ FileData* SystemData::getContinueGame()
 }
 
 // Tools, emulators and the screenshot viewer (a group's systems count as their group's): what they ran
-// is shown, but X does not run it again.
+// is shown, but X does not run it again, and the last played list and the game counts leave them out. By
+// name, by an explicit tool or emulator hardware type, or the image viewer's platform; a group made from
+// its systems alone gets the hardware type "system" and is no utility.
 bool SystemData::isUtilitySystem(SystemData* system)
 {
 	if (system == nullptr)
@@ -2442,7 +2444,7 @@ bool SystemData::isUtilitySystem(SystemData* system)
 			continue;
 
 		const std::string& hardware = s->getSystemMetadata().hardwareType;
-		if (hardware == "tool" || hardware == "emulator" || hardware == "system" || s->hasPlatformId(PlatformIds::IMAGEVIEWER) ||
+		if (hardware == "tool" || hardware == "emulator" || s->hasPlatformId(PlatformIds::IMAGEVIEWER) ||
 			s->getName() == "tools" || s->getName() == "emulators" || s->getName() == "imageviewer")
 			return true;
 	}
