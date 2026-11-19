@@ -1,4 +1,6 @@
 #include "VolumeInfoComponent.h"
+#include "resources/Font.h"
+#include "renderers/Renderer.h"
 #include "ThemeData.h"
 #include "PowerSaver.h"
 #include "components/ComponentGrid.h"
@@ -53,11 +55,51 @@ static unsigned int blendColor(unsigned int color, unsigned int background, int 
 }
 
 VolumeInfoComponent::VolumeInfoComponent(Window* window, bool actionLine)
-	: GuiComponent(window)
+	: GuiComponent(window), mFrame(nullptr), mLabel(nullptr), mThemed(false), mBackgroundColor(0), mBorderColor(0),
+	mTrackColor(0), mCornerRadius(0), mGlyph(nullptr), mBarX(0), mBarWidth(0)
 {
 	mDisplayTime = -1;
 	mVolume = -1;
 	mCheckTime = 0;
+
+	const Window::PopupStyle& style = window->getMeterStyle();
+	if (style.enabled && style.font)
+	{
+		// The theme's pill: the glyph (volume or brightness), a horizontal bar and the level
+		mThemed = true;
+		mBackgroundColor = style.backgroundColor;
+		mBorderColor = style.borderColor;
+		mTrackColor = style.trackColor;
+		mFillColor = style.fillColor;
+		mTrackDivider = 1;
+
+		float width = style.size.x();
+		float height = style.size.y();
+		mCornerRadius = style.cornerRadius > 0 ? style.cornerRadius : height / 2.0f;
+
+		float padding = Math::round(height * 0.43f);
+		float gap = Math::round(height * 0.3f);
+		float glyphSize = style.iconSize > 0 ? style.iconSize : Math::round(height * 0.5f);
+		float labelWidth = Math::round(style.font->sizeText("100 %").x());
+
+		mBarX = padding + glyphSize + gap;
+		mBarWidth = Math::max(8.0f, width - mBarX - gap - labelWidth - padding);
+		setSize(width, height);
+
+		// the glyphs come from the icon font ES falls back to, at the theme's icon size
+		float scale = Renderer::ScreenSettings::fontScale();
+		int glyphFontSize = Math::max(1, (int)Math::round(glyphSize / (scale > 0 ? scale : 1.0f)));
+		mGlyph = new TextComponent(mWindow, "", Font::get(glyphFontSize, style.font->getPath()), style.color, ALIGN_CENTER);
+		mGlyph->setPosition(padding, 0);
+		mGlyph->setSize(glyphSize, height);
+		addChild(mGlyph);
+
+		mLabel = new TextComponent(mWindow, "", style.font, style.color, ALIGN_RIGHT);
+		mLabel->setPosition(width - padding - labelWidth, 0);
+		mLabel->setSize(labelWidth, height);
+		addChild(mLabel);
+		return;
+	}
 
 	auto theme = ThemeData::getMenuTheme();	
 
@@ -108,6 +150,9 @@ VolumeInfoComponent::VolumeInfoComponent(Window* window, bool actionLine)
 
 void VolumeInfoComponent::moveToSlot(int slot)
 {
+	if (mThemed)
+		return;
+
 	// FCA TopLeft
 	float posX = Renderer::getScreenWidth() * 0.02f + slot * (mSize.x() + Renderer::getScreenWidth() * 0.01f);
 	float posY = Renderer::getScreenHeight() * 0.04f;
@@ -120,8 +165,14 @@ int VolumeInfoComponent::readLevel()
 	return VolumeControl::getInstance()->getVolume();
 }
 
+std::string VolumeInfoComponent::glyph(int level)
+{
+	return level == 0 ? _U("\uF026") : _U("\uF028"); // a speaker, muted or not
+}
+
 VolumeInfoComponent::~VolumeInfoComponent()
 {
+	delete mGlyph;
 	delete mLabel;
 	delete mFrame;
 }
@@ -158,7 +209,12 @@ void VolumeInfoComponent::update(int deltaTime)
 
 		mVolume = volume;
 
-		if (mVolume == 0)
+		if (mThemed)
+		{
+			mGlyph->setText(glyph(mVolume));
+			mLabel->setText(std::to_string(mVolume) + " %");
+		}
+		else if (mVolume == 0)
 			mLabel->setText("X");
 		else
 			mLabel->setText(std::to_string(mVolume) + "%");
@@ -184,6 +240,30 @@ void VolumeInfoComponent::render(const Transform4x4f& parentTrans)
 	auto theme = ThemeData::getMenuTheme();
 
 	int opacity = 255 - Math::max(0, (mDisplayTime - VISIBLE_TIME) * 255 / FADE_TIME);
+
+	if (mThemed)
+	{
+		// fades in place: the pill, the bar's track and fill, the glyph and the level
+		setOpacity(opacity);
+
+		auto withOpacity = [opacity](unsigned int color) { return (color & 0xFFFFFF00) | ((color & 0xFF) * opacity / 255); };
+
+		Transform4x4f trans = parentTrans * getTransform();
+		Renderer::setMatrix(trans);
+		Renderer::drawSolidRectangle(0, 0, mSize.x(), mSize.y(), withOpacity(mBackgroundColor), withOpacity(mBorderColor),
+			(mBorderColor & 0xFF) ? 1.0f : 0.0f, mCornerRadius);
+
+		float h = Math::max(2.0f, Math::round(mSize.y() * 0.143f));
+		float y = Math::round((mSize.y() - h) / 2.0f);
+		Renderer::drawSolidRectangle(mBarX, y, mBarWidth, h, withOpacity(mTrackColor), 0, 0, h / 2.0f);
+
+		float fill = Math::round(mBarWidth * Math::max(0, Math::min(100, mVolume)) / 100.0f);
+		if (fill > 0)
+			Renderer::drawSolidRectangle(mBarX, y, fill, h, withOpacity(mFillColor), 0, 0, h / 2.0f);
+
+		GuiComponent::renderChildren(trans);
+		return;
+	}
 	setOpacity(opacity);
 	setScale(opacity / 255.0f);
 

@@ -1,4 +1,5 @@
 #include "BrightnessInfoComponent.h"
+#include "LocaleES.h"
 #include "math/Misc.h"
 #include "utils/FileSystemUtil.h"
 #include "utils/StringUtil.h"
@@ -75,6 +76,11 @@ BrightnessInfoComponent::~BrightnessInfoComponent()
 	if (mDispFd >= 0)
 		close(mDispFd);
 #endif
+}
+
+std::string BrightnessInfoComponent::glyph(int level)
+{
+	return _U("\uF185"); // a sun
 }
 
 int BrightnessInfoComponent::readLevel()

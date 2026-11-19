@@ -113,6 +113,33 @@ public:
 
 	void onThemeChanged(const std::shared_ptr<ThemeData>& theme);
 
+	// A theme's look and place for the info popups and for the volume and brightness meters: the screen view's
+	// notification elements "notification" and "meters", when they have a size (in pixels here)
+	struct PopupStyle
+	{
+		PopupStyle() : enabled(false), origin(0, 0), color(0xFFFFFFFF), backgroundColor(0x0D1A2BF2), borderColor(0),
+			trackColor(0xFFFFFF40), fillColor(0xFFFFFFFF), cornerRadius(0), iconSize(0), spacing(0), maxCount(0) {}
+
+		bool enabled;
+		Vector2f pos;
+		Vector2f origin;
+		Vector2f size;
+		std::shared_ptr<Font> font;
+		std::string iconPath;
+		unsigned int color;
+		unsigned int backgroundColor;
+		unsigned int borderColor;
+		unsigned int trackColor;
+		unsigned int fillColor;
+		float cornerRadius;
+		float iconSize;
+		float spacing;
+		int maxCount;
+	};
+
+	const PopupStyle& getNoticeStyle() const { return mNoticeStyle; }
+	const PopupStyle& getMeterStyle() const { return mMeterStyle; }
+
 	std::shared_ptr<BatteryIndicatorComponent>	getBatteryIndicator() { return mBatteryIndicator; }
 
 	AsyncNotificationComponent* createAsyncNotificationComponent(bool actionLine = false);
@@ -185,6 +212,11 @@ private:
 	std::shared_ptr<BatteryIndicatorComponent>	mBatteryIndicator;	
 
 	float mNotificationOffsetY = 0.02f;
+	PopupStyle mNoticeStyle;
+	PopupStyle mMeterStyle;
+
+	// The info popups shown at once (a theme's style can cap them; the others wait)
+	int shownNotificationCount() const;
 
 	bool mNormalizeNextUpdate;
 

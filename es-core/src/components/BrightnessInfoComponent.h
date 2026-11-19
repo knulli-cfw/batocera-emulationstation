@@ -15,6 +15,7 @@ public:
 
 protected:
 	int readLevel() override;
+	std::string glyph(int level) override;
 	bool showChange() override;
 
 private:

@@ -235,7 +235,23 @@ std::map<std::string, std::map<std::string, ThemeData::ElementPropertyType>> The
 	{ "clock", {} }, // Inherits text
 
 	{ "notification", {
-		{ "y", FLOAT } } },
+		{ "y", FLOAT },
+		// with a size: the info popups' look and place ("notification") or the volume and brightness meters' ("meters")
+		{ "pos", NORMALIZED_PAIR },
+		{ "origin", NORMALIZED_PAIR },
+		{ "size", NORMALIZED_PAIR },
+		{ "fontPath", PATH },
+		{ "fontSize", FLOAT },
+		{ "color", COLOR },
+		{ "backgroundColor", COLOR },
+		{ "borderColor", COLOR },
+		{ "trackColor", COLOR },
+		{ "fillColor", COLOR },
+		{ "cornerSize", FLOAT },
+		{ "iconPath", PATH },
+		{ "iconSize", FLOAT },
+		{ "spacing", FLOAT },
+		{ "maxCount", FLOAT } } },
 
 	{ "networkIcon", {  // Inherits image
 		{ "networkIcon", PATH },

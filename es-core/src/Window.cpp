@@ -370,12 +370,32 @@ void Window::stopNotificationPopups()
 	PowerSaver::resume();
 }
 
+// With a theme's cap on the popups shown at once, the first one gives way after a while to those waiting; a
+// waiting one's time starts when it shows
+#define POPUP_WAITING_MS 2500
+
+int Window::shownNotificationCount() const
+{
+	int count = (int)mNotificationPopups.size();
+	if (mNoticeStyle.enabled && mNoticeStyle.maxCount > 0)
+		count = std::min(count, mNoticeStyle.maxCount);
+
+	return count;
+}
+
 void Window::updateNotificationPopups(int deltaTime)
 {
 	bool changed = false;
 
+	int shown = shownNotificationCount();
+	if (shown > 0 && shown < (int)mNotificationPopups.size())
+		mNotificationPopups.front()->shorten(POPUP_WAITING_MS);
+
 	for (int i = mNotificationPopups.size() - 1 ; i >= 0 ; i--)
 	{
+		if (i >= shown)
+			continue;
+
 		mNotificationPopups[i]->update(deltaTime);
 
 		if (!mNotificationPopups[i]->isRunning())
@@ -403,6 +423,32 @@ void Window::updateNotificationPopups(int deltaTime)
 
 void Window::layoutNotificationPopups()
 {
+	if (mNoticeStyle.enabled)
+	{
+		// From the theme's place, one under the other; one going away lets the next ones move up
+		float posY = mNoticeStyle.pos.y() - mNoticeStyle.size.y() * mNoticeStyle.origin.y();
+		int shown = shownNotificationCount();
+
+		for (int i = 0; i < shown; i++)
+		{
+			auto popup = mNotificationPopups[i];
+			float offset = popup->getSize().y() + mNoticeStyle.spacing;
+
+			float fadingOut = popup->getFadeOut();
+			if (fadingOut != 0)
+			{
+				fadingOut = fadingOut - 1;
+				fadingOut = Math::lerp(0, 1, fadingOut * fadingOut * fadingOut + 1);
+				posY -= offset * fadingOut;
+			}
+
+			popup->setPosition(Math::round(mNoticeStyle.pos.x() - popup->getSize().x() * mNoticeStyle.origin.x()), Math::round(posY), 0);
+			posY += offset;
+		}
+
+		return;
+	}
+
 	float posY = Renderer::getScreenHeight() * 0.02f;
 	int paddingY = (int)posY;
 
@@ -790,8 +836,9 @@ void Window::render()
 	// Render notifications
 	if (!mRenderScreenSaver)
 	{
-		for (auto popup : mNotificationPopups)
-			popup->render(transform);
+		if (!mNoticeStyle.enabled)
+			for (auto popup : mNotificationPopups)
+				popup->render(transform);
 
 		renderAsyncNotifications(transform);
 	}
@@ -812,6 +859,33 @@ void Window::render()
 		for (auto extra : mScreenExtras)
 			if (!menuOver || extra->isKindOf<PostProcessShaderComponent>())
 				extra->render(transform);
+
+		// A theme's popups go over the screen's extras (its status line)
+		if (mNoticeStyle.enabled)
+		{
+			int shown = shownNotificationCount();
+			for (int i = 0; i < shown; i++)
+				mNotificationPopups[i]->render(transform);
+		}
+	}
+
+	if (mMeterStyle.enabled && mVolumeInfo && mBrightnessInfo)
+	{
+		// The theme's place for one meter; both showing, side by side around it
+		bool both = mVolumeInfo->isShowing() && mBrightnessInfo->isShowing();
+		float width = mMeterStyle.size.x();
+		float x = mMeterStyle.pos.x() - (both ? 2 * width + mMeterStyle.spacing : width) * mMeterStyle.origin.x();
+		float y = mMeterStyle.pos.y() - mMeterStyle.size.y() * mMeterStyle.origin.y();
+
+		if (mVolumeInfo->isShowing())
+		{
+			mVolumeInfo->setPosition(Math::round(x), Math::round(y), 0);
+			if (both)
+				x += width + mMeterStyle.spacing;
+		}
+
+		if (mBrightnessInfo->isShowing())
+			mBrightnessInfo->setPosition(Math::round(x), Math::round(y), 0);
 	}
 
 	if (mVolumeInfo && Settings::VolumePopup())
@@ -1360,6 +1434,59 @@ void Window::processPostedFunctions()
 		TRYCATCH("processPostedFunction", func.func())
 }
 
+// A screen view's notification element with a size: the look and place of the popups it styles
+static Window::PopupStyle readPopupStyle(const ThemeData::ThemeElement* elem)
+{
+	Window::PopupStyle style;
+	if (elem == nullptr || !elem->has("size"))
+		return style;
+
+	Vector2f screen((float)Renderer::getScreenWidth(), (float)Renderer::getScreenHeight());
+	Vector2f size = elem->get<Vector2f>("size") * screen;
+	if (size.x() <= 0 || size.y() <= 0)
+		return style;
+
+	style.enabled = true;
+	style.size = Vector2f(Math::round(size.x()), Math::round(size.y()));
+	style.pos = elem->has("pos") ? elem->get<Vector2f>("pos") * screen : Vector2f::Zero();
+	style.font = Font::getFromTheme(elem, ThemeFlags::ALL, Font::get(FONT_SIZE_MINI));
+
+	if (elem->has("origin"))
+		style.origin = elem->get<Vector2f>("origin");
+
+	if (elem->has("color"))
+		style.color = elem->get<unsigned int>("color");
+
+	if (elem->has("backgroundColor"))
+		style.backgroundColor = elem->get<unsigned int>("backgroundColor");
+
+	if (elem->has("borderColor"))
+		style.borderColor = elem->get<unsigned int>("borderColor");
+
+	if (elem->has("trackColor"))
+		style.trackColor = elem->get<unsigned int>("trackColor");
+
+	if (elem->has("fillColor"))
+		style.fillColor = elem->get<unsigned int>("fillColor");
+
+	if (elem->has("cornerSize"))
+		style.cornerRadius = Math::round(elem->get<float>("cornerSize") * screen.y());
+
+	if (elem->has("iconPath"))
+		style.iconPath = elem->get<std::string>("iconPath");
+
+	if (elem->has("iconSize"))
+		style.iconSize = Math::round(elem->get<float>("iconSize") * screen.y());
+
+	if (elem->has("spacing"))
+		style.spacing = Math::round(elem->get<float>("spacing") * screen.y());
+
+	if (elem->has("maxCount"))
+		style.maxCount = std::max(0, (int)elem->get<float>("maxCount"));
+
+	return style;
+}
+
 void Window::onThemeChanged(const std::shared_ptr<ThemeData>& theme)
 {
 	applyThemeOptions(theme);
@@ -1383,6 +1510,9 @@ void Window::onThemeChanged(const std::shared_ptr<ThemeData>& theme)
 		// default value
 		mNotificationOffsetY = 0.02f;
 	}
+
+	mNoticeStyle = readPopupStyle(elem);
+	mMeterStyle = readPopupStyle(theme->getElement("screen", "meters", "notification"));
 
 	if (mClock)
 	{

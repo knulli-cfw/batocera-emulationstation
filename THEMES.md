@@ -1589,6 +1589,43 @@ BATOCERA 5.24 - controllerActivity element must be defined in screen view
 
   - z-index value for component.  Components will be rendered in order of z-index value from low to high.
 
+#### notification
+
+Defined in the screen view.  `<notification name="notification">` styles the info popups (a message, a song's
+title, a notice sent through the API); `<notification name="meters">` the volume and brightness meters.  Without a
+size, ES draws its default ones.
+
+* `y` - type: FLOAT.
+
+  - "notification" only: top of the background jobs' notifications (top right), as a fraction of the screen's height.  Default is 0.02.
+
+* `size` - type: NORMALIZED_PAIR.
+
+  - A popup's largest width and its height (a meter's width and height).
+
+* `pos`, `origin` - type: NORMALIZED_PAIR.
+
+  - Where the first popup goes and which of its points sits there (`1 0`: its top right corner).  Popups go one
+    under the other, `spacing` apart; with both meters showing, they go side by side around that place.
+
+* `fontPath`, `fontSize` - The text (a meter's level).
+
+* `color`, `backgroundColor`, `borderColor` - type: COLOR.
+
+  - The text and the glyphs, the box under them and its 1 px border (none when transparent).
+
+* `cornerSize` - type: FLOAT.  The box's corner radius, as a fraction of the screen's height (meters: half their height by default).
+
+* `iconPath` - type: PATH.  "notification": an icon before the text.
+
+* `iconSize` - type: FLOAT.  The icon's or the meter glyph's size, as a fraction of the screen's height.
+
+* `spacing` - type: FLOAT.  The gap between popups, as a fraction of the screen's height.
+
+* `maxCount` - type: FLOAT.  "notification": popups shown at once; the next one shows when one ends, and the first gives way after 2.5 s when others wait.
+
+* `trackColor`, `fillColor` - type: COLOR.  "meters": the bar's track and its fill up to the level.
+
   
 
 
