@@ -667,6 +667,10 @@ void VideoComponent::setProperty(const std::string name, const ThemeData::ThemeE
 	}
 	else if (value.type == ThemeData::ThemeElement::Property::PropertyType::Bool && name == "enabled")
 	{
+		// Bound again to the same value (each binding pass): nothing changes, a start under way goes on
+		if (value.b == mEnabled)
+			return;
+
 		mEnabled = value.b;
 
 		if (!mEnabled)

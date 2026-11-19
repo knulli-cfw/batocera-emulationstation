@@ -22,6 +22,7 @@ struct VideoContext
 		surfaces[1] = nullptr;
 		valid = false;
 		displayed = false;
+		width = height = 0;
 		hasFrame[0] = false;
 		hasFrame[1] = false;
 		surfaceId = 0;
@@ -39,6 +40,7 @@ struct VideoContext
 	bool				hasFrame[2];
 
 	bool				valid;
+	unsigned int		width, height;	// of the buffers
 	// Set by VLC's display callback; the UI thread starts showing the video (VideoVlcComponent::checkDisplayed)
 	std::atomic<bool>	displayed;
 };
@@ -142,6 +144,7 @@ private:
 
 	void setupContext();
 	void freeContext();
+	void releasePlayback();
 
 	// startVideo asks VLC to read the file's tracks on its own thread; each frame checkParse looks whether it
 	// has, then playback starts (startPlayback). Until then the snapshot or what is under the video shows and
