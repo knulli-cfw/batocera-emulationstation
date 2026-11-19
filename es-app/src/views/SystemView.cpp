@@ -727,7 +727,20 @@ bool SystemView::input(InputConfig* config, Input input)
 	if (input.value != 0)
 	{
 		// Tabs: X continues the selected system's last game, else plays the game the panel suggests;
-		// nothing on tools, emulators and screenshots (it never runs a tool again unasked)
+		// nothing on tools, emulators and screenshots (it never runs a tool again unasked). In columns, at the
+		// tabs (level 1, no system's column shown) it continues the console's last game, the status line's
+		if (hasTabs() && config->isMappedTo("x", input) && hasColumns() && mColumnLevel == 1)
+		{
+			FileData* game = SystemData::getConsoleLastPlayedGame();
+			if (game != nullptr)
+			{
+				mCarousel.stopScrolling();
+				ViewController::get()->launch(game);
+			}
+
+			return true;
+		}
+
 		if (hasTabs() && config->isMappedTo("x", input))
 		{
 			SystemData* system = getSelected();
@@ -1401,7 +1414,7 @@ std::vector<HelpPrompt> SystemView::getHelpPrompts()
 	if (hasTabs())
 	{
 		SystemData* system = getSelected();
-		if (system != nullptr && system->getContinueGame() != nullptr)
+		if (hasColumns() && mColumnLevel == 1 ? SystemData::getConsoleLastPlayedGame() != nullptr : system != nullptr && system->getContinueGame() != nullptr)
 			prompts.push_back(HelpPrompt("x", _("CONTINUE")));
 
 		if (SystemData::getSystem("all") != nullptr)
