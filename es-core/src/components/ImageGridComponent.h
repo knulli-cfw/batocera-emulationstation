@@ -141,6 +141,15 @@ public:
 
 	void		preloadTiles();
 
+	// Whether the cursor's item shows selected: a grid whose view gave the focus to another column shows it as
+	// any other item (its "deactivate" storyboards, then its "unfocus" ones), and selected again once it has the
+	// focus back
+	void		setCursorShown(bool shown);
+	bool		isCursorShown() { return mCursorShown; }
+	// The cursor's column and the number of columns (rows of a horizontal grid)
+	int			getCursorColumn();
+	int			getColumnCount();
+
 protected:
 	virtual void onCursorChanged(const CursorState& state) override;
 	virtual void onScroll(int /*amt*/) { if (!mScrollSound.empty()) Sound::get(mScrollSound)->play(); }
@@ -211,6 +220,8 @@ private:
 	float mCameraOffset;
 
 	std::map<int, std::shared_ptr<GridTileComponent>> mScrollLoopTiles;
+
+	bool mCursorShown;
 
 	// Handle pointer types derived from IBindable
 	template <typename U = T>
@@ -385,7 +396,9 @@ void ImageGridComponent<T>::ensureVisibleTileExist()
 					}
 
 					mLastCursor = mCursor;
-					tile->setSelected(true, true, nullptr, true);
+					tile->setSelected(mCursorShown, true, nullptr, true);
+					if (!mCursorShown)
+						tile->playStoryboard("unfocus");
 				}
 
 				if (mShowing)
@@ -469,6 +482,7 @@ ImageGridComponent<T>::ImageGridComponent(Window* window) : IList<ImageGridData,
 
 	mCenterSelection = CenterSelection::NEVER;
 	mScrollLoop = false;
+	mCursorShown = true;
 	mScrollDirection = SCROLL_VERTICALLY;
 
 	mCursorChangedCallback = nullptr;
@@ -1149,10 +1163,13 @@ void ImageGridComponent<T>::onCursorChanged(const CursorState& state)
 			if (!mAnimateSelection)
 			{
 				oldPos = Vector3f(0, 0);
-				mEntries[mCursor].data.tile->setSelected(true, true, &oldPos, true);
+				mEntries[mCursor].data.tile->setSelected(mCursorShown, true, &oldPos, true);
 			}
 			else
-				mEntries[mCursor].data.tile->setSelected(true, true, oldPos == Vector3f::Zero() ? nullptr : &oldPos, true);
+				mEntries[mCursor].data.tile->setSelected(mCursorShown, true, oldPos == Vector3f::Zero() ? nullptr : &oldPos, true);
+
+			if (!mCursorShown)
+				mEntries[mCursor].data.tile->playStoryboard("unfocus");
 
 			auto selected = mEntries[mCursor].data.tile;
 			auto old = mLastCursor >= 0 && mLastCursor < mEntries.size() ? mEntries[mLastCursor].data.tile : nullptr;
@@ -1576,7 +1593,7 @@ bool ImageGridComponent<T>::onMouseClick(int button, bool pressed, int x, int y)
 						}
 
 						Vector3f oldPos = Vector3f::Zero();
-						mEntries[mCursor].data.tile->setSelected(true, true, mAnimateSelection ? nullptr : &oldPos, true);
+						mEntries[mCursor].data.tile->setSelected(mCursorShown, true, mAnimateSelection ? nullptr : &oldPos, true);
 					}
 
 					if (mCursorChangedCallback)
@@ -1700,7 +1717,7 @@ void ImageGridComponent<T>::onMouseMove(int x, int y)
 					}
 
 					Vector3f oldPos = Vector3f::Zero();
-					mEntries[mCursor].data.tile->setSelected(true, true, mAnimateSelection ? nullptr : &oldPos, true, false);
+					mEntries[mCursor].data.tile->setSelected(mCursorShown, true, mAnimateSelection ? nullptr : &oldPos, true, false);
 				}
 
 				if (mCursorChangedCallback)
@@ -1714,6 +1731,34 @@ void ImageGridComponent<T>::onMouseMove(int x, int y)
 		mEntriesDirty = true;
 		mPressedPoint = Vector2i(x, y);
 	}
+}
+
+template<typename T>
+void ImageGridComponent<T>::setCursorShown(bool shown)
+{
+	if (mCursorShown == shown)
+		return;
+
+	mCursorShown = shown;
+
+	if (mCursor >= 0 && mCursor < (int)mEntries.size() && mEntries[mCursor].data.tile != nullptr)
+	{
+		mEntries[mCursor].data.tile->setSelected(shown, true, nullptr, true);
+		if (!shown)
+			mEntries[mCursor].data.tile->playStoryboard("unfocus");
+	}
+}
+
+template<typename T>
+int ImageGridComponent<T>::getColumnCount()
+{
+	return Math::max(1, isVertical() ? mGridDimension.x() : mGridDimension.y());
+}
+
+template<typename T>
+int ImageGridComponent<T>::getCursorColumn()
+{
+	return mCursor < 0 ? 0 : mCursor % getColumnCount();
 }
 
 #endif // ES_CORE_COMPONENTS_IMAGE_GRID_COMPONENT_H

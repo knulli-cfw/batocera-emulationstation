@@ -257,6 +257,9 @@ public:
 
 	void	updateBindings(IBindable* bindable) override;
 	bool    hasItemTemplate() { return mHasItemTemplate; }
+	// Starts the item template's storyboards of an event of the grid's own ("unfocus": the cursor's item while
+	// the grid has no focus), on the elements that have one
+	void	playStoryboard(const std::string& event);
 
 private:
 	void	handleStoryBoard(bool activate);

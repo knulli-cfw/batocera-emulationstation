@@ -1142,6 +1142,27 @@ void GridTileComponent::handleStoryBoard(bool activate)
 	}
 }
 
+void GridTileComponent::playStoryboard(const std::string& event)
+{
+	if (!mHasItemTemplate)
+		return;
+
+	for (auto comp : enumerateExtraChildrens())
+	{
+		if (comp->getStoryBoards().find(event) == comp->getStoryBoards().cend())
+			continue;
+
+		if (comp->isStoryBoardRunning())
+			comp->deselectStoryboard(false);
+
+		if (comp->selectStoryboard(event))
+		{
+			comp->startStoryboard();
+			comp->update(0);
+		}
+	}
+}
+
 void GridTileComponent::onShow()
 {
 	GuiComponent::onShow();	
