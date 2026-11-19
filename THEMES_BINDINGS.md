@@ -14,9 +14,11 @@ They can't be use in "if" attributes which requires static theme variables.
 
 You can also use dynamic variables in the "enabled" attribute in the storyboards animation element ( <animation enabled="{global:cheevos}" [...] /> ).
 
-A hidden container's elements are not bound while it is hidden: its own visibility is bound first, and its
-elements when it shows. A view can hold the layouts and parts of other cases in containers without binding all
-of them each time (a video keeps its own visibility: one in a hidden container would still play).
+With the theme variable `esBindShownOnly` (or the es_settings key `BindShownOnly`, see THEMES.md), a hidden
+container's elements are not bound while it is hidden: its own visibility is bound first, and its elements when
+it shows. A view can hold the layouts and parts of other cases in containers without binding all of them each
+time. The videos in a hidden container are bound all the same (a video keeps playing what it was bound to,
+shown or not; give it its own visibility).
 
 The Binding engine supports standard operators evaluation ( +, -, *, /, &&, ||, ! ) and also simple evaluation methods.
 
@@ -94,6 +96,7 @@ placeholder                 bool                  True if it's a placeholder ( i
 playerCount                 int
 hasManual                   bool
 hasSaveState                bool
+saveStatesSupported         bool                  True if the emulator and core the game runs with keep save states (false on a folder)
 hasKeyboardMapping          bool
 gametime                    int	                  time played in seconds
 desc                        string
@@ -136,6 +139,8 @@ type                        string
 stars                       string                returns a string composed of rating stars
 nameShort                   string                name, before any parenthesis
 nameExtra                   string                name, after any parenthesis
+cleanName                   string                name without the trailing tags of dump sets: (USA), (En,Fr), (Rev 1), (v1.1), (Beta), [!]...; " : " as ": "
+imageRatio                  float                 the image's width over its height (4:3 is 1.33, a DS's two screens 0.67); 0 without an image
 ```
 
 **global:**
@@ -154,7 +159,8 @@ screenWidth                 int
 screenHeight                int
 screenRatio                 string
 vertical                    bool
-lastPlayed                  game                  The game played last on the console, tools and screenshots left out ({global:lastPlayed:system:fullName})
+lastPlayed                  game                  The game played last on the console, tools, emulators and screenshots left out ({global:lastPlayed:system:fullName})
+homeColumn                  int                   The level the home's columns show (1 the first column, 2 the grid), 0 without columns (THEMES.md, Columns)
 ```	
 
 **systemrandom:**

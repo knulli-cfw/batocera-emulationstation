@@ -3,6 +3,7 @@
 #include "animations/LambdaAnimation.h"
 #include "views/UIModeController.h"
 #include "views/ViewController.h"
+#include "views/SystemView.h"
 #include "CollectionSystemManager.h"
 #include "Settings.h"
 #include "SystemData.h"
@@ -108,6 +109,29 @@ bool GridGameListView::input(InputConfig* config, Input input)
 		// Ctrl-R to reload a view when debugging
 	}
 	*/
+
+	// Columns (the home slides in beside the list): left at the grid's left edge goes back as B does, L1 and R1
+	// go back to the previous or next tab of the home
+	if (input.value != 0 && mColumns.hasSlide() && !mPopupSelfReference && mCursorStack.empty())
+	{
+		auto home = ViewController::get()->getSystemListView();
+		if (home->hasColumns())
+		{
+			if (config->isMappedLike("left", input) && mGrid.getCursorColumn() == 0)
+			{
+				goBack();
+				return true;
+			}
+
+			if (config->isMappedTo("pageup", input) || config->isMappedTo("pagedown", input))
+			{
+				goBack();
+				home->changeTab(config->isMappedTo("pageup", input) ? -1 : 1);
+				return true;
+			}
+		}
+	}
+
 	if(config->isMappedLike("left", input) || config->isMappedLike("right", input))
 		return GuiComponent::input(config, input);
 

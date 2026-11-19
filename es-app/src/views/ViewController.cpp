@@ -172,8 +172,13 @@ void ViewController::goToSystemView(SystemData* system, bool forceImmediate)
 			dest = bundle;
 	}
 
+	// Columns: back from a game list, the home slides in again beside it
+	std::shared_ptr<IGameListView> columnList;
+	if (!forceImmediate && mState.viewing == GAME_LIST)
+		columnList = std::dynamic_pointer_cast<IGameListView>(mCurrentView);
+
 	// Tell any current view it's about to be hidden
-	if (mCurrentView)
+	if (mCurrentView && columnList == nullptr)
 		mCurrentView->onHide();
 
 	// Realign system view
@@ -196,6 +201,14 @@ void ViewController::goToSystemView(SystemData* system, bool forceImmediate)
 	Scripting::fireEvent("system-selected", dest->getName());
 
 	systemList->goToSystem(dest, false);
+
+	if (columnList != nullptr)
+	{
+		if (startColumnSlide(columnList, false))
+			return;
+
+		mCurrentView->onHide();
+	}
 
 	mCurrentView = systemList;
 
@@ -257,6 +270,7 @@ void ViewController::goToGameList(SystemData* system, bool forceImmediate)
 
 	std::shared_ptr<IGameListView> view = getGameListView(destinationSystem);
 
+	bool fromHome = mState.viewing == SYSTEM_SELECT;
 
 	if (mState.viewing == SYSTEM_SELECT)
 	{
@@ -330,6 +344,10 @@ void ViewController::goToGameList(SystemData* system, bool forceImmediate)
 
 	mDeferPlayViewTransitionTo = nullptr;
 
+	// Columns: the game list slides in beside the home's grid
+	if (!forceImmediate && fromHome && startColumnSlide(view, true))
+		return;
+
 	if (forceImmediate || Settings::TransitionStyle() == "fade")
 	{
 		if (mCurrentView)
@@ -342,6 +360,104 @@ void ViewController::goToGameList(SystemData* system, bool forceImmediate)
 	{
 		cancelAnimation(0);
 		mDeferPlayViewTransitionTo = view;
+	}
+}
+
+// Columns (ColumnLayout): the home at level 2 and a game list side by side slide by the layout's width, eased
+// out (moving in the frame after the press); the header and the shared column crossfade (the leaving view's
+// over the first 35 % of the way, the coming one's from 30 to 70 %), as the theme's design does
+static const int COLUMN_SLIDE_MS = 360;
+
+static float smoothStep(float a, float b, float t)
+{
+	float x = Math::clamp((t - a) / (b - a), 0.0f, 1.0f);
+	return x * x * (3.0f - 2.0f * x);
+}
+
+bool ViewController::startColumnSlide(std::shared_ptr<IGameListView> list, bool toList)
+{
+	auto home = getSystemListView();
+	if (list == nullptr || home == nullptr || !home->hasColumns() || !home->getColumnLayout().hasSlide() || Settings::PowerSaverMode() == "instant")
+		return false;
+
+	// A slide turned back halfway goes back from where it is
+	float p = mColumnSlide.list == list ? mColumnSlide.p : (toList ? 0.0f : 1.0f);
+	if (mColumnSlide.list != nullptr && mColumnSlide.list != list)
+	{
+		home->setColumnFade(1.0f);
+		mColumnSlide.list->setColumnFade(1.0f);
+	}
+
+	home->setColumnLevel(2, false);
+
+	cancelAnimation(0);
+	mDeferPlayViewTransitionTo = nullptr;
+
+	mColumnSlide.list = list;
+	mColumnSlide.from = p;
+	mColumnSlide.to = toList ? 1.0f : 0.0f;
+	mColumnSlide.p = p;
+	mColumnSlide.time = 0;
+	mColumnSlide.pending = true;
+
+	if (mCurrentView)
+		mCurrentView->onHide();
+
+	if (toList)
+		mCurrentView = list;
+	else
+		mCurrentView = home;
+
+	mCurrentView->onShow();
+
+	// The camera already shows the destination; the slide draws both views until it ends
+	mCamera.translation() = -mCurrentView->getPosition();
+
+	applyColumnFades(0);
+	updateHelpPrompts();
+	return true;
+}
+
+void ViewController::updateColumnSlide(int deltaTime)
+{
+	if (mColumnSlide.list == nullptr)
+		return;
+
+	// The first step waits for the frame after the one that made the view
+	if (mColumnSlide.pending)
+		mColumnSlide.pending = false;
+	else
+		mColumnSlide.time += deltaTime;
+
+	float t = Math::min(1.0f, (float)mColumnSlide.time / (float)COLUMN_SLIDE_MS);
+	float e = Math::easeOutCubic(t);
+
+	mColumnSlide.p = Math::lerp(mColumnSlide.from, mColumnSlide.to, e);
+	applyColumnFades(e);
+
+	if (t >= 1.0f)
+	{
+		getSystemListView()->setColumnFade(1.0f);
+		mColumnSlide.list->setColumnFade(1.0f);
+		mColumnSlide.list = nullptr;
+	}
+}
+
+void ViewController::applyColumnFades(float t)
+{
+	auto home = getSystemListView();
+	float leaving = 1.0f - smoothStep(0.0f, 0.35f, t);
+	float coming = smoothStep(0.3f, 0.7f, t);
+
+	if (mColumnSlide.to > 0.5f)
+	{
+		home->setColumnFade(leaving);
+		mColumnSlide.list->setColumnFade(coming);
+	}
+	else
+	{
+		mColumnSlide.list->setColumnFade(leaving);
+		home->setColumnFade(coming);
 	}
 }
 
@@ -939,6 +1055,7 @@ void ViewController::update(int deltaTime)
 	if (mCurrentView)
 		mCurrentView->update(deltaTime);
 
+	updateColumnSlide(deltaTime);
 	updateSelf(deltaTime);
 
 	if (mDeferPlayViewTransitionTo != nullptr)
@@ -955,6 +1072,8 @@ void ViewController::update(int deltaTime)
 
 void ViewController::render(const Transform4x4f& parentTrans)
 {
+	mScreenTransform = parentTrans;
+
 	Transform4x4f trans = mCamera * parentTrans;
 	Transform4x4f transInverse;
 	transInverse.invert(trans);
@@ -963,7 +1082,22 @@ void ViewController::render(const Transform4x4f& parentTrans)
 	Vector3f viewStart = transInverse.translation();
 	Vector3f viewEnd = transInverse * Vector3f((float)Renderer::getScreenWidth(), (float)Renderer::getScreenHeight(), 0);
 
-	if (!isAnimationPlaying(0) && mCurrentView != nullptr)
+	if (mColumnSlide.list != nullptr)
+	{
+		// The home and the game list side by side, wherever their positions are
+		auto home = getSystemListView();
+		float slide = home->getColumnLayout().slide;
+		float offset = mColumnSlide.p * slide;
+
+		Transform4x4f homeTrans = parentTrans;
+		homeTrans.translate(Vector3f(-offset, 0, 0) - home->getPosition());
+		home->render(homeTrans);
+
+		Transform4x4f listTrans = parentTrans;
+		listTrans.translate(Vector3f(slide - offset, 0, 0) - mColumnSlide.list->getPosition());
+		mColumnSlide.list->render(listTrans);
+	}
+	else if (!isAnimationPlaying(0) && mCurrentView != nullptr)
 	{
 		mCurrentView->render(trans);
 	}

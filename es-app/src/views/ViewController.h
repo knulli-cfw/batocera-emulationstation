@@ -112,6 +112,11 @@ public:
 	static void reloadAllGames(Window* window, bool deleteCurrentGui = false, bool doCallExternalTriggers = false);
 
 	void setActiveView(std::shared_ptr<GuiComponent> view);
+
+	// The screen's own transform: what the views draw their parts that stay in place with
+	const Transform4x4f& getScreenTransform() { return mScreenTransform; }
+	// A column slide (ColumnLayout) is under way
+	bool isColumnSliding() { return mColumnSlide.list != nullptr; }
 	
 	virtual bool hitTest(int x, int y, Transform4x4f& parentTransform, std::vector<GuiComponent*>* pResult = nullptr) override;
 
@@ -120,6 +125,22 @@ private:
 	static ViewController* sInstance;
 
 	void playViewTransition(bool forceImmediate);
+
+	// A column slide (ColumnLayout): the home and a game list side by side, p from 0 (the home) to 1 (the
+	// list); the current view is the destination from the start
+	struct ColumnSlide
+	{
+		ColumnSlide() : from(0), to(0), p(0), time(0), pending(false) { }
+
+		std::shared_ptr<IGameListView> list;
+		float from, to, p;
+		int time;
+		bool pending;
+	};
+
+	bool startColumnSlide(std::shared_ptr<IGameListView> list, bool toList);
+	void updateColumnSlide(int deltaTime);
+	void applyColumnFades(float t);
 	bool doLaunchGame(FileData* game, LaunchGameOptions options);
 	bool checkLaunchOptions(FileData* game, LaunchGameOptions options, Vector3f center);
 	int getSystemId(SystemData* system);
@@ -134,6 +155,9 @@ private:
 	bool mLockInput;
 	std::shared_ptr<GuiComponent>	mDeferPlayViewTransitionTo;
 	State mState;
+
+	ColumnSlide mColumnSlide;
+	Transform4x4f mScreenTransform;
 };
 
 #endif // ES_APP_VIEWS_VIEW_CONTROLLER_H

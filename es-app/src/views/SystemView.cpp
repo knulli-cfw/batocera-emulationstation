@@ -33,6 +33,11 @@
 #include <SDL_timer.h>
 
 std::map<std::string, int> SystemView::sSystemTabs;
+int SystemView::sShownColumn = 0;
+
+// The pan between a column layout's first column and its grid, eased out: it moves in the frame after the
+// press and slows down to its place
+static const int COLUMN_PAN_MS = 360;
 
 SystemView::SystemView(Window* window) : GuiComponent(window),
 	mViewNeedsReload(true),
@@ -62,6 +67,15 @@ SystemView::SystemView(Window* window) : GuiComponent(window),
 	mSuggestionEnded = nullptr;
 	mShownSystem = nullptr;
 	mContinueShownAt = 0;
+
+	mColumnLevel = 1;
+	mColumnPan = 0;
+	mColumnPanFrom = 0;
+	mColumnPanTo = 0;
+	mColumnPanTime = -1;
+	mColumnFade = 1;
+
+	BindingManager::registerGlobalProperty("homeColumn", [] { return BindableProperty(SystemView::getShownColumn()); });
 
 	setSize((float)Renderer::getScreenWidth(), (float)Renderer::getScreenHeight());
 	populate();
@@ -403,6 +417,24 @@ void SystemView::populate(bool keepExtras)
 	auto grid = mCarousel.asGrid();
 	if (grid)
 		grid->preloadTiles();
+
+	// Columns: the pan and the level shown as they were (a tab change keeps them)
+	if (hasColumns())
+	{
+		if (mColumnPanTime < 0)
+			mColumnPan = mColumnLevel == 2 ? mColumns.pan : 0;
+
+		if (sShownColumn == 0)
+			showColumnLevel(mColumnLevel);
+	}
+	else
+	{
+		mColumnPan = 0;
+		mColumnPanTime = -1;
+		sShownColumn = 0;
+		if (grid)
+			grid->setCursorShown(true);
+	}
 }
 
 void SystemView::goToSystem(SystemData* system, bool animate)
@@ -550,6 +582,52 @@ bool SystemView::input(InputConfig* config, Input input)
 	{
 		showQuickSearch();
 		return true;
+	}
+
+	// Columns: at level 1 up and down change the tab and right or A give the grid the focus; at level 2 B or
+	// left at the grid's left edge give it back, right at its right edge opens the system's games (as A does)
+	if (hasColumns() && input.value != 0)
+	{
+		auto grid = mCarousel.asGrid();
+
+		if (mColumnLevel == 1)
+		{
+			if (config->isMappedLike("up", input))
+			{
+				moveTab(-1, false);
+				return true;
+			}
+
+			if (config->isMappedLike("down", input))
+			{
+				moveTab(1, false);
+				return true;
+			}
+
+			if (config->isMappedLike("right", input) || config->isMappedTo(BUTTON_OK, input))
+			{
+				setColumnLevel(2, true);
+				return true;
+			}
+
+			if (config->isMappedLike("left", input))
+				return true;
+		}
+		else if (grid != nullptr)
+		{
+			if (config->isMappedTo(BUTTON_BACK, input) || (config->isMappedLike("left", input) && grid->getCursorColumn() == 0))
+			{
+				setColumnLevel(1, true);
+				return true;
+			}
+
+			if (config->isMappedLike("right", input) && (grid->getCursorColumn() == grid->getColumnCount() - 1 || mCarousel.getCursorIndex() == mCarousel.size() - 1))
+			{
+				mCarousel.stopScrolling();
+				ViewController::get()->goToGameList(getSelected());
+				return true;
+			}
+		}
 	}
 
 	// Tabs: L1/R1 show the previous or next tab
@@ -815,6 +893,18 @@ void SystemView::showNavigationBar(const std::string& title, const std::function
 
 void SystemView::update(int deltaTime)
 {
+	// The pan between the columns
+	if (mColumnPanTime >= 0)
+	{
+		mColumnPanTime += deltaTime;
+
+		float t = Math::min(1.0f, (float)mColumnPanTime / (float)COLUMN_PAN_MS);
+		mColumnPan = Math::lerp(mColumnPanFrom, mColumnPanTo, Math::easeOutCubic(t));
+
+		if (t >= 1.0f)
+			mColumnPanTime = -1;
+	}
+
 	prepareOtherTabs();
 
 	// A system's slides and suggestions, made off the UI thread, arrived: its card and the panel bind them
@@ -1138,6 +1228,16 @@ void SystemView::render(const Transform4x4f& parentTrans)
 	if (!Renderer::isVisibleOnScreen(rect))
 		return;
 
+	// Columns: the view's content pans; its background and header stay in place
+	bool columns = hasColumns();
+	Transform4x4f panned = trans;
+	if (columns && mColumnPan != 0)
+		panned.translate(Vector3f(-mColumnPan, 0, 0));
+
+	Transform4x4f screen = ViewController::get()->getScreenTransform();
+	if (columns)
+		renderInPlace(screen, ColumnLayout::BACKGROUND);
+
 	auto carouselZindex = mCarousel.getZIndex();
 	auto systemInfoZIndex = mSystemInfo.getZIndex();
 	auto minMax = std::minmax(carouselZindex, systemInfoZIndex);
@@ -1145,21 +1245,118 @@ void SystemView::render(const Transform4x4f& parentTrans)
 	renderExtras(trans, INT16_MIN, minMax.first);
 
 	for (auto sb : mStaticBackgrounds)
-		sb->render(trans);
+		renderExtra(sb, trans);
 
 	if (mCarousel.getZIndex() > mSystemInfo.getZIndex())
-		renderInfoBar(trans);	
+		renderInfoBar(panned);	
 	else
-		renderCarousel(trans);
+		renderCarousel(panned);
 
 	renderExtras(trans, minMax.first, minMax.second);
 
 	if (mCarousel.getZIndex() > mSystemInfo.getZIndex())
-		renderCarousel(trans);	
+		renderCarousel(panned);	
 	else
-		renderInfoBar(trans);
+		renderInfoBar(panned);
 
 	renderExtras(trans, minMax.second, INT16_MAX);
+
+	if (columns)
+		renderInPlace(screen, ColumnLayout::HEADER);
+}
+
+ColumnLayout::Role SystemView::columnRole(GuiComponent* extra)
+{
+	// The shared column: the screen's right part at level 2 (what the game list leaves of the screen), past the
+	// first column and the grid
+	float right = mColumns.pan + Renderer::getScreenWidth();
+	float left = mColumns.hasSlide() ? mColumns.pan + mColumns.slide : right;
+	return mColumns.roleOf(extra, left, right);
+}
+
+// An extra as the columns draw it: panned with the view (the header and the background are drawn in place by
+// render), the shared column at the slide's fade
+void SystemView::renderExtra(GuiComponent* extra, const Transform4x4f& trans)
+{
+	if (!hasColumns())
+	{
+		extra->render(trans);
+		return;
+	}
+
+	auto role = columnRole(extra);
+	if (role == ColumnLayout::BACKGROUND || role == ColumnLayout::HEADER)
+		return;
+
+	Transform4x4f panned = trans;
+	if (mColumnPan != 0)
+		panned.translate(Vector3f(-mColumnPan, 0, 0));
+
+	ColumnLayout::renderAt(extra, panned, ColumnLayout::opacityOf(role, mColumnFade, false));
+}
+
+// The selected system's background (never faded: the game list's fades over it) or header, in place
+void SystemView::renderInPlace(const Transform4x4f& screen, ColumnLayout::Role role)
+{
+	int cursor = mCarousel.getCursorIndex();
+	if (cursor < 0 || cursor >= (int)mEntries.size())
+		return;
+
+	for (auto sb : mStaticBackgrounds)
+		if (sb->isVisible() && columnRole(sb) == role)
+			ColumnLayout::renderAt(sb, screen, ColumnLayout::opacityOf(role, mColumnFade, false));
+
+	for (auto extra : mEntries[cursor].backgroundExtras)
+		if (extra->isVisible() && columnRole(extra) == role)
+			ColumnLayout::renderAt(extra, screen, ColumnLayout::opacityOf(role, mColumnFade, false));
+}
+
+bool SystemView::hasColumns()
+{
+	return mColumns.pan > 0 && hasTabs();
+}
+
+void SystemView::setColumnLevel(int level, bool animate)
+{
+	if (!hasColumns())
+		return;
+
+	level = level == 2 ? 2 : 1;
+	float target = level == 2 ? mColumns.pan : 0;
+
+	mColumnLevel = level;
+
+	if (!animate || Settings::PowerSaverMode() == "instant")
+	{
+		mColumnPan = target;
+		mColumnPanTime = -1;
+		showColumnLevel(level);
+		return;
+	}
+
+	if (mColumnPan == target && mColumnPanTime < 0)
+	{
+		showColumnLevel(level);
+		return;
+	}
+
+	// The theme and the grid's cursor show the new level at once, the pan follows
+	mColumnPanFrom = mColumnPan;
+	mColumnPanTo = target;
+	mColumnPanTime = 0;
+	showColumnLevel(level);
+}
+
+// The level the theme ({global:homeColumn}) and the grid's cursor show
+void SystemView::showColumnLevel(int level)
+{
+	sShownColumn = level;
+
+	auto grid = mCarousel.asGrid();
+	if (grid != nullptr)
+		grid->setCursorShown(level == 2);
+
+	updateExtraTextBinding();
 }
 
 std::vector<HelpPrompt> SystemView::getHelpPrompts()
@@ -1229,6 +1426,7 @@ void  SystemView::getViewElements(const std::shared_ptr<ThemeData>& theme)
 	LOG(LogDebug) << "SystemView::getViewElements()";
 
 	mTabDefinition = theme->getVariable("systemtabs");
+	mColumns.read(theme);
 
 	const ThemeData::ThemeElement* textListElem = theme->getElement("system", "textlist", "textlist");
 	if (textListElem)
@@ -1460,13 +1658,16 @@ void SystemView::applyTabGrid()
 	mGridElement = element;
 }
 
-void SystemView::moveTab(int direction)
+void SystemView::moveTab(int direction, bool wrap)
 {
 	int count = (int)mTabs.size();
 	int tab = mActiveTab;
 
 	for (int i = 0; i < count; i++)
 	{
+		if (!wrap && (tab + direction < 0 || tab + direction >= count))
+			return;
+
 		tab = (tab + direction + count) % count;
 		if (!mTabs[tab].systems.empty())
 			break;
@@ -1672,23 +1873,23 @@ void SystemView::renderExtras(const Transform4x4f& trans, float lower, float upp
 				if (allPaths.find(value) == allPaths.cend())
 				{
 					if (extra->getTag() == "background" || extra->getTag().find("bg-") == 0 || extra->getTag().find("bg_") == 0)
-						extra->render(trans);
+						renderExtra(extra, trans);
 					else
 					{
 						auto opa = extra->getOpacity();
 						extra->setOpacity(mExtrasFadeOpacity * opa);
-						extra->render(trans);
+						renderExtra(extra, trans);
 						extra->setOpacity(opa);
 					}
 				}
 				else if (extra->isKindOf<ImageComponent>() && ((ImageComponent*)extra)->isTiled() && extra->getPosition() == Vector3f::Zero() && extra->getSize() == Vector2f(Renderer::getScreenWidth(), Renderer::getScreenHeight()))
-					extra->render(trans);
+					renderExtra(extra, trans);
 			}
 			else if (extra->isKindOf<TextComponent>() && allValues.find(value) == allValues.cend())
 			{
 				auto opa = extra->getOpacity();
 				extra->setOpacity(mExtrasFadeOpacity * opa);
-				extra->render(trans);
+				renderExtra(extra, trans);
 				extra->setOpacity(opa);
 			}
 		}
@@ -1776,7 +1977,7 @@ void SystemView::renderExtras(const Transform4x4f& trans, float lower, float upp
 					{
 						auto opa = extra->getOpacity();
 						extra->setOpacity((1.0f - mExtrasFadeOpacity) * opa);
-						extra->render(extra->isStaticExtra() ? trans : xt);
+						renderExtra(extra, extra->isStaticExtra() ? trans : xt);
 						extra->setOpacity(opa);
 						continue;
 					}
@@ -1784,7 +1985,7 @@ void SystemView::renderExtras(const Transform4x4f& trans, float lower, float upp
 					{
 						auto opa = extra->getOpacity();
 						extra->setOpacity((1.0f - mExtrasFadeOpacity) * opa);
-						extra->render(extra->isStaticExtra() ? trans : extrasTrans);
+						renderExtra(extra, extra->isStaticExtra() ? trans : extrasTrans);
 						extra->setOpacity(opa);
 						continue;
 					}
@@ -1793,7 +1994,7 @@ void SystemView::renderExtras(const Transform4x4f& trans, float lower, float upp
 				{
 					auto opa = extra->getOpacity();
 					extra->setOpacity((1.0f - mExtrasFadeOpacity) * opa);
-					extra->render(extra->isStaticExtra() ? trans : extrasTrans);
+					renderExtra(extra, extra->isStaticExtra() ? trans : extrasTrans);
 					extra->setOpacity(opa);
 					continue;
 				}
@@ -1826,13 +2027,13 @@ void SystemView::renderExtras(const Transform4x4f& trans, float lower, float upp
 					popClip = true;
 				}
 
-				extra->render(trans);
+				renderExtra(extra, trans);
 
 				if (popClip)
 					Renderer::popClipRect();
 			}
 			else
-				extra->render(extrasTrans);
+				renderExtra(extra, extrasTrans);
 		}
 
 		Renderer::popClipRect();

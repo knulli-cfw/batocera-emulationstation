@@ -765,6 +765,40 @@ separated by `,`:
   include can redefine the items of a theme's grid. Without `replace="true"` the first template stays the one used,
   as before.
 
+##### Columns (tabbed system grid)
+
+A tabbed grid can be laid out as columns that slide sideways, with three theme variables, each a fraction of
+the screen (none or 0: no columns):
+
+```xml
+<variables>
+	<esColumnPan>0.3125</esColumnPan>		<!-- the first column's width -->
+	<esColumnSlide>0.6875</esColumnSlide>	<!-- how far right of the home a game list opens -->
+	<esColumnHeader>0.0542</esColumnHeader>	<!-- the band at the top that stays in place -->
+</variables>
+```
+
+* The system view is laid out wider than the screen: a first column at the left (`esColumnPan` wide, the tabs
+  drawn by the theme with `{system:tab}`), the grid after it and a last column past the screen's right edge.
+* Level 1: the first column has the focus. Up and down show the previous or next tab (without wrapping) and
+  the grid follows at once; right or A give the grid the focus.
+* Level 2: the grid has the focus and the view pans left by `esColumnPan`, eased out (360 ms). B, or left
+  in the grid's first column, give the focus back to the first column (the view pans back). Right in the
+  grid's last column (or on its last item) opens the system's games, as A does. L1/R1 still change the tab.
+* `{global:homeColumn}` is the level shown (1 or 2; 0 without columns), switched as the pan starts, for
+  what the theme draws differently (the tabs framed while they have the focus, say). While the grid does not
+  have the focus, its selected item shows as the others (its `deactivate` storyboards), then plays the item
+  template's `unfocus` storyboards (a lighter border on the remembered item, say).
+* A game list opens `esColumnSlide` to the right of the home at level 2: both slide left by it (360 ms, eased
+  out), so the home's last column and the list's first share what is left of the screen. There the leaving
+  view's elements fade out over the first 35 % of the way and the coming one's fade in from 30 to 70 %. B, or
+  left in the game grid's first column, slide back; L1/R1 slide back to the previous or next tab.
+* Which part of the views an element is comes from where the theme puts it: a full-screen element is the
+  background (it stays in place; a game list's fades in and out over the home's), one inside the top
+  `esColumnHeader` band stays in place and fades with the shared column (a status line), one that starts in
+  the shared column fades, the rest slides.
+* With the power saver's instant mode there is no pan and no slide.
+
 ##### Slides (system grid)
 
 `{system:slides}` lists a system's captures, one path per line, for a `slideshow` in the grid's item template

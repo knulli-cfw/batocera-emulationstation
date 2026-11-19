@@ -18,6 +18,7 @@
 #include <unordered_set>
 
 #include "SystemViewControlWrapper.h"
+#include "views/ColumnLayout.h"
 
 class AnimatedImageComponent;
 class SystemData;
@@ -82,6 +83,19 @@ public:
 	// Binds the selected system's extras again (its counts or last game changed)
 	void refreshBindings() { updateExtraTextBinding(); }
 
+	// Columns (ColumnLayout, a tabbed grid only): level 1, the first column (the tabs) has the focus; level 2,
+	// the grid. The view pans between them; a game list opens beside level 2.
+	bool	hasColumns();
+	int		getColumnLevel() { return mColumnLevel; }
+	void	setColumnLevel(int level, bool animate);
+	// L1 or R1 from a game list: the previous or next tab
+	void	changeTab(int direction) { if (hasTabs()) moveTab(direction); }
+	const ColumnLayout& getColumnLayout() { return mColumns; }
+	// The opacity of the header and the shared column while a game list slides in or out (1 at rest)
+	void	setColumnFade(float fade) { mColumnFade = fade; }
+	// The level the theme shows, {global:homeColumn}: 0 without columns
+	static int getShownColumn() { return sShownColumn; }
+
 protected:
 	//virtual void onCursorChanged(const CursorState& state) override;
 	void onCursorChanged(const CursorState& state);
@@ -120,7 +134,12 @@ private:
 	bool	 hasTabs();
 	bool	 buildTabs();
 	void	 applyTabGrid();
-	void	 moveTab(int direction);
+	void	 moveTab(int direction, bool wrap = true);
+
+	void	 showColumnLevel(int level);
+	void	 renderExtra(GuiComponent* extra, const Transform4x4f& trans);
+	void	 renderInPlace(const Transform4x4f& screen, ColumnLayout::Role role);
+	ColumnLayout::Role columnRole(GuiComponent* extra);
 	bool	 onContinueVideoEnded(SystemData* system);
 
 	void	 renderCarousel(const Transform4x4f& parentTrans);
@@ -179,6 +198,15 @@ private:
 	std::map<SystemData*, std::vector<GuiComponent*>> mParkedExtras;
 
 	static std::map<std::string, int>	sSystemTabs;
+
+	ColumnLayout						mColumns;
+	int									mColumnLevel;
+	float								mColumnPan;		// drawn, in pixels
+	float								mColumnPanFrom;
+	float								mColumnPanTo;
+	int									mColumnPanTime;	// ms into the pan, -1 at rest
+	float								mColumnFade;
+	static int							sShownColumn;
 };
 
 #endif // ES_APP_VIEWS_SYSTEM_VIEW_H

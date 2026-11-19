@@ -3,6 +3,7 @@
 #define ES_APP_VIEWS_GAME_LIST_IGAME_LIST_VIEW_H
 
 #include "renderers/Renderer.h"
+#include "views/ColumnLayout.h"
 #include "FileData.h"
 #include "GuiComponent.h"
 
@@ -13,7 +14,7 @@ class Window;
 class IGameListView : public GuiComponent
 {
 public:
-	IGameListView(Window* window, FolderData* root) : GuiComponent(window), mRoot(root)
+	IGameListView(Window* window, FolderData* root) : GuiComponent(window), mRoot(root), mColumnFade(1.0f)
 		{ setSize((float)Renderer::getScreenWidth(), (float)Renderer::getScreenHeight()); }
 
 	virtual ~IGameListView() {}
@@ -48,10 +49,18 @@ public:
 
 	virtual void repopulate() = 0;
 
+	// Columns (ColumnLayout): the opacity of the header, the background and the shared column while the view
+	// slides in or out beside the home (1 at rest)
+	void setColumnFade(float fade) { mColumnFade = fade; }
+	const ColumnLayout& getColumnLayout() { return mColumns; }
+
 protected:
 	FolderData* mRoot;
 	std::shared_ptr<ThemeData> mTheme;
 	std::string mCustomThemeName;
+
+	ColumnLayout mColumns;
+	float mColumnFade;
 };
 
 #endif // ES_APP_VIEWS_GAME_LIST_IGAME_LIST_VIEW_H
