@@ -18,6 +18,7 @@
 #include "ThemeData.h"
 #include <mutex>
 #include "components/AsyncNotificationComponent.h"
+#include "components/PostProcessShaderComponent.h"
 #include "components/ControllerActivityComponent.h"
 #include "components/BatteryIndicatorComponent.h"
 #include "guis/GuiMsgBox.h"
@@ -138,7 +139,8 @@ bool Window::init(bool initRenderer, bool initInputManager)
 		mDefaultFonts.push_back(Font::get(FONT_SIZE_LARGE));
 	}
 
-	mBackgroundOverlay->setImage(":/scroll_gradient.png");
+	// The theme's fade behind menus (init runs again after each game): the built-in one until a theme sets one
+	mBackgroundOverlay->setImage(ThemeData::getMenuTheme()->Background.fadePath);
 	mBackgroundOverlay->setResize((float)Renderer::getScreenWidth(), (float)Renderer::getScreenHeight());
 
 	if (mClock == nullptr)
@@ -779,8 +781,13 @@ void Window::render()
 
 	if (!mRenderScreenSaver)
 	{
+		// A full-screen menu covers the screen's extras (a status bar), as ES's own clock and battery; a
+		// screen shader still applies
+		bool menuOver = mGuiStack.size() > 1 && Renderer::ScreenSettings::fullScreenMenus();
+
 		for (auto extra : mScreenExtras)
-			extra->render(transform);
+			if (!menuOver || extra->isKindOf<PostProcessShaderComponent>())
+				extra->render(transform);
 	}
 
 	if (mVolumeInfo && Settings::VolumePopup())
