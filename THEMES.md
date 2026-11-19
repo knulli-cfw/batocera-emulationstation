@@ -839,7 +839,7 @@ ES versions with slides support the feature `slideshow`.
 	- The tiles of a menu's image grid (the save states)
 * `menuKeyboard name="menukeyboard"` - PATH | FOCUSEDPATH | ACTIVEPATH | CORNERSIZE | SPACING | FONTPATH | FONTSIZE | COLOR | SELECTEDCOLOR | WORDKEYS | FOCUSKEYS
 	- The on-screen keyboard's keys
-* `menuText name="menutext"` - FONTPATH | FONTSIZE | COLOR
+* `menuText name="menutext"` - FONTPATH | FONTSIZE | COLOR | ROWHEIGHT | ROWPADDING | ICONSIZE | FULLROWS
 	- text for all menu entries
 * `menuText name="menutitle"` - FONTPATH | FONTSIZE | COLOR
 	- text for menu titles
@@ -1434,6 +1434,14 @@ BATOCERA 5.24
 	- Default is 878787FF. Color of the selector bar.
 * `selectorColorEnd` - type: NORMALIZED_PAIR. 
     - Bottom color for the gradient of the "selector bar."
+* `rowHeight` - type: FLOAT. (`menutext` only)
+	- A list row's least height, as a fraction of the screen height (groups keep their own). Default: the row's content.
+* `rowPadding` - type: FLOAT. (`menutext` only)
+	- The margin left and right inside list rows, as a fraction of the screen width. Default is 10 pixels.
+* `iconSize` - type: FLOAT. (`menutext` only)
+	- The height of the rows' icons (menuIcons), as a fraction of the screen height. Default: 1.25 times the text's letter height.
+* `fullRows` - type: BOOLEAN. (`menutext` only)
+	- Lists show whole rows only: they scroll by rows and leave out a row they cannot show whole. Default is false.
 	
 
 #### menuSwitch

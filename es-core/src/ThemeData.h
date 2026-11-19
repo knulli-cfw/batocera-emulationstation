@@ -172,6 +172,15 @@ struct ButtonElement
 	Vector2f	cornerSize;
 };
 
+// The rows of menu lists (menutext rowHeight, rowPadding, iconSize, fullRows)
+struct MenuRowElement
+{
+	float height;	// a row's least height, in pixels; 0: its content's
+	float padding;	// the margin left and right inside a row, in pixels
+	float iconSize;	// pixels; 0: 1.25 times the text's letter height
+	bool fullRows;	// lists show whole rows only
+};
+
 // The text field of the on-screen keyboard and of other text popups (menuTextEdit)
 struct TextEditElement
 {
@@ -221,6 +230,7 @@ public:
 		IconElement Icons { ":/on.svg", ":/off.svg", ":/auto.svg", ":/option_arrow.svg", ":/arrow.svg", ":/slider_knob.svg", ":/textinput_ninepatch.png", ":/textinput_ninepatch_active.png" };
 		ButtonElement Button { ":/button.png", ":/button_filled.png", Vector2f(16,16) };
 		TextEditElement TextEdit { nullptr, 0 };
+		MenuRowElement Row { 0.0f, 10.0f, 0.0f, false };
 		TileElement Tile { "", "", Vector2f(16, 16) };
 		KeyboardElement Keyboard { "", "", "", Vector2f(16, 16), 0.0f, 0xFFFFFFFF, 0xFFFFFFFF, nullptr, false, false };
 

@@ -97,7 +97,7 @@ void MenuComponent::addMenuIcon(Window* window, ComponentListRow& row, const std
 		auto icon = std::make_shared<ImageComponent>(window, true);
 		icon->setImage(iconPath);
 		icon->setColorShift(theme->Text.color);
-		icon->setResize(0, theme->Text.font->getLetterHeight() * 1.25f);
+		icon->setResize(0, theme->Row.iconSize > 0 ? theme->Row.iconSize : theme->Text.font->getLetterHeight() * 1.25f);
 		row.addElement(icon, false);
 
 		// spacer between icon and text

@@ -634,6 +634,10 @@ std::map<std::string, std::map<std::string, ThemeData::ElementPropertyType>> The
 	{ "menuText", {
 		{ "fontPath", PATH },
 		{ "fontSize", FLOAT },
+		{ "rowHeight", FLOAT },
+		{ "rowPadding", FLOAT },
+		{ "iconSize", FLOAT },
+		{ "fullRows", BOOLEAN },
 		{ "separatorColor", COLOR },
 		{ "selectorColor", COLOR },
 		{ "selectorColorEnd", COLOR },
@@ -2447,6 +2451,15 @@ ThemeData::ThemeMenu::ThemeMenu(ThemeData* theme)
 			Text.selectorGradientColor = elem->get<unsigned int>("selectorColorEnd");
 		if (elem->has("selectorGradientType"))
 			Text.selectorGradientType = (elem->get<std::string>("selectorGradientType").compare("horizontal"));
+
+		if (elem->has("rowHeight"))
+			Row.height = elem->get<float>("rowHeight") * Renderer::getScreenHeight();
+		if (elem->has("rowPadding"))
+			Row.padding = elem->get<float>("rowPadding") * Renderer::getScreenWidth();
+		if (elem->has("iconSize"))
+			Row.iconSize = elem->get<float>("iconSize") * Renderer::getScreenHeight();
+		if (elem->has("fullRows"))
+			Row.fullRows = elem->get<bool>("fullRows");
 	}
 
 

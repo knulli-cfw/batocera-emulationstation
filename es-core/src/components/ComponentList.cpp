@@ -8,7 +8,8 @@
 #include "components/OptionListComponent.h"
 #include "InputManager.h"
 
-#define TOTAL_HORIZONTAL_PADDING_PX 20
+// The margin left and right inside a row: the theme's (menutext rowPadding), else 10 pixels
+static float rowPadding() { return ThemeData::getMenuTheme()->Row.padding; }
 
 ComponentList::ComponentList(Window* window) : IList<ComponentListRow, std::string>(window, LIST_SCROLL_STYLE_SLOW, LIST_NEVER_LOOP), mScrollbar(window)
 {
@@ -88,7 +89,7 @@ void ComponentList::addGroup(const std::string& label, bool forceVisible)
 		group->setRenderBackground(true);
 
 	group->setLineSpacing(theme->Group.lineSpacing);
-	group->setPadding(Vector4f(TOTAL_HORIZONTAL_PADDING_PX / 2, 0, TOTAL_HORIZONTAL_PADDING_PX / 2, 0));
+	group->setPadding(Vector4f(rowPadding(), 0, rowPadding(), 0));
 
 	row.addElement(group, true);
 	row.selectable = false;
@@ -305,13 +306,62 @@ void ComponentList::updateCameraOffset()
 			i++;
 		}
 
-		if(mCameraOffset < 0)
+		if (ThemeData::getMenuTheme()->Row.fullRows)
+		{
+			// Whole rows only (menutext fullRows): the camera stays on a row's top, never past the first row
+			// from which the rest fits, and the cursor's row is whole
+			float last = 0;
+			for (unsigned int j = 0; j < mEntries.size() && totalHeight - last > mSize.y(); j++)
+				last += getRowHeight(mEntries.at(j).data);
+
+			if (mCameraOffset > last)
+				mCameraOffset = last;
+
+			const float cursorTop = mSelectorBarOffset;
+			const float cursorBottom = cursorTop + getRowHeight(mEntries.at(mCursor).data);
+			if (mCameraOffset > cursorTop)
+				mCameraOffset = cursorTop;
+
+			float top = 0;
+			for (unsigned int j = 0; j < mEntries.size() && cursorBottom > mCameraOffset + mSize.y() && top < cursorTop; j++)
+			{
+				top += getRowHeight(mEntries.at(j).data);
+				if (top > mCameraOffset)
+					mCameraOffset = top;
+			}
+		}
+		else if(mCameraOffset < 0)
 			mCameraOffset = 0;
 		else if(mCameraOffset + mSize.y() > totalHeight)
 			mCameraOffset = totalHeight - mSize.y();
 	}
 	else
 		mCameraOffset = 0;
+}
+
+// The height a list shows: all of it, or with whole rows only, down to the last whole row under the camera
+float ComponentList::getShownHeight() const
+{
+	if (!ThemeData::getMenuTheme()->Row.fullRows)
+		return mSize.y();
+
+	float y = 0;
+	float shown = 0;
+	for (auto& entry : mEntries)
+	{
+		float h = getRowHeight(entry.data);
+		if (y >= mCameraOffset - 0.5f)
+		{
+			if (y + h - mCameraOffset > mSize.y() + 0.5f)
+				break;
+
+			shown = y + h - mCameraOffset;
+		}
+
+		y += h;
+	}
+
+	return shown;
 }
 
 void ComponentList::render(const Transform4x4f& parentTrans)
@@ -331,8 +381,8 @@ void ComponentList::render(const Transform4x4f& parentTrans)
 
 	Transform4x4f trans = parentTrans * getTransform();
 
-	// clip everything to be inside our bounds
-	Vector3f dim(mSize.x(), mSize.y(), 0);
+	// clip everything to be inside our bounds (with whole rows only, to the last whole row)
+	Vector3f dim(mSize.x(), getShownHeight(), 0);
 	dim = trans * dim - trans.translation();
 
 	Renderer::pushClipRect(trans.translation().x(), trans.translation().y(), Math::round(dim.x()), Math::round(dim.y() + 1));
@@ -460,7 +510,7 @@ float ComponentList::getRowHeight(const ComponentListRow& row) const
 	if (sz == 0)
 		return 0;
 	else if (sz == 1)
-		return row.elements[0].component->getSize().y();
+		return row.group ? row.elements[0].component->getSize().y() : Math::max(row.elements[0].component->getSize().y(), ThemeData::getMenuTheme()->Row.height);
 
 	// returns the highest component height found in the row
 	float height = 0;
@@ -472,7 +522,7 @@ float ComponentList::getRowHeight(const ComponentListRow& row) const
 			height = h;
 	}
 
-	return height;
+	return row.group ? height : Math::max(height, ThemeData::getMenuTheme()->Row.height);
 }
 
 float ComponentList::getTotalRowHeight() const
@@ -496,7 +546,7 @@ void ComponentList::updateElementPosition(const ComponentListRow& row, float yOf
 	// assumes updateElementSize has already been called
 	float rowHeight = getRowHeight(row);
 
-	float x = row.selectable ? TOTAL_HORIZONTAL_PADDING_PX / 2 : 0;
+	float x = row.selectable ? rowPadding() : 0;
 	for(unsigned int i = 0; i < row.elements.size(); i++)
 	{
 		const auto comp = row.elements.at(i).component;
@@ -509,7 +559,7 @@ void ComponentList::updateElementPosition(const ComponentListRow& row, float yOf
 
 void ComponentList::updateElementSize(const ComponentListRow& row)
 {
-	float width = mSize.x() - (row.selectable ? TOTAL_HORIZONTAL_PADDING_PX : 0);
+	float width = mSize.x() - (row.selectable ? 2 * rowPadding() : 0);
 	std::vector< std::shared_ptr<GuiComponent> > resizeVec;
 
 	for(auto it = row.elements.cbegin(); it != row.elements.cend(); it++)
