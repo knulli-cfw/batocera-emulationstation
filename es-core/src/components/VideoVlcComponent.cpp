@@ -123,6 +123,14 @@ namespace
 			return worker;
 		}
 
+		// The players' stops, on their own: VLC's stop waits for its threads (a quarter of a second on the
+		// console), and the next card's video need not wait behind it
+		static PlayerWorker* stops()
+		{
+			static PlayerWorker* worker = new PlayerWorker();
+			return worker;
+		}
+
 		// false when the worker already has max tasks waiting (one stuck): the task is not taken
 		bool post(const std::function<void()>& task, size_t max = 0)
 		{
@@ -205,7 +213,7 @@ namespace
 
 	void stopOnWorker(libvlc_media_player_t* player, std::shared_ptr<VideoContext> context)
 	{
-		PlayerWorker::players()->post([player, context]
+		PlayerWorker::stops()->post([player, context]
 		{
 			libvlc_media_player_stop(player);
 			libvlc_media_player_release(player);
@@ -959,6 +967,7 @@ bool VideoVlcComponent::waitForPlayers(int ms)
 {
 	int start = SDL_GetTicks();
 	bool done = PlayerWorker::players()->drain(ms);
+	done = PlayerWorker::stops()->drain(std::max(1, ms - (int)(SDL_GetTicks() - start))) && done;
 	if (done)
 		LOG(LogDebug) << "VideoVlcComponent: players stopped in " << (SDL_GetTicks() - start) << " ms";
 	else
