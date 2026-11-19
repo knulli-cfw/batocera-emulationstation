@@ -43,13 +43,28 @@ GuiSaveState::GuiSaveState(Window* window, FileData* game, const std::function<v
 	float sh = (float)Math::min(Renderer::getScreenHeight(), Renderer::getScreenWidth());
 	sh = (float) theme->TextSmall.font->getSize() / sh;
 
+	// A theme's tiles (menuTile): its images as drawn, the selected one by its own image (a border, not a
+	// fill), 8 px between tiles; else the stock tiles, the selected one filled with the selector's colour
+	auto& tile = theme->Tile;
+	bool themedTiles = !tile.path.empty();
+
+	std::string gridSpacing = themedTiles ? "  <margin>8 0</margin>  <padding>4 6 4 6</padding>" : "  <margin>0.01 0.02</margin>  <padding>0 0</padding>";
+	std::string tileBackground = themedTiles ?
+		"  <backgroundImage>" + tile.path + "</backgroundImage>"
+		"  <backgroundCornerSize>" + std::to_string(tile.cornerSize.x()) + " " + std::to_string(tile.cornerSize.y()) + "</backgroundCornerSize>"
+		"  <backgroundColor>FFFFFFFF</backgroundColor>" :
+		"  <backgroundColor>FFFFFF00</backgroundColor>";
+	std::string selectedBackground = themedTiles ?
+		"  <backgroundImage>" + tile.selectedPath + "</backgroundImage>"
+		"  <backgroundColor>FFFFFFFF</backgroundColor>" :
+		"  <backgroundColor>" + Utils::String::toHexString(theme->Text.selectorColor) + "</backgroundColor>";
+
 	std::string xml =
 		"<theme defaultView=\"Tiles\">"
 		"<formatVersion>7</formatVersion>"
 		"<view name = \"grid\">"
 		"<imagegrid name=\"gamegrid\">"
-		"  <margin>0.01 0.02</margin>"
-		"  <padding>0 0</padding>"
+		+ gridSpacing +
 		"  <scrollDirection>horizontal</scrollDirection>"
 		"  <autoLayout>" + std::to_string(slots * screenProportion / cellProportion) +" 1</autoLayout>"
 		"  <autoLayoutSelectedZoom>1</autoLayoutSelectedZoom>"
@@ -57,12 +72,12 @@ GuiSaveState::GuiSaveState(Window* window, FileData* game, const std::function<v
 		"  <centerSelection>false</centerSelection>"		
 		"</imagegrid>"		
 		"<gridtile name=\"default\">"
-		"  <backgroundColor>FFFFFF00</backgroundColor>"
+		+ tileBackground +
 		"  <padding>8 8</padding>"
 		"  <imageColor>FFFFFFFF</imageColor>"
 		"</gridtile>"		
 		"<gridtile name=\"selected\">"
-		"  <backgroundColor>" + Utils::String::toHexString(theme->Text.selectorColor) + "</backgroundColor>"
+		+ selectedBackground +
 		"</gridtile>"
 		"<text name=\"gridtile\">"
 		"  <color>" + Utils::String::toHexString(theme->Text.color) + "</color>"
@@ -122,13 +137,18 @@ void GuiSaveState::loadGrid()
 		});
 
 
-	mGrid->add(_("START NEW GAME"), ":/freeslot.svg", SaveStateItem(mRepository->getDefaultNewGameSaveState()));
+	// The theme's icons for a new game and a new autosave (menuIcons iconNewGame, iconAutoSave)
+	auto theme = ThemeData::getMenuTheme();
+	std::string newGameIcon = theme->getMenuIcon("iconNewGame");
+	std::string autoSaveIcon = theme->getMenuIcon("iconAutoSave");
+
+	mGrid->add(_("START NEW GAME"), newGameIcon.empty() ? ":/freeslot.svg" : newGameIcon, SaveStateItem(mRepository->getDefaultNewGameSaveState()));
 
 	if (mRepository->supportsAutoSave() && mGame->getCurrentGameSetting("autosave") == "1")
 	{
 		auto autoSave = std::find_if(states.cbegin(), states.cend(), [](SaveState* x) { return x->slot == -1; });
 		if (autoSave == states.cend())
-			mGrid->add(_("START NEW AUTO SAVE"), ":/freeslot.svg", SaveStateItem(mRepository->getDefaultAutoSaveSaveState()));
+			mGrid->add(_("START NEW AUTO SAVE"), autoSaveIcon.empty() ? ":/freeslot.svg" : autoSaveIcon, SaveStateItem(mRepository->getDefaultAutoSaveSaveState()));
 	}
 
 	for (auto item : states)

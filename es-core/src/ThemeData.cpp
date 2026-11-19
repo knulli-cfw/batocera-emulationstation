@@ -683,6 +683,10 @@ std::map<std::string, std::map<std::string, ThemeData::ElementPropertyType>> The
 		{ "fontPath", PATH },
 		{ "fontSize", FLOAT },
 		{ "caretColor", COLOR } } },
+	{ "menuTile",{
+		{ "path", PATH },
+		{ "selectedPath", PATH },
+		{ "cornerSize", NORMALIZED_PAIR } } },
 	{ "menuKeyboard",{
 		{ "path", PATH },
 		{ "focusedPath", PATH },
@@ -2498,6 +2502,17 @@ ThemeData::ThemeMenu::ThemeMenu(ThemeData* theme)
 			TextEdit.font = Font::getFromTheme(elem, ThemeFlags::ALL, Font::get(FONT_SIZE_MEDIUM), true);
 		if (elem->has("caretColor"))
 			TextEdit.caretColor = elem->get<unsigned int>("caretColor");
+	}
+
+	elem = theme->getElement("menu", "menutile", "menuTile");
+	if (elem && elem->has("path") && elem->has("selectedPath") &&
+		ResourceManager::getInstance()->fileExists(elem->get<std::string>("path")) &&
+		ResourceManager::getInstance()->fileExists(elem->get<std::string>("selectedPath")))
+	{
+		Tile.path = elem->get<std::string>("path");
+		Tile.selectedPath = elem->get<std::string>("selectedPath");
+		if (elem->has("cornerSize"))
+			Tile.cornerSize = elem->get<Vector2f>("cornerSize");
 	}
 
 	elem = theme->getElement("menu", "menukeyboard", "menuKeyboard");

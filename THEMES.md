@@ -835,6 +835,8 @@ ES versions with slides support the feature `slideshow`.
 	- Images for menu buttons
 * `menuTextEdit name="menutextedit"` - ACTIVE | INACTIVE | FONTPATH | FONTSIZE | CARETCOLOR
 	- The text field of the on-screen keyboard and other text popups
+* `menuTile name="menutile"` - PATH | SELECTEDPATH | CORNERSIZE
+	- The tiles of a menu's image grid (the save states)
 * `menuKeyboard name="menukeyboard"` - PATH | FOCUSEDPATH | ACTIVEPATH | CORNERSIZE | SPACING | FONTPATH | FONTSIZE | COLOR | SELECTEDCOLOR | WORDKEYS | FOCUSKEYS
 	- The on-screen keyboard's keys
 * `menuText name="menutext"` - FONTPATH | FONTSIZE | COLOR
@@ -1468,6 +1470,19 @@ BATOCERA 5.24 - replace the textbox background images in OSK
   - The caret's colour, kept at full strength while the field is not edited (the on-screen keyboard types into
     it from its keys). Default: the menu text's colour, dimmed while the field is not edited.
 
+#### menuTile
+
+The tiles of a menu's image grid, the save states' (`menuTile name="menutile"`). Without `path` and `selectedPath`
+the tiles keep their stock look, the selected one filled with `menutext`'s `selectorColor`. With them the grid
+leaves 8 pixels between tiles and draws both images as they are.
+
+* `path` - type: PATH.
+  - A tile's background (ninepatch).
+* `selectedPath` - type: PATH.
+  - The selected tile's background.
+* `cornerSize` - type: NORMALIZED_PAIR.
+  - The images' corner size, in pixels. Default is `16 16`.
+
 #### menuKeyboard
 
 The on-screen keyboard's keys (`menuKeyboard name="menukeyboard"`). Without `path` and `focusedPath` the keyboard
@@ -1501,7 +1516,8 @@ keeps its stock look. The images are ninepatches drawn as they are, with no tint
 BATOCERA 5.24 - Add images to menuitems
 
 * `*` - type: PATH. 
-  - Element name must be the image name in the list : iconSystem, iconUpdates, iconControllers, iconGames, iconUI, iconSound, iconNetwork, iconScraper, iconAdvanced, iconQuit, iconRetroachievements, iconKodi, iconRestart, iconShutdown, iconFastShutdown
+  - Element name must be the image name in the list : iconSystem, iconUpdates, iconControllers, iconGames, iconUI, iconSound, iconNetwork, iconScraper, iconAdvanced, iconQuit, iconRetroachievements, iconKodi, iconRestart, iconShutdown, iconFastShutdown,
+    iconNewGame and iconAutoSave (the save states' tiles that start a new game and a new autosave)
 
 #### controllerActivity
 

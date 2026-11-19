@@ -179,6 +179,14 @@ struct TextEditElement
 	unsigned int caretColor;	// 0: the menu text's colour, dimmed while the field is not edited
 };
 
+// The tiles of a menu's image grid, the save states' (menuTile); the stock look while path is empty
+struct TileElement
+{
+	std::string path;			// a tile
+	std::string selectedPath;	// the selected tile
+	Vector2f	cornerSize;
+};
+
 // The on-screen keyboard's keys (menuKeyboard); the stock look while path is empty
 struct KeyboardElement
 {
@@ -213,6 +221,7 @@ public:
 		IconElement Icons { ":/on.svg", ":/off.svg", ":/auto.svg", ":/option_arrow.svg", ":/arrow.svg", ":/slider_knob.svg", ":/textinput_ninepatch.png", ":/textinput_ninepatch_active.png" };
 		ButtonElement Button { ":/button.png", ":/button_filled.png", Vector2f(16,16) };
 		TextEditElement TextEdit { nullptr, 0 };
+		TileElement Tile { "", "", Vector2f(16, 16) };
 		KeyboardElement Keyboard { "", "", "", Vector2f(16, 16), 0.0f, 0xFFFFFFFF, 0xFFFFFFFF, nullptr, false, false };
 
 		std::string getMenuIcon(const std::string name)
