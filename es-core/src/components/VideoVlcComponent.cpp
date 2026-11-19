@@ -9,6 +9,7 @@
 #include <vlc/vlc.h>
 #include <SDL_mutex.h>
 #include <cmath>
+#include <chrono>
 #include <condition_variable>
 #include <deque>
 #include <functional>
@@ -103,8 +104,7 @@ namespace
 	public:
 		static void post(const std::function<void()>& task)
 		{
-			// Never destroyed: the worker outlives main's statics
-			static PlayerWorker* worker = new PlayerWorker();
+			PlayerWorker* worker = get();
 
 			std::unique_lock<std::mutex> lock(worker->mLock);
 			if (!worker->mStarted)
@@ -117,8 +117,44 @@ namespace
 			worker->mWake.notify_one();
 		}
 
+		// Waits until the tasks handed over so far ran, at most ms: false when some still run
+		static bool drain(int ms)
+		{
+			PlayerWorker* worker = get();
+			{
+				std::unique_lock<std::mutex> lock(worker->mLock);
+				if (!worker->mStarted)
+					return true;
+			}
+
+			struct Done
+			{
+				std::mutex lock;
+				std::condition_variable wake;
+				bool done = false;
+			};
+
+			auto done = std::make_shared<Done>();
+			post([done]
+			{
+				std::unique_lock<std::mutex> lock(done->lock);
+				done->done = true;
+				done->wake.notify_all();
+			});
+
+			std::unique_lock<std::mutex> lock(done->lock);
+			return done->wake.wait_for(lock, std::chrono::milliseconds(ms), [done] { return done->done; });
+		}
+
 	private:
 		PlayerWorker() : mStarted(false) { }
+
+		static PlayerWorker* get()
+		{
+			// Never destroyed: the worker outlives main's statics
+			static PlayerWorker* worker = new PlayerWorker();
+			return worker;
+		}
 
 		void run()
 		{
@@ -838,6 +874,18 @@ void VideoVlcComponent::init()
 	mVLC = libvlc_new(cmdline.size(), theArgs);
 
 	delete[] theArgs;
+}
+
+bool VideoVlcComponent::waitForPlayers(int ms)
+{
+	int start = SDL_GetTicks();
+	bool done = PlayerWorker::drain(ms);
+	if (done)
+		LOG(LogDebug) << "VideoVlcComponent: players stopped in " << (SDL_GetTicks() - start) << " ms";
+	else
+		LOG(LogWarning) << "VideoVlcComponent: players still stopping after " << ms << " ms";
+
+	return done;
 }
 
 // The first frame VLC displayed: the video shows from now on

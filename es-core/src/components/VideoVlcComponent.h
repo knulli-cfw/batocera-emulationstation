@@ -70,6 +70,9 @@ class VideoVlcComponent : public VideoComponent
 
 public:
 	static void init();
+	// Waits, at most ms, until the players stopped so far released their audio and video outputs (before a
+	// game runs): false when some still stop
+	static bool waitForPlayers(int ms);
 
 	VideoVlcComponent(Window* window);
 	virtual ~VideoVlcComponent();

@@ -24,6 +24,7 @@
 #include "components/BatteryIndicatorComponent.h"
 #include "guis/GuiMsgBox.h"
 #include "components/VolumeInfoComponent.h"
+#include "components/VideoVlcComponent.h"
 #include "components/BrightnessInfoComponent.h"
 #include "Splash.h"
 #include "PowerSaver.h"
@@ -200,6 +201,9 @@ void Window::deinit(bool deinitRenderer)
 	// Hide all GUI elements on uninitialisation - this disable
 	for(auto i = mGuiStack.cbegin(); i != mGuiStack.cend(); i++)
 		(*i)->onHide();
+
+	// Their videos stop on a worker: a game run now could find the sound output still held
+	VideoVlcComponent::waitForPlayers(1500);
 
 	if (deinitRenderer)
 		InputManager::getInstance()->deinit();
