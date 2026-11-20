@@ -236,6 +236,7 @@ std::map<std::string, std::map<std::string, ThemeData::ElementPropertyType>> The
 	{ "clock", {} }, // Inherits text
 
 	{ "notification", {
+		{ "vertical", BOOLEAN },
 		{ "y", FLOAT },
 		// with a size: the info popups' look and place ("notification") or the volume and brightness meters' ("meters")
 		{ "pos", NORMALIZED_PAIR },

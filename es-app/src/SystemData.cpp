@@ -2546,6 +2546,8 @@ BindableProperty SystemData::getProperty(const std::string& name)
 		}
 	}
 
+	if (name == "alphabetical")
+		return getSortId() <= FileSorts::FILENAME_DESCENDING;
 	if (name == "prevTab" || name == "nextTab")
 		return SystemView::adjacentTabName(this, name == "prevTab" ? -1 : 1);
 	if (name == "prevConsole" || name == "nextConsole")

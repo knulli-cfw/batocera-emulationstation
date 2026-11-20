@@ -162,6 +162,7 @@ void ViewController::goToSystemView(std::string& systemName, bool forceImmediate
 
 void ViewController::goToSystemView(SystemData* system, bool forceImmediate)
 {
+	mCycleFrom.reset();
 	SystemData* dest = system;
 
 	int systemId = getSystemId(dest);
@@ -244,11 +245,36 @@ bool ViewController::goToGameList(const std::string& systemName, bool forceImmed
 	return false;
 }
 
+// Both lists stay in screen coordinates, including on category boundaries and wraparound.
+void ViewController::cycleGameList(SystemData* system, int direction)
+{
+	if (!system || mState.viewing != GAME_LIST || mState.system == system)
+		return;
+	if (mColumnSlide.list)
+	{
+		getSystemListView()->setColumnFade(1);
+		mColumnSlide.list->setColumnFade(1);
+		mColumnSlide.list.reset();
+	}
+	auto previous = getGameListView(mState.system, false);
+	goToGameList(system, true);
+	cancelAnimation(0);
+	mFadeOpacity = 0;
+	mCamera.translation() = -mCurrentView->getPosition();
+	if (Settings::PowerSaverMode() != "instant")
+	{
+		mCycleFrom = previous;
+		mCycleElapsed = 0;
+		mCycleDirection = direction;
+	}
+}
+
 void ViewController::goToGameList(SystemData* system, bool forceImmediate)
 {
 	if (system == nullptr)
 		return;
 
+	mCycleFrom.reset();
 	SystemData* destinationSystem = system;
 	FolderData* collectionFolder = nullptr;
 
@@ -664,13 +690,23 @@ void ViewController::launch(FileData* game, LaunchGameOptions options, Vector3f 
 			GuiImageViewer::showCbz(mWindow, game->getPath());
 		else if (!Utils::FileSystem::isAudio(game->getPath()))
 		{
-			auto gameImage = game->getImagePath();
+			const auto galleryImage = [](FileData* entry) -> std::string {
+				auto file = entry->getSourceFileData();
+				const auto path = file->getPath();
+				if (file->getType() != GAME || Utils::FileSystem::isVideo(path) || Utils::FileSystem::isAudio(path))
+					return {};
+				const auto ext = Utils::String::toLower(Utils::FileSystem::getExtension(path));
+				if (ext == ".pdf" || ext == ".cbz")
+					return {};
+				return Utils::FileSystem::isImage(path) || ext == ".bmp" ? path : file->getImagePath();
+			};
+			auto gameImage = galleryImage(game);
 			if (Utils::FileSystem::exists(gameImage))
 			{
-				auto imgViewer = new GuiImageViewer(mWindow);
+				auto imgViewer = new GuiImageViewer(mWindow, false, true);
 
 				for (auto sibling : game->getParent()->getChildrenListToDisplay())
-					imgViewer->add(sibling->getImagePath());
+					imgViewer->add(galleryImage(sibling));
 
 				imgViewer->setCursor(gameImage);
 				mWindow->pushGui(imgViewer);
@@ -1068,6 +1104,8 @@ void ViewController::update(int deltaTime)
 		mCurrentView->update(deltaTime);
 
 	updateColumnSlide(deltaTime);
+	if (mCycleFrom && ((mCycleElapsed += deltaTime) >= 165 || mState.viewing != GAME_LIST || mColumnSlide.list))
+		mCycleFrom.reset();
 	updateSelf(deltaTime);
 
 	if (mDeferPlayViewTransitionTo != nullptr)
@@ -1108,6 +1146,20 @@ void ViewController::render(const Transform4x4f& parentTrans)
 		Transform4x4f listTrans = parentTrans;
 		listTrans.translate(Vector3f(slide - offset, 0, 0) - mColumnSlide.list->getPosition());
 		mColumnSlide.list->render(listTrans);
+	}
+	else if (mCycleFrom && mCurrentView)
+	{
+		Transform4x4f from = parentTrans;
+		from.translate(-mCycleFrom->getPosition());
+		mCycleFrom->render(from);
+		const int w = Renderer::getScreenWidth();
+		const int reveal = Math::round(w * Math::easeOutCubic(mCycleElapsed / 165.0f));
+		if (reveal > 0)
+		{
+			Renderer::pushClipRect(Vector2i(mCycleDirection > 0 ? w - reveal : 0, 0), Vector2i(reveal, Renderer::getScreenHeight()));
+			mCurrentView->render(trans);
+			Renderer::popClipRect();
+		}
 	}
 	else if (!isAnimationPlaying(0) && mCurrentView != nullptr)
 	{

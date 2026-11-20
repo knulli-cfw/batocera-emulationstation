@@ -270,8 +270,8 @@ private:
 
 static bool g_isGuiImageViewerRunning = false;
 
-GuiImageViewer::GuiImageViewer(Window* window, bool linearSmooth) :
-	GuiComponent(window), mGrid(window), mPdfThreads(nullptr)
+GuiImageViewer::GuiImageViewer(Window* window, bool linearSmooth, bool gallery) :
+	GuiComponent(window), mGallery(gallery), mGrid(window), mPdfThreads(nullptr)
 {
 	g_isGuiImageViewerRunning = true;
 
@@ -315,6 +315,12 @@ GuiImageViewer::GuiImageViewer(Window* window, bool linearSmooth) :
 		"</view>"
 		"</theme>";
 
+	if (gallery)
+	{
+		xml = Utils::String::replace(xml, "<padding>4 4</padding>", "<padding>0 0</padding>");
+		xml = Utils::String::replace(xml, "<linearSmooth>true</linearSmooth>",
+			"<pos>0.5 0.5</pos><origin>0.5 0.5</origin><maxSize>1 1</maxSize><linearSmooth>true</linearSmooth>");
+	}
 	if (!linearSmooth)
 		xml = Utils::String::replace(xml, "<linearSmooth>true</linearSmooth>", "<linearSmooth>false</linearSmooth>");
 
@@ -325,6 +331,16 @@ GuiImageViewer::GuiImageViewer(Window* window, bool linearSmooth) :
 	mGrid.applyTheme(mTheme, "grid", "gamegrid", 0);
 
 	animateTo(Vector2f(0, Renderer::getScreenHeight()), Vector2f(0, 0));
+}
+
+void GuiImageViewer::render(const Transform4x4f& parentTrans)
+{
+	if (mGallery)
+	{
+		Renderer::setMatrix(getTransform() * parentTrans);
+		Renderer::drawRect(0, 0, mSize.x(), mSize.y(), 0x000000ff);
+	}
+	GuiComponent::render(parentTrans);
 }
 
 void GuiImageViewer::loadPdf(const std::string& imagePath)

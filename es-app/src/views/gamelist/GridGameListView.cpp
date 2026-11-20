@@ -19,7 +19,7 @@ GridGameListView::GridGameListView(Window* window, FolderData* root, const std::
 	ISimpleGameListView(window, root),
 	mGrid(window),
 	mDetails(this, &mGrid, mWindow, DetailedContainer::GridView),
-	mLetterLabel(window)
+	mLetterLabel(window), mPageProgress(window)
 {
 	// Let DetailedContainer handle extras with activation scripts
 	mExtraMode = ThemeData::ExtraImportType::WITHOUT_ACTIVATESTORYBOARD;
@@ -45,6 +45,8 @@ GridGameListView::GridGameListView(Window* window, FolderData* root, const std::
 	mLetterLabel.setZIndex(150);
 	mLetterLabel.setVisible(false);
 	addChild(&mLetterLabel);
+	mPageProgress.setVisible(false);
+	addChild(&mPageProgress);
 	
 	if (!themeName.empty())
 		setThemeName(themeName);
@@ -125,7 +127,15 @@ bool GridGameListView::input(InputConfig* config, Input input)
 	if (mColumns.hasSlide() && !mPopupSelfReference &&
 	    (config->isMappedTo("l2", input) || config->isMappedTo("r2", input)))
 	{
-		if (input.value) mGrid.pageRows(config->isMappedTo("l2", input) ? -1 : 1);
+		const int direction = config->isMappedTo("l2", input) ? -1 : 1;
+		if (input.value && mPageDirection != direction)
+		{
+			mGrid.pageRows(direction);
+			mPageDirection = direction;
+			mPageRepeat = 550;
+		}
+		else if (!input.value && mPageDirection == direction)
+			mPageDirection = 0;
 		return true;
 	}
 
@@ -140,7 +150,7 @@ bool GridGameListView::input(InputConfig* config, Input input)
 			if (config->isMappedTo("pageup", input) || config->isMappedTo("pagedown", input))
 			{
 				auto dest = SystemView::adjacentConsole(mRoot->getSystem(), config->isMappedTo("pageup", input) ? -1 : 1);
-				if (dest) ViewController::get()->goToGameList(dest);
+				if (dest) ViewController::get()->cycleGameList(dest, config->isMappedTo("pageup", input) ? -1 : 1);
 				return true;
 			}
 		}
@@ -183,6 +193,7 @@ void GridGameListView::populateList(const std::vector<FileData*>& files)
 
 	mGrid.resetLastCursor();
 	mGrid.clear();
+	mPageDirection = 0;
 	mLetterStarts.clear();
 	mLetterBuild = {};
 	mLetterDirection = 0;
@@ -256,6 +267,13 @@ void GridGameListView::onThemeChanged(const std::shared_ptr<ThemeData>& theme)
 
 	mGrid.applyTheme(theme, getName(), "gamegrid", ThemeFlags::ALL);
 	mDetails.onThemeChanged(theme);
+	const auto page = theme->getElement(getName(), "pageProgress", "text");
+	mPageProgress.setVisible(page != nullptr);
+	if (page)
+	{
+		mPageProgress.applyTheme(theme, getName(), "pageProgress", ThemeFlags::ALL);
+		sortChildren();
+	}
 	updateInfoPanel();
 }
 
@@ -271,6 +289,13 @@ void GridGameListView::updateInfoPanel()
 	Utils::FileSystem::FileSystemCacheActivator fsc;
 
 	updateThemeExtrasBindings();
+	if (mPageProgress.isVisible())
+	{
+		const int perPage = std::max(1, mGrid.getColumnCount() * mGrid.pageRowCount());
+		const int count = mGrid.size() == 1 && mGrid.getSelected()->isPlaceHolder() ? 0 : mGrid.size();
+		const int page = count ? mGrid.getCursorIndex() / perPage + 1 : 0;
+		mPageProgress.setText(std::to_string(page) + " / " + std::to_string((count + perPage - 1) / perPage));
+	}
 
 	FileData* file = (mGrid.size() == 0 || mGrid.isScrolling()) ? NULL : mGrid.getSelected();
 	bool isClearing = mGrid.getObjects().size() == 0 && mGrid.getCursorIndex() == 0 && mGrid.getScrollingVelocity() == 0;
@@ -392,6 +417,7 @@ bool GridGameListView::handleLetterAxis(InputConfig* config, Input input)
 
 void GridGameListView::onHide()
 {
+	mPageDirection = 0;
 	mLetterDirection = 0;
 	mLetterDisplay = 0;
 	mLetterLabel.setVisible(false);
@@ -400,7 +426,16 @@ void GridGameListView::onHide()
 
 void GridGameListView::update(int deltaTime)
 {
-	if (mWindow->peekGui() != ViewController::get()) mLetterDirection = 0;
+	if (mWindow->peekGui() != ViewController::get())
+		mLetterDirection = mPageDirection = 0;
+	if (mPageDirection && (mPageRepeat -= deltaTime) <= 0)
+	{
+		if (mRoot->getSystem()->getSortId() <= FileSorts::FILENAME_DESCENDING)
+			jumpLetter(mPageDirection);
+		else
+			mGrid.pageRows(mPageDirection);
+		mPageRepeat = 270;
+	}
 	if (mLetterDirection && (mLetterRepeat -= deltaTime) <= 0)
 	{
 		jumpLetter(mLetterDirection);

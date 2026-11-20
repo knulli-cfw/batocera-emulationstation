@@ -52,6 +52,7 @@ public:
 	// Navigation.
 	void goToNextGameList();
 	void goToPrevGameList();
+	void cycleGameList(SystemData* system, int direction);
 	void goToGameList(SystemData* system, bool forceImmediate = false);
 	bool goToGameList(const std::string& systemName, bool forceImmediate = false);
 	void goToSystemView(SystemData* system, bool forceImmediate = false);
@@ -157,6 +158,9 @@ private:
 	State mState;
 
 	ColumnSlide mColumnSlide;
+	std::shared_ptr<IGameListView> mCycleFrom;
+	int mCycleElapsed = 0;
+	int mCycleDirection = 1;
 	Transform4x4f mScreenTransform;
 };
 

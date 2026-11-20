@@ -16,12 +16,13 @@ public:
 	static void showImage(Window* window, const std::string imagePath, bool zoomSingleFile = false);
 	static void showImages(Window* window, std::vector<std::string>& images);
 
-	GuiImageViewer(Window* window, bool linearSmooth = false);
+	GuiImageViewer(Window* window, bool linearSmooth = false, bool gallery = false);
 	~GuiImageViewer();
 
 	bool input(InputConfig* config, Input input) override;
 	virtual std::vector<HelpPrompt> getHelpPrompts() override;
 
+	void render(const Transform4x4f& parentTrans) override;
 	void add(const std::string imagePath);
 	void setCursor(const std::string imagePath);
 
@@ -30,6 +31,7 @@ protected:
 	void loadCbz(const std::string& imagePath);
 	void loadImages(std::vector<std::string>& images);
 
+	bool mGallery;
 	ImageGridComponent<std::string> mGrid;
 	std::shared_ptr<ThemeData> mTheme;
 	std::string mPdf;

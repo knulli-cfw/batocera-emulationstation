@@ -75,7 +75,7 @@ VolumeInfoComponent::VolumeInfoComponent(Window* window, bool actionLine)
 
 		float width = style.size.x();
 		float height = style.size.y();
-		mCornerRadius = style.cornerRadius > 0 ? style.cornerRadius : height / 2.0f;
+		mCornerRadius = style.cornerRadius > 0 ? style.cornerRadius : std::min(width, height) / 2.0f;
 
 		float padding = Math::round(height * 0.43f);
 		float gap = Math::round(height * 0.3f);
@@ -98,6 +98,15 @@ VolumeInfoComponent::VolumeInfoComponent(Window* window, bool actionLine)
 		mLabel->setPosition(width - padding - labelWidth, 0);
 		mLabel->setSize(labelWidth, height);
 		addChild(mLabel);
+		if (style.vertical)
+		{
+			mGlyph->setPosition(0, 0);
+			const float cap = std::min(width, height / 2.0f);
+			mGlyph->setSize(width, cap * 0.72f);
+			mLabel->setHorizontalAlignment(ALIGN_CENTER);
+			mLabel->setPosition(0, height - cap * 0.65f);
+			mLabel->setSize(width, cap * 0.65f);
+		}
 		return;
 	}
 
@@ -252,6 +261,20 @@ void VolumeInfoComponent::render(const Transform4x4f& parentTrans)
 		Renderer::setMatrix(trans);
 		Renderer::drawSolidRectangle(0, 0, mSize.x(), mSize.y(), withOpacity(mBackgroundColor), withOpacity(mBorderColor),
 			(mBorderColor & 0xFF) ? 1.0f : 0.0f, mCornerRadius);
+
+		if (mWindow->getMeterStyle().vertical)
+		{
+			const float width = Math::round(mSize.x() * 0.25f);
+			const float x = Math::round((mSize.x() - width) / 2);
+			const float y = Math::round(mGlyph->getSize().y());
+			const float length = std::max(1.0f, mLabel->getPosition().y() - y);
+			const float fill = Math::round(length * Math::max(0, Math::min(100, mVolume)) / 100.0f);
+			Renderer::drawSolidRectangle(x, y, width, length, withOpacity(mTrackColor), 0, 0, width / 2);
+			if (fill > 0)
+				Renderer::drawSolidRectangle(x, y + length - fill, width, fill, withOpacity(mFillColor), 0, 0, std::min(width, fill) / 2);
+			GuiComponent::renderChildren(trans);
+			return;
+		}
 
 		float h = Math::max(2.0f, Math::round(mSize.y() * 0.143f));
 		float y = Math::round((mSize.y() - h) / 2.0f);

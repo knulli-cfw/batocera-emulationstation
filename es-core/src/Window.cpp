@@ -1460,6 +1460,7 @@ static Window::PopupStyle readPopupStyle(const ThemeData::ThemeElement* elem)
 		return style;
 
 	style.enabled = true;
+	style.vertical = elem->has("vertical") && elem->get<bool>("vertical");
 	style.size = Vector2f(Math::round(size.x()), Math::round(size.y()));
 	style.pos = elem->has("pos") ? elem->get<Vector2f>("pos") * screen : Vector2f::Zero();
 	style.font = Font::getFromTheme(elem, ThemeFlags::ALL, Font::get(FONT_SIZE_MINI));

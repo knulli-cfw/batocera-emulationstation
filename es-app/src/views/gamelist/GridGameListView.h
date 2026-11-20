@@ -65,6 +65,9 @@ private:
 	std::future<LetterStarts> mLetterBuild;
 	LetterStarts mLetterStarts;
 	TextComponent mLetterLabel;
+	TextComponent mPageProgress;
+	int mPageDirection = 0;
+	int mPageRepeat = 0;
 	int mLetterDirection = 0;
 	int mLetterRepeat = 0;
 	int mLetterDisplay = 0;

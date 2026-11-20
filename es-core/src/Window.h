@@ -117,10 +117,11 @@ public:
 	// notification elements "notification" and "meters", when they have a size (in pixels here)
 	struct PopupStyle
 	{
-		PopupStyle() : enabled(false), origin(0, 0), color(0xFFFFFFFF), backgroundColor(0x0D1A2BF2), borderColor(0),
+		PopupStyle() : enabled(false), vertical(false), origin(0, 0), color(0xFFFFFFFF), backgroundColor(0x0D1A2BF2), borderColor(0),
 			trackColor(0xFFFFFF40), fillColor(0xFFFFFFFF), cornerRadius(0), iconSize(0), spacing(0), maxCount(0) {}
 
 		bool enabled;
+		bool vertical;
 		Vector2f pos;
 		Vector2f origin;
 		Vector2f size;
