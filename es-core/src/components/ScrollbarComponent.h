@@ -16,6 +16,7 @@ public:
 	ScrollbarComponent(Window* window);
 
 	bool isEnabled() { return mEnabled; }
+	bool hasTrack() const { return (mTrackColor & 0xFF) != 0; }
 
 	void update(int deltaTime) override;
 	void render(const Transform4x4f& parentTrans) override;
@@ -54,6 +55,7 @@ private:
 	int	  mFadeOutTime;
 
 	unsigned int mColor;
+	unsigned int mTrackColor = 0;
 
 	int mAlignment;
 

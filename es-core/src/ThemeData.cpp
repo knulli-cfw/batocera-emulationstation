@@ -213,6 +213,7 @@ std::map<std::string, std::map<std::string, ThemeData::ElementPropertyType>> The
 		{ "scrollSound", PATH },
 
 		{ "scrollbarColor", COLOR },
+		{ "scrollbarTrackColor", COLOR },
 		{ "scrollbarSize", FLOAT },
 		{ "scrollbarCorner", FLOAT },
 		{ "scrollbarAlignment", STRING },		// left, right, outer left, outer right

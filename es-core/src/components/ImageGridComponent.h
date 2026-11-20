@@ -857,9 +857,27 @@ void ImageGridComponent<T>::render(const Transform4x4f& parentTrans)
 
 		auto scrollableSize = mTileSize + mMargin;
 
+		if (mScrollbar.hasTrack() && mPeekSize > 0.0f)
+		{
+			if (isVertical())
+				sz.y() += Math::round(mPeekSize * Renderer::getScreenHeight());
+			else
+				sz.x() += Math::round(mPeekSize * Renderer::getScreenWidth());
+		}
 		mScrollbar.setContainerBounds(pos, sz, isVertical());
-		mScrollbar.setRange(0, mTotalHeight + (isVertical() ? scrollableSize.y() : scrollableSize.y()), isVertical() ? scrollableSize.y() : scrollableSize.y());
-		mScrollbar.setScrollPosition(mCameraOffset);
+		const float stride = isVertical() ? scrollableSize.y() : scrollableSize.x();
+		if (mScrollbar.hasTrack())
+		{
+			const int columns = getColumnCount();
+			const int rows = (int(mEntries.size()) + columns - 1) / columns;
+			mScrollbar.setRange(0, rows, pageRowCount());
+			mScrollbar.setScrollPosition(stride > 0 ? mCameraOffset / stride : 0);
+		}
+		else
+		{
+			mScrollbar.setRange(0, mTotalHeight + stride, stride);
+			mScrollbar.setScrollPosition(mCameraOffset);
+		}
 		mScrollbar.render(parentTrans);
 	}
 }
