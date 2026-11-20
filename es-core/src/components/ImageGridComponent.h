@@ -149,6 +149,16 @@ public:
 	// The cursor's column and the number of columns (rows of a horizontal grid)
 	int			getCursorColumn();
 	int			getColumnCount();
+	bool cycleCardInput(InputConfig* config, Input input)
+	{
+		bool left = config->isMappedLike("left", input);
+		if (!left && !config->isMappedLike("right", input)) return false;
+		listInput(input.value ? (left ? -1 : 1) : 0, true);
+		return true;
+	}
+	int pageRowCount() { return std::max(1, (isVertical() ? mGridDimension.y() : mGridDimension.x()) - 2 * EXTRAITEMS); }
+	bool canPageRows() { return static_cast<int>(mEntries.size()) > getColumnCount() * pageRowCount(); }
+	void pageRows(int direction);
 
 protected:
 	virtual void onCursorChanged(const CursorState& state) override;
@@ -1769,6 +1779,18 @@ template<typename T>
 int ImageGridComponent<T>::getColumnCount()
 {
 	return Math::max(1, isVertical() ? mGridDimension.x() : mGridDimension.y());
+}
+
+template<typename T>
+void ImageGridComponent<T>::pageRows(int direction)
+{
+	if (mEntries.empty()) return;
+	const int columns = getColumnCount();
+	const int rows = pageRowCount();
+	const int column = mCursor % columns;
+	const int lastRow = (int(mEntries.size()) - 1 - column) / columns;
+	const int row = std::max(0, std::min(lastRow, mCursor / columns + direction * rows));
+	this->setCursorIndex(row * columns + column);
 }
 
 template<typename T>

@@ -12,12 +12,14 @@
 #include "SystemConf.h"
 #include "guis/GuiGamelistOptions.h"
 #include "GameNameFormatter.h"
+#include "FileSorts.h"
 #include "utils/Randomizer.h"
 
 GridGameListView::GridGameListView(Window* window, FolderData* root, const std::shared_ptr<ThemeData>& theme, std::string themeName, Vector2f gridSize) :
 	ISimpleGameListView(window, root),
 	mGrid(window),
-	mDetails(this, &mGrid, mWindow, DetailedContainer::GridView)
+	mDetails(this, &mGrid, mWindow, DetailedContainer::GridView),
+	mLetterLabel(window)
 {
 	// Let DetailedContainer handle extras with activation scripts
 	mExtraMode = ThemeData::ExtraImportType::WITHOUT_ACTIVATESTORYBOARD;
@@ -33,6 +35,16 @@ GridGameListView::GridGameListView(Window* window, FolderData* root, const std::
 	mGrid.setDefaultZIndex(20);
 	mGrid.setCursorChangedCallback([&](const CursorState& /*state*/) { updateInfoPanel(); });
 	addChild(&mGrid);
+	mLetterLabel.setFont(Font::get(FONT_SIZE_MEDIUM));
+	mLetterLabel.setColor(0xf3f4fcff);
+	mLetterLabel.setBackgroundColor(0x181f35ef);
+	mLetterLabel.setRenderBackground(true);
+	mLetterLabel.setHorizontalAlignment(ALIGN_CENTER);
+	mLetterLabel.setSize(mSize.x() * 0.075f, mSize.y() * 0.075f);
+	mLetterLabel.setPosition(mSize.x() * 0.90f, mSize.y() * 0.085f);
+	mLetterLabel.setZIndex(150);
+	mLetterLabel.setVisible(false);
+	addChild(&mLetterLabel);
 	
 	if (!themeName.empty())
 		setThemeName(themeName);
@@ -110,23 +122,25 @@ bool GridGameListView::input(InputConfig* config, Input input)
 	}
 	*/
 
-	// Columns (the home slides in beside the list): left at the grid's left edge goes back as B does, L1 and R1
-	// go back to the previous or next tab of the home
-	if (input.value != 0 && mColumns.hasSlide() && !mPopupSelfReference && mCursorStack.empty())
+	if (mColumns.hasSlide() && !mPopupSelfReference &&
+	    (config->isMappedTo("l2", input) || config->isMappedTo("r2", input)))
+	{
+		if (input.value) mGrid.pageRows(config->isMappedTo("l2", input) ? -1 : 1);
+		return true;
+	}
+
+	if (mColumns.hasSlide() && !mPopupSelfReference && mGrid.cycleCardInput(config, input))
+		return true;
+	// Shoulders change console; A opens an item and B returns.
+	if (input.value != 0 && mColumns.hasSlide() && !mPopupSelfReference)
 	{
 		auto home = ViewController::get()->getSystemListView();
 		if (home->hasColumns())
 		{
-			if (config->isMappedLike("left", input) && mGrid.getCursorColumn() == 0)
-			{
-				goBack();
-				return true;
-			}
-
 			if (config->isMappedTo("pageup", input) || config->isMappedTo("pagedown", input))
 			{
-				goBack();
-				home->changeTab(config->isMappedTo("pageup", input) ? -1 : 1);
+				auto dest = SystemView::adjacentConsole(mRoot->getSystem(), config->isMappedTo("pageup", input) ? -1 : 1);
+				if (dest) ViewController::get()->goToGameList(dest);
 				return true;
 			}
 		}
@@ -168,7 +182,10 @@ void GridGameListView::populateList(const std::vector<FileData*>& files)
 	updateHeaderLogoAndText();
 
 	mGrid.resetLastCursor();
-	mGrid.clear(); 
+	mGrid.clear();
+	mLetterStarts.clear();
+	mLetterBuild = {};
+	mLetterDirection = 0;
 	mGrid.resetLastCursor();
 
 	if (files.size() > 0)
@@ -212,6 +229,7 @@ void GridGameListView::populateList(const std::vector<FileData*>& files)
 			mGrid.add(". .", imagePath, createParentFolderData());
 		}
 
+		indexLetters(files, mGrid.size());
 		GameNameFormatter formatter(mRoot->getSystem());
 
 		for (auto file : files)
@@ -319,8 +337,81 @@ std::vector<FileData*> GridGameListView::getFileDataEntries()
 	return mGrid.getObjects();
 }
 
+void GridGameListView::indexLetters(const std::vector<FileData*>& files, int offset)
+{
+	const auto sort = mRoot->getSystem()->getSortId();
+	if (!mColumns.hasSlide() || sort > FileSorts::FILENAME_DESCENDING) return;
+	std::vector<std::string> names;
+	names.reserve(files.size());
+	for (auto* file : files) names.push_back(file->getName());
+	const auto articles = Settings::IgnoreLeadingArticles() ? Utils::String::commaStringToVector(_("A,AN,THE")) : std::vector<std::string>();
+	// The worker owns its snapshot. Reloading a list can destroy FileData objects.
+	mLetterBuild = std::async(std::launch::async, [offset, articles](std::vector<std::string> names) {
+		LetterStarts result;
+		for (size_t i = 0; i < names.size(); ++i)
+		{
+			const auto name = articles.empty() ? names[i] : FileSorts::stripLeadingArticle(names[i], articles);
+			if (name.empty()) continue;
+			const auto first = name.substr(0, Utils::String::nextCursor(name, 0));
+			const auto letter = first.size() == 1 && first[0] >= '0' && first[0] <= '9' ? "#" : Utils::String::toUpper(first);
+			if (result.empty() || result.back().second != letter)
+				result.emplace_back(offset + int(i), letter);
+		}
+		return result;
+	}, std::move(names));
+}
+
+void GridGameListView::jumpLetter(int direction)
+{
+	if (mLetterBuild.valid() && mLetterBuild.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready)
+		mLetterStarts = mLetterBuild.get();
+	if (mLetterStarts.empty()) return;
+	auto after = std::upper_bound(mLetterStarts.begin(), mLetterStarts.end(), mGrid.getCursorIndex(),
+		[](int index, const LetterStarts::value_type& start) { return index < start.first; });
+	const int count = int(mLetterStarts.size());
+	const int current = int(after - mLetterStarts.begin()) - 1;
+	const auto& target = mLetterStarts[(current + direction + count * 2) % count];
+	mGrid.setCursorIndex(target.first);
+	mLetterLabel.setText(target.second);
+	mLetterLabel.setVisible(true);
+	mLetterLabel.setOpacity(255);
+	mLetterDisplay = 720;
+}
+
+bool GridGameListView::handleLetterAxis(InputConfig* config, Input input)
+{
+	if (!mColumns.hasSlide() || mPopupSelfReference || mRoot->getSystem()->getSortId() > FileSorts::FILENAME_DESCENDING)
+		return false;
+	const bool up = config->isMappedTo("joystick2up", input);
+	if (!up && !config->isMappedTo("joystick2up", input, true)) return false;
+	mLetterDirection = input.value == 0 ? 0 : (up ? -1 : 1);
+	if (mLetterDirection) jumpLetter(mLetterDirection);
+	mLetterRepeat = 400;
+	return true;
+}
+
+void GridGameListView::onHide()
+{
+	mLetterDirection = 0;
+	mLetterDisplay = 0;
+	mLetterLabel.setVisible(false);
+	ISimpleGameListView::onHide();
+}
+
 void GridGameListView::update(int deltaTime)
 {
+	if (mWindow->peekGui() != ViewController::get()) mLetterDirection = 0;
+	if (mLetterDirection && (mLetterRepeat -= deltaTime) <= 0)
+	{
+		jumpLetter(mLetterDirection);
+		mLetterRepeat = 180;
+	}
+	if (mLetterDisplay > 0)
+	{
+		mLetterDisplay = std::max(0, mLetterDisplay - deltaTime);
+		mLetterLabel.setOpacity(std::min(255, mLetterDisplay * 2));
+		mLetterLabel.setVisible(mLetterDisplay > 0);
+	}
 	mDetails.update(deltaTime);
 	ISimpleGameListView::update(deltaTime);
 }

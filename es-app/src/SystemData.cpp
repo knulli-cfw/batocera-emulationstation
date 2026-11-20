@@ -2546,6 +2546,13 @@ BindableProperty SystemData::getProperty(const std::string& name)
 		}
 	}
 
+	if (name == "prevTab" || name == "nextTab")
+		return SystemView::adjacentTabName(this, name == "prevTab" ? -1 : 1);
+	if (name == "prevConsole" || name == "nextConsole")
+	{
+		auto target = SystemView::adjacentConsole(this, name == "prevConsole" ? -1 : 1);
+		return target ? target->getFullName() : std::string();
+	}
 	if (name == "tab")
 		return SystemView::getSystemTab(this);
 

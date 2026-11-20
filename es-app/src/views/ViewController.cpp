@@ -269,6 +269,11 @@ void ViewController::goToGameList(SystemData* system, bool forceImmediate)
 		}
 	}
 
+	// Direct boot into a column list needs the same tab destinations as entry from Home.
+	if (!mSystemListView && destinationSystem->getTheme() &&
+	    !destinationSystem->getTheme()->getVariable("esColumnPan").empty())
+		getSystemListView();
+
 	std::shared_ptr<IGameListView> view = getGameListView(destinationSystem);
 
 	bool fromHome = mState.viewing == SYSTEM_SELECT;
@@ -1029,6 +1034,11 @@ bool ViewController::input(InputConfig* config, Input input)
 		return true;
 	}
 
+	if (mState.viewing == GAME_LIST)
+	{
+		auto grid = dynamic_cast<GridGameListView*>(mCurrentView.get());
+		if (grid && grid->handleLetterAxis(config, input)) return true;
+	}
 	if (config->isMappedTo("joystick2up", input) && input.value != 0)
 	{
 		changeVolume(5);

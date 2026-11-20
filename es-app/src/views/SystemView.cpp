@@ -34,6 +34,11 @@
 #include <SDL_timer.h>
 
 std::map<std::string, int> SystemView::sSystemTabs;
+namespace
+{
+	std::vector<SystemData*> consoleOrder;
+	std::vector<std::pair<std::string, std::string>> tabNeighbors;
+}
 int SystemView::sShownColumn = 0;
 
 // The pan between a column layout's first column and its grid, eased out: it moves in the frame after the
@@ -424,7 +429,7 @@ void SystemView::populate(bool keepExtras)
 	if (hasColumns())
 	{
 		if (mColumnPanTime < 0)
-			mColumnPan = mColumnLevel == 2 ? mColumns.pan : 0;
+			mColumnPan = columnPanTarget(mColumnLevel);
 
 		if (sShownColumn == 0)
 			showColumnLevel(mColumnLevel);
@@ -586,14 +591,26 @@ bool SystemView::input(InputConfig* config, Input input)
 		return true;
 	}
 
-	// Columns: at level 1 up and down change the tab and right or A give the grid the focus; at level 2 B or
-	// left at the grid's left edge give it back, right at its right edge opens the system's games (as A does)
+	// Right enters the category rail's selection. On cards, horizontal input
+	// stays in this grid and wraps, including repeated input across both ends.
+	if (hasColumns() && mColumnLevel == 2 && mCarousel.asGrid() &&
+	    mCarousel.asGrid()->cycleCardInput(config, input))
+		return true;
 	if (hasColumns() && input.value != 0)
 	{
 		auto grid = mCarousel.asGrid();
 
 		if (mColumnLevel == 1)
 		{
+			if (grid && (config->isMappedTo("l2", input) || config->isMappedTo("r2", input)))
+			{
+				if (grid->canPageRows())
+				{
+					setColumnLevel(2, true);
+					grid->pageRows(config->isMappedTo("l2", input) ? -1 : 1);
+				}
+				return true;
+			}
 			if (config->isMappedLike("up", input))
 			{
 				moveTab(-1, false);
@@ -617,18 +634,17 @@ bool SystemView::input(InputConfig* config, Input input)
 		}
 		else if (grid != nullptr)
 		{
-			if (config->isMappedTo(BUTTON_BACK, input) || (config->isMappedLike("left", input) && grid->getCursorColumn() == 0))
+			if (config->isMappedTo("l2", input) || config->isMappedTo("r2", input))
+			{
+				grid->pageRows(config->isMappedTo("l2", input) ? -1 : 1);
+				return true;
+			}
+			if (config->isMappedTo(BUTTON_BACK, input))
 			{
 				setColumnLevel(1, true);
 				return true;
 			}
 
-			if (config->isMappedLike("right", input) && (grid->getCursorColumn() == grid->getColumnCount() - 1 || mCarousel.getCursorIndex() == mCarousel.size() - 1))
-			{
-				mCarousel.stopScrolling();
-				ViewController::get()->goToGameList(getSelected());
-				return true;
-			}
 		}
 	}
 
@@ -1026,6 +1042,10 @@ void SystemView::onCursorChanged(const CursorState& state)
 
 	int mCursor = mCarousel.getCursorIndex();
 
+	if (hasColumns() && mColumnLevel == 2 &&
+	    columnPanTarget(2) != (mColumnPanTime < 0 ? mColumnPan : mColumnPanTo))
+		setColumnLevel(2, true);
+
 	if (AudioManager::isInitialized())
 		AudioManager::getInstance()->changePlaylist(getSelected()->getTheme());
 
@@ -1336,13 +1356,21 @@ bool SystemView::hasColumns()
 	return mColumns.pan > 0 && hasTabs();
 }
 
+float SystemView::columnPanTarget(int level)
+{
+	if (level != 2 || mCarousel.size() == 0)
+		return 0;
+	auto theme = getSelected()->getTheme();
+	return theme && theme->getVariable("esColumnKeepTabs") == "true" ? 0 : mColumns.pan;
+}
+
 void SystemView::setColumnLevel(int level, bool animate)
 {
 	if (!hasColumns())
 		return;
 
 	level = level == 2 ? 2 : 1;
-	float target = level == 2 ? mColumns.pan : 0;
+	float target = columnPanTarget(level);
 
 	mColumnLevel = level;
 
@@ -1588,6 +1616,8 @@ bool SystemView::buildTabs()
 {
 	mTabs.clear();
 	sSystemTabs.clear();
+	consoleOrder.clear();
+	tabNeighbors.clear();
 
 	if (mTabDefinition.empty() || !mCarousel.isGrid())
 		return false;
@@ -1657,6 +1687,23 @@ bool SystemView::buildTabs()
 		return false;
 	}
 
+	// Navigation and its labels share the same order of visible, nonempty tabs.
+	std::vector<int> filled;
+	const std::string excludedTab = mGridTheme ? mGridTheme->getVariable("esConsoleCycleSkipTab") : "";
+	for (size_t i = 0; i < mTabs.size(); ++i)
+	{
+		if (mTabs[i].systems.empty()) continue;
+		filled.push_back(static_cast<int>(i));
+		if (mTabs[i].name == excludedTab) continue;
+		for (auto system : mTabs[i].systems)
+			if (system->isGameSystem() && !system->isCollection())
+				consoleOrder.push_back(system);
+	}
+	tabNeighbors.resize(mTabs.size());
+	for (size_t i = 0; i < filled.size(); ++i)
+		tabNeighbors[filled[i]] = {mTabs[filled[(i + filled.size() - 1) % filled.size()]].name,
+			mTabs[filled[(i + 1) % filled.size()]].name};
+
 	if (mActiveTab < 0 || mActiveTab >= (int)mTabs.size() || mTabs[mActiveTab].systems.empty())
 		mActiveTab = firstFilled;
 
@@ -1666,6 +1713,22 @@ bool SystemView::buildTabs()
 bool SystemView::hasTabs()
 {
 	return !mTabs.empty() && mCarousel.isGrid();
+}
+
+SystemData* SystemView::adjacentConsole(SystemData* system, int direction)
+{
+	if (consoleOrder.empty()) return nullptr;
+	auto it = std::find(consoleOrder.begin(), consoleOrder.end(), system);
+	if (it == consoleOrder.end()) return direction < 0 ? consoleOrder.back() : consoleOrder.front();
+	const int count = static_cast<int>(consoleOrder.size());
+	return consoleOrder[(static_cast<int>(it - consoleOrder.begin()) + direction + count) % count];
+}
+
+std::string SystemView::adjacentTabName(SystemData* system, int direction)
+{
+	int tab = getSystemTab(system);
+	if (tab < 0 || tab >= static_cast<int>(tabNeighbors.size())) return "";
+	return direction < 0 ? tabNeighbors[tab].first : tabNeighbors[tab].second;
 }
 
 int SystemView::getSystemTab(SystemData* system)

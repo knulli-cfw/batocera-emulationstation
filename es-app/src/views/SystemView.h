@@ -79,6 +79,8 @@ public:
 
 	// The index of the tab that shows a system, in the theme's "systemtabs" order; -1 without tabs
 	static int getSystemTab(SystemData* system);
+	static SystemData* adjacentConsole(SystemData* system, int direction);
+	static std::string adjacentTabName(SystemData* system, int direction);
 
 	// Binds the selected system's extras again (its counts or last game changed)
 	void refreshBindings() { updateExtraTextBinding(); }
@@ -87,6 +89,7 @@ public:
 	// the grid. The view pans between them; a game list opens beside level 2.
 	bool	hasColumns();
 	int		getColumnLevel() { return mColumnLevel; }
+	float columnPanTarget(int level);
 	void	setColumnLevel(int level, bool animate);
 	// L1 or R1 from a game list: the previous or next tab
 	void	changeTab(int direction) { if (hasTabs()) moveTab(direction); }
