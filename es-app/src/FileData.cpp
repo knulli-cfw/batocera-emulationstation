@@ -634,6 +634,30 @@ std::string FileData::getlaunchCommand(LaunchGameOptions& options, bool includeC
 	if (monitorId >= 0 && command.find(" -system ") != std::string::npos)
 		command = command + " -monitor " + std::to_string(monitorId);
 
+#if KNULLI
+	// Resolve the default after gameStart sync. Record explicit sessions as well.
+	if (options.netPlayMode == DISABLED && SaveStateRepository::isEnabledForGame(this))
+	{
+		const std::string resume = Paths::getUserEmulationStationPath() + "/resume/emulatorlauncher";
+		for (const std::string name : {std::string("emulatorlauncher"), std::string("/usr/bin/emulatorlauncher")})
+		{
+			if (command.compare(0, name.size() + 1, name + " ") != 0 || !Utils::FileSystem::exists(resume))
+				continue;
+			auto state = options.saveStateInfo;
+			std::string launcher = Utils::FileSystem::getEscapedPath(resume);
+			if (!state)
+				return launcher + command.substr(name.size());
+			launcher += " --es-resume-slot=" + std::to_string(state->slot);
+			command = launcher + command.substr(name.size());
+			// The active libretro core can open a slot directly, without staging a
+			// copy or renaming the player's automatic state before sync.
+			if (getEmulator() == "libretro" && (!state->config || state->config->isActiveConfig(this)))
+				return command;
+			break;
+		}
+	}
+#endif
+
 	if (SaveStateRepository::isEnabled(this))
 	{
 		if (options.saveStateInfo == nullptr)
@@ -704,14 +728,21 @@ bool FileData::launchGame(Window* window, LaunchGameOptions options)
 		return false;
 
 	// KNULLI - QUICK RESUME MODE >>>>>
-	QuickResume::setQuickResume(getlaunchCommand(false), getFullPath());
+	const std::string quickResumeCommand = getlaunchCommand(false);
 	// KNULLI - QUICK RESUME MODE <<<<<
 
 	AudioManager::getInstance()->deinit();
 	VolumeControl::getInstance()->deinit();
 
 	bool hideWindow = Settings::getInstance()->getBool("HideWindow");
-	window->deinit(hideWindow);
+	if (!window->deinit(hideWindow, true))
+	{
+		VolumeControl::getInstance()->init();
+		AudioManager::getInstance()->init();
+		window->displayNotificationMessage(_("VIDEO PREVIEW IS STILL STOPPING. PLEASE TRY AGAIN."));
+		return false;
+	}
+	QuickResume::setQuickResume(quickResumeCommand, getFullPath());
 	
 	const std::string rom = Utils::FileSystem::getEscapedPath(getPath());
 	const std::string basename = Utils::FileSystem::getStem(getPath());

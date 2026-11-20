@@ -4,6 +4,7 @@
 #include "utils/StringUtil.h"
 #include "utils/FileSystemUtil.h"
 #include "Paths.h"
+#include "SystemConf.h"
 #include "Log.h"
 #include <mutex>
 
@@ -50,6 +51,25 @@ std::shared_ptr<SaveStateConfig> SaveStateConfig::Default()
 
 std::string SaveStateConfig::getDirectory(SystemData* system)
 {
+#if KNULLI
+	// A relocated RetroArch state directory is also the save manager's directory.
+	if (emulator == "libretro" && directory == "{{system}}")
+	{
+		auto setting = [system](const std::string& key) {
+			auto conf = SystemConf::getInstance();
+			auto value = conf->get(system->getName() + ".retroarch." + key);
+			if (value.empty()) value = conf->get("global.retroarch." + key);
+			return Utils::String::replace(value, "\"", "");
+		};
+		auto base = setting("savestate_directory");
+		if (!base.empty() && base[0] == '/' && setting("sort_savestates_enable") != "true")
+		{
+			if (setting("sort_savestates_by_content_enable") == "true")
+				return Utils::FileSystem::combine(base, Utils::FileSystem::getFileName(system->getStartPath()));
+			return base;
+		}
+	}
+#endif
 	std::string path = Utils::String::replace(directory, "{{system}}", system->getName());
 	path = Utils::String::replace(path, "{{emulator}}", emulator);
 	path = Utils::String::replace(path, "{{core}}", core.empty() ? emulator : core);

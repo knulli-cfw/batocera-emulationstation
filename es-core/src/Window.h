@@ -62,7 +62,7 @@ public:
 	void render();
 
 	bool init(bool initRenderer = true, bool initInputManager = true);
-	void deinit(bool deinitRenderer = true);
+	bool deinit(bool deinitRenderer = true, bool forGame = false);
 
 	void normalizeNextUpdate();
 

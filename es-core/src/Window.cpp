@@ -210,7 +210,7 @@ static bool coversScreen(GuiComponent* gui)
 	return false;
 }
 
-void Window::deinit(bool deinitRenderer)
+bool Window::deinit(bool deinitRenderer, bool forGame)
 {
 	resetMenuBackgroundShader();
 
@@ -221,11 +221,17 @@ void Window::deinit(bool deinitRenderer)
 	for(auto i = mGuiStack.cbegin(); i != mGuiStack.cend(); i++)
 		(*i)->onHide();
 
-	// Their videos stop on a worker: a game run now could find the sound output still held
-	VideoVlcComponent::waitForPlayers(1500);
-
-	// no video measured while a game runs
-	VideoLeadIn::pause(true);
+	bool probeStopped = VideoLeadIn::pause(true);
+	bool playersStopped = VideoVlcComponent::waitForPlayers(1500);
+	if (forGame && (!playersStopped || !probeStopped))
+	{
+		VideoLeadIn::pause(false);
+		for (auto extra : mScreenExtras)
+			extra->onShow();
+		if (peekGui())
+			peekGui()->onShow();
+		return false;
+	}
 
 	if (deinitRenderer)
 		InputManager::getInstance()->deinit();
@@ -235,6 +241,7 @@ void Window::deinit(bool deinitRenderer)
 
 	if (deinitRenderer)
 		Renderer::deinit();
+	return true;
 }
 
 void Window::textInput(const char* text)

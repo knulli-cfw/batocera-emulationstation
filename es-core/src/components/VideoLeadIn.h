@@ -22,7 +22,7 @@ namespace VideoLeadIn
 	void request(const std::string& path, bool first);
 
 	// No measure starts while paused (a game runs)
-	void pause(bool paused);
+	bool pause(bool paused);
 }
 
 #endif // ES_CORE_COMPONENTS_VIDEO_LEAD_IN_H
