@@ -1346,12 +1346,12 @@ void VideoVlcComponent::startPlayback(const Probe& probe)
 
 	// Make sure we found a valid video track
 	if ((mVideoWidth > 0) && (mVideoHeight > 0))
-	{			
+	{
 		if (mVideoWidth > 1 && Settings::getInstance()->getBool("OptimizeVideo"))
 		{
 			// Avoid videos bigger than resolution
 			Vector2f maxSize(Renderer::getScreenWidth(), Renderer::getScreenHeight());
-								
+
 #ifdef _RPI_
 			// Temporary -> RPI -> Try to limit videos to 400x300 for performance benchmark
 			if (!Renderer::isSmallScreen())

@@ -1331,14 +1331,14 @@ void SystemView::render(const Transform4x4f& parentTrans)
 		renderExtra(sb, trans);
 
 	if (mCarousel.getZIndex() > mSystemInfo.getZIndex())
-		renderInfoBar(panned);	
+		renderInfoBar(panned);
 	else
 		renderCarousel(panned);
 
 	renderExtras(trans, minMax.first, minMax.second);
 
 	if (mCarousel.getZIndex() > mSystemInfo.getZIndex())
-		renderCarousel(panned);	
+		renderCarousel(panned);
 	else
 		renderInfoBar(panned);
 

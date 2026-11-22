@@ -25,7 +25,7 @@
 #include "views/gamelist/ISimpleGameListView.h"
 
 std::vector<std::string> GuiGamelistOptions::gridSizes {
-	"automatic", 
+	"automatic",
 	"1x1", "1x2", "1x3", "1x4", "1x5", "1x6", "1x7",
 	"2x1", "2x2", "2x3", "2x4", "2x5", "2x6", "2x7",
 	"3x1", "3x2", "3x3", "3x4", "3x5", "3x6", "3x7",
@@ -76,7 +76,7 @@ GuiGamelistOptions::GuiGamelistOptions(Window* window, IGameListView* gamelist, 
 			if (!filterInfo.empty())
 				mMenu.addWithDescription(_("OTHER FILTERS"), filterInfo, nullptr, std::bind(&GuiGamelistOptions::openGamelistFilter, this));
 			else
-				mMenu.addEntry(_("OTHER FILTERS"), true, std::bind(&GuiGamelistOptions::openGamelistFilter, this));			
+				mMenu.addEntry(_("OTHER FILTERS"), true, std::bind(&GuiGamelistOptions::openGamelistFilter, this));
 		}
 
 		ISimpleGameListView* simpleView = dynamic_cast<ISimpleGameListView*>(getGamelist());
@@ -88,7 +88,7 @@ GuiGamelistOptions::GuiGamelistOptions(Window* window, IGameListView* gamelist, 
 				delete this;
 			});
 		}
-		
+
 		if (!fromPlaceholder)
 		{
 			// jump to letter
@@ -142,7 +142,7 @@ GuiGamelistOptions::GuiGamelistOptions(Window* window, IGameListView* gamelist, 
 				mMenu.addRow(row);
 			}
 		}
-				
+
 		// sort list by
 		unsigned int currentSortId = mSystem->getSortId();
 		if (currentSortId > FileSorts::getSortTypes().size())
@@ -182,7 +182,7 @@ GuiGamelistOptions::GuiGamelistOptions(Window* window, IGameListView* gamelist, 
 				else
 					mMenu.addEntry(_("EDIT DYNAMIC COLLECTION FILTERS"), false, std::bind(&GuiGamelistOptions::editCollectionFilters, this));
 			}
-			else 
+			else
 				mMenu.addGroup(_("CUSTOM COLLECTION"));
 
 			mMenu.addEntry(_("DELETE COLLECTION"), false, std::bind(&GuiGamelistOptions::deleteCollection, this));
@@ -218,7 +218,7 @@ GuiGamelistOptions::GuiGamelistOptions(Window* window, IGameListView* gamelist, 
 
 	bool found = false;
 	for (auto it = styles.cbegin(); it != styles.cend(); it++)
-	{		
+	{
 		bool sel = (viewMode.empty() && it->first == "automatic") || viewMode == it->first;
 		if (sel)
 			found = true;
@@ -248,7 +248,7 @@ GuiGamelistOptions::GuiGamelistOptions(Window* window, IGameListView* gamelist, 
 			fromPlaceholder = true;
 		else if (file->getType() == FOLDER && mSystem->getName() == CollectionSystemManager::get()->getCustomCollectionsBundle()->getName())
 			fromPlaceholder = true;
-		
+
 		if (!fromPlaceholder)
 		{
 			auto srcSystem = file->getSourceFileData()->getSystem();
@@ -273,7 +273,7 @@ GuiGamelistOptions::GuiGamelistOptions(Window* window, IGameListView* gamelist, 
 						GuiMenu::editKeyboardMappings(mWindow, srcSystem, false);
 					});
 				}
-					
+
 				mMenu.addEntry(_("ADVANCED SYSTEM OPTIONS"), true, [this, sysOptions] { GuiMenu::popSystemConfigurationGui(mWindow, sysOptions); });
 			}
 		}
@@ -342,12 +342,12 @@ void GuiGamelistOptions::addTextFilterToMenu()
 	}
 
 	ComponentListRow row;
-	
+
 	auto lbl = std::make_shared<TextComponent>(mWindow, _("FILTER GAMES BY TEXT"), font, color);
 	row.addElement(lbl, true); // label
 
 	std::string searchText;
-	
+
 	if (idx != nullptr)
 		searchText = idx->getTextFilter();
 
@@ -411,7 +411,7 @@ GuiGamelistOptions::~GuiGamelistOptions()
 	if (mListSort && saveSort && mListSort->getSelected() != mSystem->getSortId())
 	{
 		mSystem->setSortId(mListSort->getSelected());
-		
+
 		FolderData* root = mSystem->getRootFolder();
 		/*
 		const FolderData::SortType& sort = FileSorts::getSortTypes().at(mListSort->getSelected());
@@ -557,7 +557,7 @@ void GuiGamelistOptions::jumpToLetter()
 	{
 		mListSort->selectFirstItem();
 		mSystem->setSortId(0);
-		
+
 		FolderData* root = mSystem->getRootFolder();
 		if (root != nullptr)
 			gamelist->onFileChanged(root, FILE_SORTED);
@@ -630,8 +630,8 @@ std::vector<HelpPrompt> GuiGamelistOptions::getHelpPrompts()
 IGameListView* GuiGamelistOptions::getGamelist()
 {
 	if(mGamelist != nullptr)
-		return mGamelist; 
-	
+		return mGamelist;
+
 	return ViewController::get()->getGameListView(mSystem).get();
 }
 
@@ -715,7 +715,7 @@ void GuiGamelistOptions::deleteCollection()
 			if (CollectionSystemManager::get()->deleteCustomCollection(&customCollection->second))
 			{
 				mWindow->renderSplashScreen();
-		
+
 				CollectionSystemManager::get()->loadEnabledListFromSettings();
 				CollectionSystemManager::get()->updateSystemsList();
 				ViewController::get()->goToStart();
