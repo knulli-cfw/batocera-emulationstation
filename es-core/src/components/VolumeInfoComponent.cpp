@@ -264,10 +264,25 @@ void VolumeInfoComponent::render(const Transform4x4f& parentTrans)
 
 		if (mWindow->getMeterStyle().vertical)
 		{
-			const float width = Math::round(mSize.x() * 0.25f);
+			const auto outline = mWindow->getMeterStyle().trackBorderColor;
+			const float width = Math::round(mSize.x() * ((outline & 0xFF) ? 0.35f : 0.25f));
 			const float x = Math::round((mSize.x() - width) / 2);
 			const float y = Math::round(mGlyph->getSize().y());
 			const float length = std::max(1.0f, mLabel->getPosition().y() - y);
+			if ((outline & 0xFF) && width >= 6 && length >= 6)
+			{
+				const float inset = 2;
+				const float inner = length - 2 * inset;
+				const float level = Math::max(0, Math::min(100, mVolume)) / 100.0f;
+				const float filled = level > 0 ? std::max(1.0f, Math::round(inner * level)) : 0;
+				Renderer::drawSolidRectangle(x, y, width, length, withOpacity(outline), 0, 0, 4);
+				Renderer::drawSolidRectangle(x + inset, y + inset, width - 2 * inset, inner, withOpacity(mTrackColor), 0, 0, 2);
+				if (filled > 0)
+					Renderer::drawSolidRectangle(x + inset, y + length - inset - filled, width - 2 * inset, filled,
+						withOpacity(mFillColor), 0, 0, 0);
+				GuiComponent::renderChildren(trans);
+				return;
+			}
 			const float fill = Math::round(length * Math::max(0, Math::min(100, mVolume)) / 100.0f);
 			Renderer::drawSolidRectangle(x, y, width, length, withOpacity(mTrackColor), 0, 0, width / 2);
 			if (fill > 0)

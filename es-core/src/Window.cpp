@@ -1477,6 +1477,9 @@ static Window::PopupStyle readPopupStyle(const ThemeData::ThemeElement* elem)
 	if (elem->has("borderColor"))
 		style.borderColor = elem->get<unsigned int>("borderColor");
 
+	if (elem->has("trackBorderColor"))
+		style.trackBorderColor = elem->get<unsigned int>("trackBorderColor");
+
 	if (elem->has("trackColor"))
 		style.trackColor = elem->get<unsigned int>("trackColor");
 

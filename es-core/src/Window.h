@@ -118,7 +118,7 @@ public:
 	struct PopupStyle
 	{
 		PopupStyle() : enabled(false), vertical(false), origin(0, 0), color(0xFFFFFFFF), backgroundColor(0x0D1A2BF2), borderColor(0),
-			trackColor(0xFFFFFF40), fillColor(0xFFFFFFFF), cornerRadius(0), iconSize(0), spacing(0), maxCount(0) {}
+			trackColor(0xFFFFFF40), trackBorderColor(0), fillColor(0xFFFFFFFF), cornerRadius(0), iconSize(0), spacing(0), maxCount(0) {}
 
 		bool enabled;
 		bool vertical;
@@ -131,6 +131,7 @@ public:
 		unsigned int backgroundColor;
 		unsigned int borderColor;
 		unsigned int trackColor;
+		unsigned int trackBorderColor;
 		unsigned int fillColor;
 		float cornerRadius;
 		float iconSize;
