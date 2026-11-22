@@ -485,7 +485,7 @@ void ISimpleGameListView::showQuickSearch()
 			ViewController::get()->reloadGameListView(mRoot->getSystem());
 	};
 
-	GuiTextEditPopupKeyboard::openSearch(mWindow, mRoot->getSystem()->getTheme(), mRoot->getSystem()->getFullName(),
+	GuiGamelistOptions::openGameSearch(mWindow, mRoot->getSystem(),
 		_("FILTER GAMES BY TEXT"), searchText, updateVal);
 }
 

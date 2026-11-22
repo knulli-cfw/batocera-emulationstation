@@ -4,6 +4,9 @@
 #include "utils/StringUtil.h"
 #include "Log.h"
 #include "Window.h"
+#include "utils/HtmlColor.h"
+#include <tuple>
+#include <cctype>
 #include "LocaleES.h"
 #include "SystemConf.h"
 
@@ -404,12 +407,27 @@ void GuiTextEditPopupKeyboard::onSizeChanged()
 		mHint->setSize(540*s, mText->getSize().y());
 		mHint->setPosition(30*s, 48*s);
 		mShortcuts->setSize(562*s, 24*s);
-		mShortcuts->setPosition(19*s, 287*s);
+		const float extra = mPickGame ? 98*s : 0;
+		mShortcuts->setPosition(19*s, 287*s+extra);
+		if (mPickGame)
+		{
+			mMatchHeader->setSize(562*s, 18*s);
+			mMatchHeader->setPosition(20*s, 79*s);
+			for (int i = 0; i < suggestionLimit; ++i)
+			{
+				float y = (99+24*i)*s;
+				mRowTitle[i]->setPadding(Vector4f(16*s, 0, 0, 0));
+				mRowTitle[i]->setSize(412*s, 23*s);
+				mRowSystem[i]->setSize(150*s, 23*s);
+				mRowTitle[i]->setPosition(19*s, y);
+				mRowSystem[i]->setPosition(431*s, y);
+			}
+		}
 		mKeyboardGrid->setColWidthPerc(12, 0.103f, false);
 		mKeyboardGrid->setRowHeightPerc(0, 0.17f, false);
 		mKeyboardGrid->setRowHeightPerc(4, 0.19f, false);
 		mKeyboardGrid->setSize(568*s, 197*s);
-		mKeyboardGrid->setPosition(16*s, 83*s);
+		mKeyboardGrid->setPosition(16*s, 83*s+extra);
 		return;
 	}
 
@@ -428,15 +446,158 @@ void GuiTextEditPopupKeyboard::onSizeChanged()
 	mKeyboardGrid->setPosition(OSK_PADDINGX, pos.y());	
 }
 
+void GuiTextEditPopupKeyboard::enableSuggestions(std::vector<SearchEntry> catalog, PickGame pick)
+{
+	mCatalog = std::move(catalog);
+	mPickGame = std::move(pick);
+	auto theme = ThemeData::getMenuTheme();
+	mMatchHeader = std::make_shared<TextComponent>(mWindow, "", theme->TextSmall.font, theme->TextSmall.color);
+	addChild(mMatchHeader.get());
+	for (int i = 0; i < suggestionLimit; ++i)
+	{
+		mRowTitle[i] = std::make_shared<TextComponent>(mWindow, "", theme->Text.font, theme->Text.color);
+		mRowSystem[i] = std::make_shared<TextComponent>(mWindow, "", theme->TextSmall.font, theme->TextSmall.color, ALIGN_RIGHT);
+		for (auto& label : {mRowTitle[i], mRowSystem[i]})
+		{
+			label->setMultiLine(TextComponent::SINGLELINE);
+			addChild(label.get());
+		}
+	}
+	mMatchCursor = std::make_shared<TextComponent>(mWindow, "›", theme->Text.font, theme->Text.color);
+	addChild(mMatchCursor.get());
+	const float s = mSize.x()/600.0f;
+	mMatchCursor->setSize(12*s, 23*s);
+	setSize(mSize.x(), Math::round(418*s));
+	setPosition(mPosition.x(), Math::round((Renderer::getScreenHeight()-mSize.y())/2));
+	refreshMatches();
+}
+
+void GuiTextEditPopupKeyboard::refreshMatches()
+{
+	mLastQuery = mText->getValue();
+	const auto query = Utils::String::toLower(Utils::String::trim(mLastQuery));
+	// Keep a bounded shortlist. Equal titles are resolved by console and then ROM path.
+	using Ranked = std::pair<int, size_t>;
+	std::vector<Ranked> best;
+	auto before = [&](const Ranked& a, const Ranked& b)
+	{
+		const auto& x = mCatalog[a.second];
+		const auto& y = mCatalog[b.second];
+		if (a.first != b.first) return a.first < b.first;
+		if (query.empty() && x.lastPlayed != y.lastPlayed) return x.lastPlayed > y.lastPlayed;
+		return std::tie(x.foldedTitle, x.system, x.path) < std::tie(y.foldedTitle, y.system, y.path);
+	};
+	for (size_t i = 0; i < mCatalog.size(); ++i)
+	{
+		const auto& name = mCatalog[i].foldedTitle;
+		const auto pos = name.find(query);
+		if (pos == std::string::npos) continue;
+		int rank = name == query ? 0 : pos == 0 ? 1 : !std::isalnum(static_cast<unsigned char>(name[pos-1])) ? 2 : 3;
+		Ranked item(rank, i);
+		auto at = std::lower_bound(best.begin(), best.end(), item, before);
+		if (at == best.end() && best.size() == suggestionLimit) continue;
+		best.insert(at, item);
+		if (best.size() > suggestionLimit) best.pop_back();
+	}
+	mMatches.clear();
+	for (auto item : best) mMatches.push_back(item.second);
+	focusMatch(-1);
+}
+
+void GuiTextEditPopupKeyboard::styleMatches()
+{
+	auto theme = ThemeData::getMenuTheme();
+	auto keys = mSearchTheme->getElement("menu", "searchKeys", "menuKeyboard");
+	const auto accent = Utils::HtmlColor::parse(mSearchTheme->getVariable("accent"));
+	const auto ink = keys->get<unsigned int>("selectedColor");
+	mMatchHeader->setText(mSearchTheme->getVariable(mMatches.empty() ? "esSearchNoMatches" :
+		(mLastQuery.empty() ? "esSearchBrowse" : "esSearchPicks")));
+	for (int i = 0; i < suggestionLimit; ++i)
+	{
+		bool visible = i < (int)mMatches.size();
+		mRowTitle[i]->setVisible(visible);
+		mRowSystem[i]->setVisible(visible);
+		if (!visible) continue;
+		const auto& item = mCatalog[mMatches[i]];
+		bool selected = mSelectedMatch == i;
+		mRowTitle[i]->setText(item.title);
+		mRowSystem[i]->setText(item.system + "  ");
+		mRowTitle[i]->setAutoScroll(selected ? TextComponent::HORIZONTAL : TextComponent::NONE);
+		mRowTitle[i]->setColor(selected ? ink : theme->Text.color);
+		mRowSystem[i]->setColor(selected ? ink : theme->TextSmall.color);
+		for (auto& label : {mRowTitle[i], mRowSystem[i]})
+		{
+			label->setBackgroundColor(selected ? accent : 0);
+			label->setRenderBackground(selected);
+		}
+	}
+	mMatchCursor->setVisible(mSelectedMatch >= 0);
+	if (mSelectedMatch >= 0)
+	{
+		const float scale = mSize.x()/600.0f;
+		mMatchCursor->setPosition(25*scale, (99+24*mSelectedMatch)*scale);
+		mMatchCursor->setColor(ink);
+	}
+	mShortcuts->setText(mSearchTheme->getVariable(mSelectedMatch >= 0 ? "esPickControls" :
+		mMatches.empty() ? "esNoPickControls" : "esSearchShortcuts"));
+}
+
+void GuiTextEditPopupKeyboard::focusMatch(int row)
+{
+	if (mSelectedMatch < 0 && row >= 0) mGrid.onFocusLost();
+	if (mSelectedMatch >= 0 && row < 0) mGrid.onFocusGained();
+	mSelectedMatch = row;
+	mPickPressed = false;
+	styleMatches();
+}
+
+bool GuiTextEditPopupKeyboard::matchInput(InputConfig* config, Input input)
+{
+	bool toggle = config->isMappedTo("r2", input);
+	bool up = config->isMappedLike("up", input);
+	bool down = config->isMappedLike("down", input);
+	if (mSelectedMatch < 0)
+	{
+		if (mMatches.empty() || (!toggle && !(up && mGrid.getSelectedComponent() == mKeyboardGrid && mKeyboardGrid->getCursor().y() == 0)))
+			return false;
+		if (input.value) focusMatch(0);
+		return true;
+	}
+	if (config->isMappedTo(BUTTON_OK, input))
+	{
+		if (input.value) mPickPressed = true;
+		else if (mPickPressed)
+		{
+			mPickGame(mCatalog[mMatches[mSelectedMatch]]);
+			delete this;
+		}
+		return true;
+	}
+	if (toggle || config->isMappedTo(BUTTON_BACK, input) || (down && mSelectedMatch+1 == (int)mMatches.size()))
+	{
+		if (input.value) focusMatch(-1);
+		return true;
+	}
+	if (up || down)
+	{
+		if (input.value) focusMatch(std::max(0, mSelectedMatch + (down ? 1 : -1)));
+		return true;
+	}
+	// START applies the typed filter and X clears it through the usual keyboard handlers.
+	return !config->isMappedTo("start", input) && !config->isMappedTo("x", input);
+}
+
 void GuiTextEditPopupKeyboard::update(int deltaTime)
 {
 	GuiComponent::update(deltaTime);
+	if (mPickGame && mText->getValue() != mLastQuery) refreshMatches();
 	if (mHint)
 		mHint->setVisible(mText->getValue().empty());
 }
 
 bool GuiTextEditPopupKeyboard::input(InputConfig* config, Input input)
 {
+	if (mPickGame && matchInput(config, input)) return true;
 	if (GuiComponent::input(config, input))
 		return true;
 

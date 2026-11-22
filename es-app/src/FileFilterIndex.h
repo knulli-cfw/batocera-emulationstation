@@ -66,7 +66,7 @@ public:
 
 	void clearAllFilters();
 	
-	virtual int showFile(FileData* game);
+	virtual int showFile(FileData* game, bool ignoreText = false);
 	virtual bool isFiltered() { return (!mTextFilter.empty() || filterByGenre || filterByPlayers || filterByPubDev || filterByFamily
 		|| filterByRatings || filterByFavorites || filterByKidGame || filterByPlayed || filterByLang || filterByRegion || filterByYear || filterByCheevos || filterByVertical || filterByLightGun || filterByWheel || filterByTrackball || filterBySpinner || filterByHasMedia || filterByMissingMedia); };
 
@@ -177,7 +177,7 @@ public:
 	bool load(const std::string file);
 	bool save();
 
-	int showFile(FileData* game) override;
+	int showFile(FileData* game, bool ignoreText = false) override;
 	bool isFiltered() override;
 
 	bool isSystemSelected(const std::string name);

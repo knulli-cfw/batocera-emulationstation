@@ -1039,7 +1039,7 @@ const std::string& CollectionFileData::getName()
 	return mSourceFileData->getName();
 }
 
-const std::vector<FileData*> FolderData::getChildrenListToDisplay() 
+const std::vector<FileData*> FolderData::getChildrenListToDisplay(bool ignoreTextFilter)
 {
 	std::vector<FileData*> ret;
 
@@ -1102,7 +1102,7 @@ const std::vector<FileData*> FolderData::getChildrenListToDisplay()
 
 		if (idx != nullptr)
 		{
-			int score = idx->showFile(*it);
+			int score = idx->showFile(*it, ignoreTextFilter);
 			if (score == 0)
 				continue;
 
@@ -1124,7 +1124,7 @@ const std::vector<FileData*> FolderData::getChildrenListToDisplay()
 			auto fd = pFolder->findUniqueGameForFolder();
 			if (fd != nullptr)
 			{
-				if (idx != nullptr && !idx->showFile(fd))
+				if (idx != nullptr && !idx->showFile(fd, ignoreTextFilter))
 					continue;
 
 				if (!showHiddenFiles && fd->getHidden())
@@ -1148,7 +1148,7 @@ const std::vector<FileData*> FolderData::getChildrenListToDisplay()
 
 	const FileSorts::SortType& sort = FileSorts::getSortTypes().at(currentSortId);
 
-	if (idx != nullptr && idx->hasRelevency())
+	if (!ignoreTextFilter && idx != nullptr && idx->hasRelevency())
 	{
 		auto compf = sort.comparisonFunction;
 

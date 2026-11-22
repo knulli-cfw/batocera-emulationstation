@@ -15,6 +15,9 @@ public:
 		const std::shared_ptr<ThemeData>& searchTheme = nullptr, const std::string& scope = "");
 	static void openSearch(Window* window, const std::shared_ptr<ThemeData>& theme, const std::string& scope,
 		const std::string& title, const std::string& value, const std::function<void(const std::string&)>& apply);
+	struct SearchEntry { std::string title, foldedTitle, system, path, lastPlayed; };
+	using PickGame = std::function<void(const SearchEntry&)>;
+	void enableSuggestions(std::vector<SearchEntry> catalog, PickGame pick);
 	void update(int deltaTime) override;
 
 	bool input(InputConfig* config, Input input);
@@ -58,6 +61,19 @@ private:
 
 	std::shared_ptr<ThemeData> mSearchTheme;
 	std::shared_ptr<TextComponent> mScope, mHint, mShortcuts;
+	static constexpr int suggestionLimit = 3;
+	std::vector<SearchEntry> mCatalog;
+	std::vector<size_t> mMatches;
+	PickGame mPickGame;
+	std::shared_ptr<TextComponent> mMatchHeader, mMatchCursor;
+	std::shared_ptr<TextComponent> mRowTitle[suggestionLimit], mRowSystem[suggestionLimit];
+	std::string mLastQuery;
+	int mSelectedMatch = -1;
+	bool mPickPressed = false;
+	void refreshMatches();
+	void styleMatches();
+	void focusMatch(int row);
+	bool matchInput(InputConfig* config, Input input);
 	bool mMultiLine;
 	bool mShift = false;	
 	bool mAlt = false;

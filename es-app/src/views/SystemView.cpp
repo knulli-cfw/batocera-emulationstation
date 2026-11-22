@@ -24,7 +24,7 @@
 #include "CollectionSystemManager.h"
 #include "resources/TextureDataManager.h"
 #include "guis/GuiTextEditPopup.h"
-#include "guis/GuiTextEditPopupKeyboard.h"
+#include "guis/GuiGamelistOptions.h"
 #include "TextToSpeech.h"
 #include "BindingManager.h"
 #include "guis/GuiRetroAchievements.h"
@@ -556,7 +556,7 @@ void SystemView::showQuickSearch()
 			ViewController::get()->goToGameList(all, false);
 		};
 
-		GuiTextEditPopupKeyboard::openSearch(mWindow, all->getTheme(), all->getFullName(),
+		GuiGamelistOptions::openGameSearch(mWindow, all,
 			_("QUICK SEARCH"), "", updateVal);
 	}
 }
