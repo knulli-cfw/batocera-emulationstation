@@ -9,7 +9,7 @@
 #include "resources/TextureResource.h"
 #include "renderers/Renderer.h"
 
-class VideoComponent;
+class VideoVlcComponent;
 
 struct GridImageProperties
 {
@@ -276,6 +276,8 @@ private:
 	void	createCheevos();
 	void	createImageOverlay();
 	void	stopVideo();
+	void setPreviewVisible(bool visible);
+	void playExtraStoryboard(const std::string& event);
 
 	void resize();
 
@@ -308,14 +310,14 @@ private:
 
 	Vector3f mAnimPosition;
 
-	VideoComponent* mVideo;
+	VideoVlcComponent* mVideo;
 	ImageComponent* mImage;
 	ImageComponent* mMarquee;
 	ImageComponent* mFavorite;
 	ImageComponent* mCheevos;
 	ImageComponent* mImageOverlay;
 
-	bool mVideoPlaying;	
+	bool mPreviewVisible;
 	bool mHasStandardMarquee;
 	bool mHasItemTemplate;
 };
