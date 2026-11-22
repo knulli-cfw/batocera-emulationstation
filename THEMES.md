@@ -1769,3 +1769,35 @@ Show Empty Systems
 ==================
 
 If you are creating per-system logos and would like to see what all systems look like in your theme on a live install without having to actually have ROMs in each system's folder, simply go to Main Menu → Game Collection Settings → Show Empty Systems
+
+## Handheld game lists, saves and word completion
+
+These variables are read by the frontend. Existing themes can keep their usual controls and keyboard. The following example belongs in a theme's variables block.
+
+```xml
+<variables>
+  <esGameListXAction>savestates</esGameListXAction>
+  <esGameLaunchTransition>shortFade</esGameLaunchTransition>
+  <esSingleNewGame>true</esSingleNewGame>
+  <esSaveToday>Today</esSaveToday>
+  <esSaveYesterday>Yesterday</esSaveYesterday>
+  <esSaveUnknownDate>Unknown date</esSaveUnknownDate>
+  <esWordComplete>Complete word</esWordComplete>
+  <esWordStart>Frequent words</esWordStart>
+  <esWordNext>Next word</esWordNext>
+</variables>
+```
+
+* With `esGameListXAction=savestates`, X opens the selected game's states and A launches directly. A game without state support can display `esNoSaveStatesText`. The theme's short fade applies to automatic/fade launch transitions. Explicit instant or slide choices retain precedence.
+* The word keyboard draws suggestions from titles in the search scope. L2 inserts the first word. R2 focuses the word cards, left/right selects and A inserts the word at the cursor. After a space, the cards suggest words that follow the previous one. Suggestions keep the keyboard open. Enable the on-screen keyboard to exercise this path.
+* Set `esRandomCollectionPreview` and `esRotateCollectionPreview` to `true` for collection panels, and `esRotateConsolePreview` for a system's panel. Bind its media and text to the same `system:continue` game. Named save dates, the collection panel and the meter's optional `trackBorderColor` can be used independently.
+* The KNULLI-specific resume adapter is optional. If installed, it must recognize explicit slots including `-2` for a fresh libretro session. Without it, ES uses its regular launcher.
+
+To run the standalone word-completion regression on Linux, from the repository root:
+
+```sh
+c++ -std=c++14 -O1 -ffunction-sections -fdata-sections -Wl,--gc-sections -Ies-core/src \
+    tests/word-completion.cpp es-core/src/utils/WordCompletion.cpp es-core/src/utils/StringUtil.cpp \
+    -o /tmp/es-word-completion
+LC_ALL=C.UTF-8 /tmp/es-word-completion
+```
