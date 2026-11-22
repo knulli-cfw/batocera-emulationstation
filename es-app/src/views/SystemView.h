@@ -148,7 +148,7 @@ private:
 	void	 renderInPlace(const Transform4x4f& screen, ColumnLayout::Role role);
 	ColumnLayout::Role columnRole(GuiComponent* extra);
 	bool	 onContinueVideoEnded(SystemData* system, VideoComponent* video);
-	bool	 collectionPanelActive();
+	bool	 homePanelActive();
 
 	void	 renderCarousel(const Transform4x4f& parentTrans);
 	void	 renderExtras(const Transform4x4f& parentTrans, float lower, float upper);
@@ -202,7 +202,7 @@ private:
 	std::string mEndedPreviewPath;
 	std::string mShownVideo;
 	int mStillElapsed = 0;
-	bool mCollectionPlayback = false;
+	bool mHomePreviewPlayback = false;
 	SystemData*							mShownSystem;
 	std::string							mShownContinue;
 	unsigned int						mContinueShownAt;

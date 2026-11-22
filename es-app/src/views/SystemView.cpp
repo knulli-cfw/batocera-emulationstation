@@ -752,7 +752,7 @@ bool SystemView::input(InputConfig* config, Input input)
 			FileData* game = system != nullptr ? system->getContinueGame() : nullptr;
 
 			// If a library change invalidated the visible pick, rebind before accepting X.
-			if (system != nullptr && (system->usesRandomCollectionPreview() || system->rotatesCollectionPreview()) &&
+			if (system != nullptr && (system->usesRandomCollectionPreview() || system->rotatesHomePreview()) &&
 				(system != mShownSystem || game == nullptr || game->getPath() != mShownContinue))
 			{
 				updateExtraTextBinding();
@@ -960,11 +960,11 @@ void SystemView::update(int deltaTime)
 		mSuggestionEnded = nullptr;
 		if (system == getSelected() && system == mShownSystem && mEndedPreviewPath == mShownContinue)
 		{
-			if (system->rotatesCollectionPreview())
+			if (system->rotatesHomePreview())
 			{
-				if (collectionPanelActive() && system->hasOtherCollectionPreview())
+				if (homePanelActive() && system->hasOtherHomePreview())
 				{
-					system->collectionPreview(true);
+					system->homePreview(true);
 					updateExtraTextBinding();
 				}
 			}
@@ -973,7 +973,7 @@ void SystemView::update(int deltaTime)
 		}
 	}
 	// An image-only or unplayable entry has no EOF. Give its still eight visible seconds.
-	if (mCollectionPlayback && collectionPanelActive() && mShownSystem->hasOtherCollectionPreview())
+	if (mHomePreviewPlayback && homePanelActive() && mShownSystem->hasOtherHomePreview())
 	{
 		mStillElapsed += deltaTime;
 		if (mStillElapsed >= 8000)
@@ -981,7 +981,7 @@ void SystemView::update(int deltaTime)
 			mStillElapsed = 0;
 			if (mShownVideo.empty() || !Utils::FileSystem::exists(mShownVideo) || VideoComponent::isUnplayable(mShownVideo))
 			{
-				mShownSystem->collectionPreview(true);
+				mShownSystem->homePreview(true);
 				updateExtraTextBinding();
 			}
 		}
@@ -1014,7 +1014,7 @@ void SystemView::update(int deltaTime)
 // MIN_SUGGESTION_MS: a video that ends at once loops until then rather than start VLC again every few frames.
 static const unsigned int MIN_SUGGESTION_MS = 5000;
 
-bool SystemView::collectionPanelActive()
+bool SystemView::homePanelActive()
 {
 	return mShownSystem && mShownSystem == getSelected() && isShowing() && (!hasColumns() || mColumnLevel == 2) &&
 		!mScreensaverActive && !GuiComponent::isLaunchTransitionRunning && mWindow->peekGui() == ViewController::get() &&
@@ -1023,10 +1023,10 @@ bool SystemView::collectionPanelActive()
 
 bool SystemView::onContinueVideoEnded(SystemData* system, VideoComponent* video)
 {
-	if (system && system->rotatesCollectionPreview())
+	if (system && system->rotatesHomePreview())
 	{
-		if (!collectionPanelActive() || system != mShownSystem || !mCollectionPlayback ||
-			video->getVideoPath() != mShownVideo || !system->hasOtherCollectionPreview())
+		if (!homePanelActive() || system != mShownSystem || !mHomePreviewPlayback ||
+			video->getVideoPath() != mShownVideo || !system->hasOtherHomePreview())
 			return true;
 		mSuggestionEnded = system;
 		mEndedPreviewPath = mShownContinue;
@@ -1059,8 +1059,8 @@ void SystemView::updateExtraTextBinding()
 	Utils::FileSystem::FileSystemCacheActivator fsc;
 	SystemData::FindPass findPass;
 
-	if (system != mShownSystem && (system->rotatesCollectionPreview() || system->usesRandomCollectionPreview()))
-		system->enterCollectionPreview();
+	if (system != mShownSystem && (system->rotatesHomePreview() || system->usesRandomCollectionPreview()))
+		system->enterHomePreview();
 
 	for (auto extra : mEntries[mCursor].backgroundExtras)
 		BindingManager::updateBindings(extra, system);
@@ -1068,9 +1068,9 @@ void SystemView::updateExtraTextBinding()
 	// The game the panel now shows, for X, and since when
 	FileData* shown = system->getContinueGame();
 	std::string path = shown != nullptr ? shown->getPath() : "";
-	mCollectionPlayback = shown && system->rotatesCollectionPreview() &&
+	mHomePreviewPlayback = shown && system->rotatesHomePreview() &&
 		system->getTheme()->getVariable("animateSystems") == "1";
-	mShownVideo = mCollectionPlayback ? shown->getVideoPath() : "";
+	mShownVideo = mHomePreviewPlayback ? shown->getVideoPath() : "";
 	if (system != mShownSystem || path != mShownContinue)
 	{
 		mShownSystem = system;
@@ -1421,7 +1421,7 @@ void SystemView::setColumnLevel(int level, bool animate)
 	{
 		mSuggestionEnded = nullptr;
 		mStillElapsed = 0;
-		if (level == 2 && getSelected() && getSelected()->rotatesCollectionPreview())
+		if (level == 2 && getSelected() && getSelected()->rotatesHomePreview())
 			mShownSystem = nullptr;
 	}
 	mColumnLevel = level;

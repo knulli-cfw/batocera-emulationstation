@@ -119,10 +119,10 @@ public:
 	// What X continues: getLastPlayedGame(true), nothing on a utility system
 	FileData* getContinueGame();
 	bool usesRandomCollectionPreview();
-	bool rotatesCollectionPreview();
-	void enterCollectionPreview();
-	bool hasOtherCollectionPreview() const;
-	FileData* collectionPreview(bool advance);
+	bool rotatesHomePreview();
+	void enterHomePreview();
+	bool hasOtherHomePreview() const;
+	FileData* homePreview(bool advance);
 	static bool isUtilitySystem(SystemData* system);
 	// The game played last on the console (tools and screenshots left out)
 	static FileData* getConsoleLastPlayedGame();
