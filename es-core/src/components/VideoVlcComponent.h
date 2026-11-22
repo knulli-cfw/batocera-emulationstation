@@ -112,6 +112,7 @@ public:
 	void setEffect(VideoVlcFlags::VideoVlcEffect effect) { mEffect = effect; }
 
 	// A resumed player may exist before its first frame has reached the renderer.
+	bool drawsExclusiveFrame() override;
 	bool hasVisibleFrame() const { return mIsPlaying && mFadeIn > 0 && mTexture != nullptr; }
 
 	bool getLinearSmooth() { return mLinearSmooth; }

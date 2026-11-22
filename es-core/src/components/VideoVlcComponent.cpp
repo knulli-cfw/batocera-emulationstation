@@ -692,6 +692,12 @@ void VideoVlcComponent::updateRoundCorners()
 	mRoundCornerStencil = Renderer::createRoundRect(x, y, size_x, size_y, radius);
 }
 
+bool VideoVlcComponent::drawsExclusiveFrame()
+{
+	return mExclusiveSnapshot && isVisible() && isShowing() && mInView && hasVisibleFrame() &&
+		!mVideoPath.empty() && mVideoPath == mPlayingVideoPath && mTexture->isLoaded();
+}
+
 void VideoVlcComponent::render(const Transform4x4f& parentTrans)
 {
 	if (!isVisible())
@@ -704,7 +710,11 @@ void VideoVlcComponent::render(const Transform4x4f& parentTrans)
 		return;
 	}
 
+	// Both layers choose from the same pre-render state. The base render may start VLC.
+	const bool waitingForFrame = mExclusiveSnapshot && !drawsExclusiveFrame();
 	VideoComponent::render(parentTrans);
+	if (waitingForFrame)
+		return;
 
 	bool initFromPixels = true;
 

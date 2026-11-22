@@ -118,6 +118,8 @@ public:
 	virtual void onVideoStarted();
 	// Whether the video comes in over its snapshot in place, the snapshot whole under it until it is in (a
 	// crossfade); otherwise the snapshot fades out as the video comes in
+	bool usesExclusiveSnapshot() const { return mExclusiveSnapshot; }
+	virtual bool drawsExclusiveFrame() { return false; }
 	virtual bool coversSnapshot() { return false; }
 
 	const MaxSizeInfo getMaxSizeInfo()
@@ -233,6 +235,7 @@ protected:
 	bool							mTargetIsMin;
 	bool							mKeepOrientation;
 	bool							mInView = true;
+	bool mExclusiveSnapshot = false;
 	// how long the video takes to come in over its snapshot (the theme's fadeTime)
 	int								mFadeTimeMs = 400;
 

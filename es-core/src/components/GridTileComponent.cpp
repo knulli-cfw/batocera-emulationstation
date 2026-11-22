@@ -425,9 +425,12 @@ void GridTileComponent::renderContent(const Transform4x4f& parentTrans, bool ren
 		if (child->isVisible() && child->getExtraType() == ExtraType::EXTRACHILDREN && child->getZIndex() < refZindex)
 			child->render(trans);
 
-	if (mImage != NULL)
+	if (mImage != nullptr)
 	{
-		if (!isMinSize || !mSelected || mVideo == nullptr || !(mVideo->isPlaying() && !mVideo->isFading()))
+		const bool hideImage = mSelected && mVideo != nullptr && (mVideo->usesExclusiveSnapshot()
+			? mVideo->drawsExclusiveFrame()
+			: isMinSize && mVideo->isPlaying() && !mVideo->isFading());
+		if (!hideImage)
 			mImage->render(trans);
 	}
 

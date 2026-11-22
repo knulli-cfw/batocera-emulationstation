@@ -249,6 +249,16 @@ bool VideoComponent::isUnplayable(const std::string& path)
 
 void VideoComponent::renderSnapshot(const Transform4x4f& parentTrans)
 {
+	if (mExclusiveSnapshot)
+	{
+		if (!drawsExclusiveFrame() && (mConfig.showSnapshotDelay || mConfig.showSnapshotNoVideo))
+		{
+			mStaticImage.setOpacity(getOpacity());
+			mStaticImage.render(parentTrans);
+		}
+		return;
+	}
+
 	// Out of view (a view still drawn while it slides away, or before it is shown), the stopped video leaves its
 	// snapshot in its place instead of a hole
 	if ((!isShowing() || !mInView) && !mIsPlaying && !mIsWaitingForVideoToStart && !isPaused() && (mConfig.showSnapshotNoVideo || mConfig.showSnapshotDelay))
@@ -347,6 +357,8 @@ void VideoComponent::applyTheme(const std::shared_ptr<ThemeData>& theme, const s
 
 	if ((properties & ThemeFlags::DELAY) && elem->has("delay"))
 		mConfig.startDelay = (unsigned)(elem->get<float>("delay") * 1000.0f);
+
+	mExclusiveSnapshot = elem->has("exclusiveSnapshot") && elem->get<bool>("exclusiveSnapshot");
 
 	if (elem->has("showSnapshotNoVideo"))
 		mConfig.showSnapshotNoVideo = elem->get<bool>("showSnapshotNoVideo");
