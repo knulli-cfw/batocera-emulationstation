@@ -436,7 +436,7 @@ void ISimpleGameListView::launchSelectedGame()
 	{
 		if (cursor->getType() == GAME)
 		{
-			if (SaveStateRepository::isEnabled(cursor) &&
+			if ((!usesSavedGamesButton() || !hasPlayableSelection()) && SaveStateRepository::isEnabled(cursor) &&
 				(cursor->getCurrentGameSetting("savestates") == "1" || (cursor->getCurrentGameSetting("savestates") == "2" && cursor->getSourceFileData()->getSystem()->getSaveStateRepository()->hasSaveStates(cursor))))
 			{
 				mWindow->pushGui(new GuiSaveState(mWindow, cursor, [this, cursor](SaveState* state)
