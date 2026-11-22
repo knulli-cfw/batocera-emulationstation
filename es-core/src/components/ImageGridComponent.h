@@ -156,7 +156,19 @@ public:
 		listInput(input.value ? (left ? -1 : 1) : 0, true);
 		return true;
 	}
-	int pageRowCount() { return std::max(1, (isVertical() ? mGridDimension.y() : mGridDimension.x()) - 2 * EXTRAITEMS); }
+	int pageRowCount()
+	{
+		const bool vertical = isVertical();
+		const float gap = vertical ? mMargin.y() : mMargin.x();
+		const float stride = (vertical ? mTileSize.y() : mTileSize.x()) + gap;
+		if (stride <= 0) return 1;
+		const float screen = vertical ? Renderer::getScreenHeight() : Renderer::getScreenWidth();
+		const float origin = vertical ? this->getPosition().y() : this->getPosition().x();
+		const float extent = vertical ? mSize.y() : mSize.x();
+		const float leading = vertical ? mPadding.y() : mPadding.x();
+		const float clip = std::min(screen - origin, extent + Math::round(mPeekSize * screen));
+		return std::max(1, static_cast<int>(std::floor((clip - leading + gap + 0.01f) / stride)));
+	}
 	bool canPageRows() { return static_cast<int>(mEntries.size()) > getColumnCount() * pageRowCount(); }
 	void pageRows(int direction);
 
@@ -205,6 +217,7 @@ private:
 	std::string mName;
 
 	int mStartPosition;
+	int mPageStart = -1; // Explicit viewport for the duration of a shoulder page turn.
 
 	bool mAllowVideo;
 	float mVideoDelay;
@@ -1157,7 +1170,7 @@ void ImageGridComponent<T>::onCursorChanged(const CursorState& state)
 	bool direction = mCursor >= mLastCursor;
 	bool isScrollLooping = false;
 
-	if (mScrollLoop)
+	if (mScrollLoop && mPageStart < 0)
 	{
 		int diff = direction ? mCursor - mLastCursor : mLastCursor - mCursor;
 		if (mScrollLoop && diff == mEntries.size() - 1)
@@ -1231,7 +1244,9 @@ void ImageGridComponent<T>::onCursorChanged(const CursorState& state)
 
 	auto oldStartPosition = mStartPosition;
 
-	if (mCenterSelection == CenterSelection::NEVER)
+	if (mPageStart >= 0)
+		mStartPosition = mPageStart;
+	else if (mCenterSelection == CenterSelection::NEVER)
 	{
 		if (col == 0)
 			mStartPosition = 0;
@@ -1802,13 +1817,22 @@ int ImageGridComponent<T>::getColumnCount()
 template<typename T>
 void ImageGridComponent<T>::pageRows(int direction)
 {
-	if (mEntries.empty()) return;
+	if (mEntries.empty() || direction == 0) return;
 	const int columns = getColumnCount();
 	const int rows = pageRowCount();
+	const int count = static_cast<int>(mEntries.size());
+	const int totalRows = (count + columns - 1) / columns;
+	if (totalRows <= rows) return;
+	const int top = std::max(0, std::min(totalRows - 1, mStartPosition / columns));
+	const int nextTop = std::max(0, top + (direction > 0 ? rows : -rows));
+	if (nextTop == top || nextTop >= totalRows) return;
 	const int column = mCursor % columns;
-	const int lastRow = (int(mEntries.size()) - 1 - column) / columns;
-	const int row = std::max(0, std::min(lastRow, mCursor / columns + direction * rows));
-	this->setCursorIndex(row * columns + column);
+	const int offset = std::max(0, std::min(rows - 1, mCursor / columns - top));
+	const int lastRowInColumn = (count - 1 - column) / columns;
+	const int row = std::max(nextTop, std::min(nextTop + offset, lastRowInColumn));
+	mPageStart = nextTop * columns;
+	this->setCursorIndex(std::min(count - 1, row * columns + column));
+	mPageStart = -1;
 }
 
 template<typename T>
