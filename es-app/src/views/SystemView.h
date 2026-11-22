@@ -38,6 +38,8 @@ struct SystemViewTab
 };
 
 
+class VideoComponent;
+
 class SystemView : public GuiComponent
 {
 public:
@@ -145,7 +147,8 @@ private:
 	void	 renderExtra(GuiComponent* extra, const Transform4x4f& trans);
 	void	 renderInPlace(const Transform4x4f& screen, ColumnLayout::Role role);
 	ColumnLayout::Role columnRole(GuiComponent* extra);
-	bool	 onContinueVideoEnded(SystemData* system);
+	bool	 onContinueVideoEnded(SystemData* system, VideoComponent* video);
+	bool	 collectionPanelActive();
 
 	void	 renderCarousel(const Transform4x4f& parentTrans);
 	void	 renderExtras(const Transform4x4f& parentTrans, float lower, float upper);
@@ -196,6 +199,10 @@ private:
 	// The panel's suggestion: the system whose video ended (update moves on), the game shown and since when,
 	// and the slides version each card was bound with
 	SystemData*							mSuggestionEnded;
+	std::string mEndedPreviewPath;
+	std::string mShownVideo;
+	int mStillElapsed = 0;
+	bool mCollectionPlayback = false;
 	SystemData*							mShownSystem;
 	std::string							mShownContinue;
 	unsigned int						mContinueShownAt;

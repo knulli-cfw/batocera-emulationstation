@@ -2431,33 +2431,80 @@ bool SystemData::usesRandomCollectionPreview()
 		mTheme && mTheme->getVariable("esRandomCollectionPreview") == "true";
 }
 
+bool SystemData::rotatesCollectionPreview()
+{
+	return isCollection() && (getName() == "all" || getName() == "favorites" || getName() == "recent") &&
+		mTheme && mTheme->getVariable("esRotateCollectionPreview") == "true";
+}
+
+bool SystemData::hasOtherCollectionPreview() const
+{
+	return mHistoryPreviews.size() > 1 || mCollectionPreviews.size() > 1;
+}
+
+void SystemData::enterCollectionPreview()
+{
+	if (getName() == "recent")
+	{
+		collectionPreview(false);
+		mHistoryPreviewIndex = 0;
+		return;
+	}
+
+	auto pick = collectionPreview(true);
+	if (pick && pick->getPath() == mCollectionLatestPath && hasOtherCollectionPreview())
+		collectionPreview(true);
+}
+
 // The deck stores collection paths, never pointers. Refresh only when the library changes.
 FileData* SystemData::collectionPreview(bool advance)
 {
 	if (mRootFolder == nullptr)
 		return nullptr;
 
+	bool history = getName() == "recent";
 	if (mCollectionPreviewsDirty)
 	{
 		std::vector<std::string> candidates;
+		std::vector<HomeSlides::Dated> dated;
 		std::unordered_set<std::string> seen;
-		FileData* latest = getConsoleLastPlayedGame();
-		std::string latestPath;
+		FileData* latest = history ? nullptr : getConsoleLastPlayedGame();
+		mCollectionLatestPath.clear();
 		for (auto game : mRootFolder->getFilesRecursive(GAME, true))
 		{
 			auto source = game->getSourceFileData();
 			if (source == nullptr || isUtilitySystem(source->getSystem()) ||
 				(getName() == "favorites" && !source->getFavorite()) || !seen.insert(source->getPath()).second)
 				continue;
-			if (latest != nullptr && source->getPath() == latest->getSourceFileData()->getPath())
-				latestPath = game->getPath();
+			if (history)
+				dated.push_back({game->getPath(), source->getName(), source->getMetadata(MetaDataId::LastPlayed)});
+			else if (latest && source->getPath() == latest->getPath())
+				mCollectionLatestPath = game->getPath();
 			else
 				candidates.push_back(game->getPath());
 		}
-		if (candidates.empty() && !latestPath.empty())
-			candidates.push_back(latestPath);
-		mCollectionPreviews.reset(candidates, homeRandom());
+		if (history)
+		{
+			auto previous = mHistoryPreviews.empty() ? std::string() : mHistoryPreviews[mHistoryPreviewIndex];
+			mHistoryPreviews = HomeSlides::newestFirst(dated, dated.size());
+			auto it = std::find(mHistoryPreviews.begin(), mHistoryPreviews.end(), previous);
+			mHistoryPreviewIndex = it == mHistoryPreviews.end() ? 0 : it - mHistoryPreviews.begin();
+		}
+		else
+		{
+			if (!mCollectionLatestPath.empty() && (candidates.empty() || rotatesCollectionPreview()))
+				candidates.push_back(mCollectionLatestPath);
+			mCollectionPreviews.reset(candidates, homeRandom());
+		}
 		mCollectionPreviewsDirty = false;
+	}
+	if (history)
+	{
+		if (mHistoryPreviews.empty())
+			return nullptr;
+		if (advance)
+			mHistoryPreviewIndex = (mHistoryPreviewIndex + 1) % mHistoryPreviews.size();
+		return findByPath(mHistoryPreviews[mHistoryPreviewIndex]);
 	}
 	if (advance)
 		mCollectionPreviews.next(homeRandom());
@@ -2466,7 +2513,7 @@ FileData* SystemData::collectionPreview(bool advance)
 
 FileData* SystemData::getContinueGame()
 {
-	if (usesRandomCollectionPreview())
+	if (usesRandomCollectionPreview() || rotatesCollectionPreview())
 		return collectionPreview(false);
 	return isUtilitySystem(this) ? nullptr : getLastPlayedGame(true);
 }

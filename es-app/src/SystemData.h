@@ -119,6 +119,9 @@ public:
 	// What X continues: getLastPlayedGame(true), nothing on a utility system
 	FileData* getContinueGame();
 	bool usesRandomCollectionPreview();
+	bool rotatesCollectionPreview();
+	void enterCollectionPreview();
+	bool hasOtherCollectionPreview() const;
 	FileData* collectionPreview(bool advance);
 	static bool isUtilitySystem(SystemData* system);
 	// The game played last on the console (tools and screenshots left out)
@@ -333,6 +336,9 @@ private:
 	int mSlidesVersion;
 	HomeSlides::Deck mSuggestions;
 	HomeSlides::Deck mCollectionPreviews;
+	std::vector<std::string> mHistoryPreviews;
+	size_t mHistoryPreviewIndex = 0;
+	std::string mCollectionLatestPath;
 	bool mCollectionPreviewsDirty = true;
 	bool mSuggestionsReady;
 	bool mHomeDirty;		// to be made (again)
