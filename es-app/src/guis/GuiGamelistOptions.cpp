@@ -348,10 +348,8 @@ void GuiGamelistOptions::addTextFilterToMenu()
 
 	row.makeAcceptInputHandler([this, updateVal]
 	{
-		if (Settings::getInstance()->getBool("UseOSK"))
-			mWindow->pushGui(new GuiTextEditPopupKeyboard(mWindow, _("FILTER GAMES BY TEXT"), mTextFilter->getValue(), updateVal, false));
-		else
-			mWindow->pushGui(new GuiTextEditPopup(mWindow, _("FILTER GAMES BY TEXT"), mTextFilter->getValue(), updateVal, false));
+		GuiTextEditPopupKeyboard::openSearch(mWindow, mSystem->getTheme(), mSystem->getFullName(),
+			_("FILTER GAMES BY TEXT"), mTextFilter->getValue(), updateVal);
 	});
 
 	mMenu.addRow(row);

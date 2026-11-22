@@ -647,7 +647,12 @@ std::string FileData::getlaunchCommand(LaunchGameOptions& options, bool includeC
 			std::string launcher = Utils::FileSystem::getEscapedPath(resume);
 			if (!state)
 				return launcher + command.substr(name.size());
-			launcher += " --es-resume-slot=" + std::to_string(state->slot);
+			// A single new-game tile starts fresh even if sync delivers an auto state
+			// after the list opens. RetroArch keeps its configured auto-save-on-exit policy.
+			const auto theme = system->getTheme();
+			const bool freshAuto = state->slot == -1 && state->fileName.empty() && getEmulator() == "libretro" &&
+				theme && theme->getVariable("esSingleNewGame") == "true";
+			launcher += " --es-resume-slot=" + std::to_string(freshAuto ? -2 : state->slot);
 			command = launcher + command.substr(name.size());
 			// The active libretro core can open a slot directly, without staging a
 			// copy or renaming the player's automatic state before sync.

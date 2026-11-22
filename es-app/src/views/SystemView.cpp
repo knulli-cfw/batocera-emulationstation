@@ -556,10 +556,8 @@ void SystemView::showQuickSearch()
 			ViewController::get()->goToGameList(all, false);
 		};
 
-		if (Settings::getInstance()->getBool("UseOSK"))
-			mWindow->pushGui(new GuiTextEditPopupKeyboard(mWindow, _("QUICK SEARCH"), "", updateVal, false));
-		else
-			mWindow->pushGui(new GuiTextEditPopup(mWindow, _("QUICK SEARCH"), "", updateVal, false));
+		GuiTextEditPopupKeyboard::openSearch(mWindow, all->getTheme(), all->getFullName(),
+			_("QUICK SEARCH"), "", updateVal);
 	}
 }
 

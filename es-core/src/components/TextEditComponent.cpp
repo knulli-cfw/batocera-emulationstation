@@ -13,7 +13,7 @@
 
 #define BLINKTIME	1000
 
-TextEditComponent::TextEditComponent(Window* window) : GuiComponent(window),
+TextEditComponent::TextEditComponent(Window* window, const std::shared_ptr<Font>& font) : GuiComponent(window),
 	mBox(window, ":/textinput_ninepatch.png"), mFocused(false), 
 	mScrollOffset(0.0f, 0.0f), mCursor(0), mEditing(false), mFont(Font::get(FONT_SIZE_MEDIUM, FONT_PATH_LIGHT)), 
 	mCursorRepeatDir(0)
@@ -24,7 +24,9 @@ TextEditComponent::TextEditComponent(Window* window) : GuiComponent(window),
 	auto theme = ThemeData::getMenuTheme();
 	mBox.setImagePath(ThemeData::getMenuTheme()->Icons.textinput_ninepatch);
 
-	if (theme->TextEdit.font != nullptr)
+	if (font)
+		mFont = font;
+	else if (theme->TextEdit.font != nullptr)
 		mFont = theme->TextEdit.font;
 
 	addChild(&mBox);

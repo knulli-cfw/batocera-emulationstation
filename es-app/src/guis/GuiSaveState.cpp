@@ -180,16 +180,16 @@ void GuiSaveState::loadGrid()
 	std::string newGameIcon = theme->getMenuIcon("iconNewGame");
 	std::string autoSaveIcon = theme->getMenuIcon("iconAutoSave");
 
-	mGrid->add(_("START NEW GAME"), newGameIcon.empty() ? ":/freeslot.svg" : newGameIcon, SaveStateItem(mRepository->getDefaultNewGameSaveState()));
-
-	if (mRepository->supportsAutoSave() && mGame->getCurrentGameSetting("autosave") == "1")
-	{
-		auto autoSave = std::find_if(states.cbegin(), states.cend(), [](SaveState* x) { return x->slot == -1; });
-		if (autoSave == states.cend())
-			mGrid->add(_("START NEW AUTO SAVE"), autoSaveIcon.empty() ? ":/freeslot.svg" : autoSaveIcon, SaveStateItem(mRepository->getDefaultAutoSaveSaveState()));
-	}
-
 	auto datesTheme = mGame->getSystem()->getTheme();
+	const bool singleStart = datesTheme && datesTheme->getVariable("esSingleNewGame") == "true";
+	const bool offerNewAuto = mRepository->supportsAutoSave() && mGame->getCurrentGameSetting("autosave") == "1" &&
+		std::none_of(states.begin(), states.end(), [](const SaveState* state) { return state->slot == -1; });
+	auto start = singleStart && offerNewAuto ? mRepository->getDefaultAutoSaveSaveState() : mRepository->getDefaultNewGameSaveState();
+
+	mGrid->add(_("START NEW GAME"), newGameIcon.empty() ? ":/freeslot.svg" : newGameIcon, SaveStateItem(start));
+	if (!singleStart && offerNewAuto)
+		mGrid->add(_("START NEW AUTO SAVE"), autoSaveIcon.empty() ? ":/freeslot.svg" : autoSaveIcon, SaveStateItem(mRepository->getDefaultAutoSaveSaveState()));
+
 	const tm today = Utils::Time::DateTime::now().getTimeStruct();
 	tm yesterday = today;
 	--yesterday.tm_mday;
@@ -289,7 +289,7 @@ bool GuiSaveState::input(InputConfig* config, Input input)
 
 	if (input.value != 0 && config->isMappedTo("y", input))
 	{
-		if (mGrid->size())
+		if (mGrid->size() && !mGrid->getSelected().saveState->fileName.empty())
 		{
 			mWindow->pushGui(new GuiMsgBox(mWindow, _("ARE YOU SURE YOU WANT TO DELETE THIS ITEM?"), _("YES"), 
 				[this]
@@ -313,7 +313,7 @@ bool GuiSaveState::input(InputConfig* config, Input input)
 	
 	if (input.value != 0 && config->isMappedTo("x", input))
 	{
-		if (mGrid->size())
+		if (mGrid->size() && !mGrid->getSelected().saveState->fileName.empty())
 		{
 			const SaveStateItem& toCopy = mGrid->getSelected();
 			

@@ -12,7 +12,7 @@ class TextCache;
 class TextEditComponent : public GuiComponent
 {
 public:
-	TextEditComponent(Window* window);
+	TextEditComponent(Window* window, const std::shared_ptr<Font>& font = nullptr);
 	
 	void textInput(const char* text) override;
 	bool input(InputConfig* config, Input input) override;

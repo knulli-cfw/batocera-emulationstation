@@ -11,10 +11,13 @@ class GuiTextEditPopupKeyboard : public GuiComponent
 {
 public:
 	GuiTextEditPopupKeyboard(Window* window, const std::string& title, const std::string& initValue,
-		const std::function<void(const std::string&)>& okCallback, bool multiLine, const std::string acceptBtnText = "OK");
+		const std::function<void(const std::string&)>& okCallback, bool multiLine, const std::string acceptBtnText = "OK",
+		const std::shared_ptr<ThemeData>& searchTheme = nullptr, const std::string& scope = "");
+	static void openSearch(Window* window, const std::shared_ptr<ThemeData>& theme, const std::string& scope,
+		const std::string& title, const std::string& value, const std::function<void(const std::string&)>& apply);
+	void update(int deltaTime) override;
 
 	bool input(InputConfig* config, Input input);
-	//void update(int deltatime) override;
 	void onSizeChanged();
 	std::vector<HelpPrompt> getHelpPrompts() override;
 
@@ -53,6 +56,8 @@ private:
 	
 	std::function<void(const std::string&)> mOkCallback;
 
+	std::shared_ptr<ThemeData> mSearchTheme;
+	std::shared_ptr<TextComponent> mScope, mHint, mShortcuts;
 	bool mMultiLine;
 	bool mShift = false;	
 	bool mAlt = false;
