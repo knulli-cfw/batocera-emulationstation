@@ -290,14 +290,14 @@ void GuiGamelistOptions::openGameSearch(Window* window, SystemData* system, cons
 	const std::string& value, const std::function<void(const std::string&)>& apply)
 {
 	auto theme = system->getTheme();
-	if (!theme || theme->getVariable("esSearchPicks").empty() || !Settings::getInstance()->getBool("UseOSK") ||
+	if (!theme || theme->getVariable("esWordComplete").empty() || !Settings::getInstance()->getBool("UseOSK") ||
 		!theme->getElement("menu", "searchKeys", "menuKeyboard"))
 	{
 		GuiTextEditPopupKeyboard::openSearch(window, theme, system->getFullName(), title, value, apply);
 		return;
 	}
 
-	std::vector<GuiTextEditPopupKeyboard::SearchEntry> catalog;
+	WordCompletion vocabulary;
 	std::vector<FolderData*> folders = {system->getRootFolder()};
 	std::set<FolderData*> visited;
 	std::set<std::string> paths;
@@ -312,25 +312,14 @@ void GuiGamelistOptions::openGameSearch(Window* window, SystemData* system, cons
 			if (item->getType() == FOLDER)
 				folders.push_back(static_cast<FolderData*>(item));
 			else if (item->getType() == GAME && paths.insert(item->getPath()).second)
-			{
-				auto source = item->getSourceFileData();
-				const auto& name = source->getName();
-				catalog.push_back({name, Utils::String::toLower(name), source->getSystem()->getFullName(),
-					item->getPath(), source->getMetadata().get("lastplayed")});
-			}
+				vocabulary.addTitle(item->getSourceFileData()->getName());
 		}
 	}
 
-	auto pick = [system, apply](const GuiTextEditPopupKeyboard::SearchEntry& entry)
-	{
-		apply(entry.title);
-		auto view = ViewController::get()->getGameListView(system);
-		if (auto game = system->getRootFolder()->FindByPath(entry.path))
-			view->setCursor(game);
-	};
-	auto keyboard = new GuiTextEditPopupKeyboard(window, theme->getVariable("esSearchTitle"), value, apply,
+	auto commit = [apply](const std::string& query) { apply(Utils::String::trim(query)); };
+	auto keyboard = new GuiTextEditPopupKeyboard(window, theme->getVariable("esSearchTitle"), value, commit,
 		false, "OK", theme, system->getFullName());
-	keyboard->enableSuggestions(std::move(catalog), pick);
+	keyboard->enableWords(std::move(vocabulary));
 	window->pushGui(keyboard);
 }
 

@@ -5,8 +5,7 @@
 #include "Log.h"
 #include "Window.h"
 #include "utils/HtmlColor.h"
-#include <tuple>
-#include <cctype>
+
 #include "LocaleES.h"
 #include "SystemConf.h"
 
@@ -407,20 +406,19 @@ void GuiTextEditPopupKeyboard::onSizeChanged()
 		mHint->setSize(540*s, mText->getSize().y());
 		mHint->setPosition(30*s, 48*s);
 		mShortcuts->setSize(562*s, 24*s);
-		const float extra = mPickGame ? 98*s : 0;
+		const float extra = mVocabulary ? 62*s : 0;
 		mShortcuts->setPosition(19*s, 287*s+extra);
-		if (mPickGame)
+		if (mVocabulary)
 		{
 			mMatchHeader->setSize(562*s, 18*s);
 			mMatchHeader->setPosition(20*s, 79*s);
 			for (int i = 0; i < suggestionLimit; ++i)
 			{
-				float y = (99+24*i)*s;
-				mRowTitle[i]->setPadding(Vector4f(16*s, 0, 0, 0));
-				mRowTitle[i]->setSize(412*s, 23*s);
-				mRowSystem[i]->setSize(150*s, 23*s);
-				mRowTitle[i]->setPosition(19*s, y);
-				mRowSystem[i]->setPosition(431*s, y);
+				const float x = (19+190*i)*s;
+				mWordCards[i]->setSize(182*s, 34*s);
+				mWordCards[i]->setPosition(x, 99*s);
+				mWordLabels[i]->setSize(168*s, 34*s);
+				mWordLabels[i]->setPosition(x+7*s, 99*s);
 			}
 		}
 		mKeyboardGrid->setColWidthPerc(12, 0.103f, false);
@@ -446,28 +444,23 @@ void GuiTextEditPopupKeyboard::onSizeChanged()
 	mKeyboardGrid->setPosition(OSK_PADDINGX, pos.y());	
 }
 
-void GuiTextEditPopupKeyboard::enableSuggestions(std::vector<SearchEntry> catalog, PickGame pick)
+void GuiTextEditPopupKeyboard::enableWords(WordCompletion vocabulary)
 {
-	mCatalog = std::move(catalog);
-	mPickGame = std::move(pick);
+	mVocabulary.reset(new WordCompletion(std::move(vocabulary)));
 	auto theme = ThemeData::getMenuTheme();
 	mMatchHeader = std::make_shared<TextComponent>(mWindow, "", theme->TextSmall.font, theme->TextSmall.color);
 	addChild(mMatchHeader.get());
 	for (int i = 0; i < suggestionLimit; ++i)
 	{
-		mRowTitle[i] = std::make_shared<TextComponent>(mWindow, "", theme->Text.font, theme->Text.color);
-		mRowSystem[i] = std::make_shared<TextComponent>(mWindow, "", theme->TextSmall.font, theme->TextSmall.color, ALIGN_RIGHT);
-		for (auto& label : {mRowTitle[i], mRowSystem[i]})
-		{
-			label->setMultiLine(TextComponent::SINGLELINE);
-			addChild(label.get());
-		}
+		mWordCards[i] = std::make_shared<NinePatchComponent>(mWindow);
+		mWordCards[i]->setCornerSize(6, 6);
+		mWordLabels[i] = std::make_shared<TextComponent>(mWindow, "", theme->Text.font, theme->Text.color, ALIGN_CENTER);
+		mWordLabels[i]->setMultiLine(TextComponent::SINGLELINE);
+		addChild(mWordCards[i].get());
+		addChild(mWordLabels[i].get());
 	}
-	mMatchCursor = std::make_shared<TextComponent>(mWindow, "›", theme->Text.font, theme->Text.color);
-	addChild(mMatchCursor.get());
-	const float s = mSize.x()/600.0f;
-	mMatchCursor->setSize(12*s, 23*s);
-	setSize(mSize.x(), Math::round(418*s));
+	const float scale = mSize.x()/600.0f;
+	setSize(mSize.x(), Math::round(382*scale));
 	setPosition(mPosition.x(), Math::round((Renderer::getScreenHeight()-mSize.y())/2));
 	refreshMatches();
 }
@@ -475,71 +468,45 @@ void GuiTextEditPopupKeyboard::enableSuggestions(std::vector<SearchEntry> catalo
 void GuiTextEditPopupKeyboard::refreshMatches()
 {
 	mLastQuery = mText->getValue();
-	const auto query = Utils::String::toLower(Utils::String::trim(mLastQuery));
-	// Keep a bounded shortlist. Equal titles are resolved by console and then ROM path.
-	using Ranked = std::pair<int, size_t>;
-	std::vector<Ranked> best;
-	auto before = [&](const Ranked& a, const Ranked& b)
-	{
-		const auto& x = mCatalog[a.second];
-		const auto& y = mCatalog[b.second];
-		if (a.first != b.first) return a.first < b.first;
-		if (query.empty() && x.lastPlayed != y.lastPlayed) return x.lastPlayed > y.lastPlayed;
-		return std::tie(x.foldedTitle, x.system, x.path) < std::tie(y.foldedTitle, y.system, y.path);
-	};
-	for (size_t i = 0; i < mCatalog.size(); ++i)
-	{
-		const auto& name = mCatalog[i].foldedTitle;
-		const auto pos = name.find(query);
-		if (pos == std::string::npos) continue;
-		int rank = name == query ? 0 : pos == 0 ? 1 : !std::isalnum(static_cast<unsigned char>(name[pos-1])) ? 2 : 3;
-		Ranked item(rank, i);
-		auto at = std::lower_bound(best.begin(), best.end(), item, before);
-		if (at == best.end() && best.size() == suggestionLimit) continue;
-		best.insert(at, item);
-		if (best.size() > suggestionLimit) best.pop_back();
-	}
-	mMatches.clear();
-	for (auto item : best) mMatches.push_back(item.second);
+	mLastCursor = mText->getCursor();
+	mChoices = mVocabulary->suggest(mLastQuery, mLastCursor, suggestionLimit);
 	focusMatch(-1);
+}
+
+void GuiTextEditPopupKeyboard::acceptWord(size_t index)
+{
+	if (mLastQuery != mText->getValue() || mLastCursor != mText->getCursor())
+	{
+		refreshMatches();
+		return;
+	}
+	if (index >= mChoices.words.size()) return;
+	auto query = mLastQuery;
+	const auto cursor = mChoices.insert(query, index);
+	mText->setValue(query);
+	mText->setCursor(cursor);
+	refreshMatches();
 }
 
 void GuiTextEditPopupKeyboard::styleMatches()
 {
-	auto theme = ThemeData::getMenuTheme();
-	auto keys = mSearchTheme->getElement("menu", "searchKeys", "menuKeyboard");
-	const auto accent = Utils::HtmlColor::parse(mSearchTheme->getVariable("accent"));
-	const auto ink = keys->get<unsigned int>("selectedColor");
-	mMatchHeader->setText(mSearchTheme->getVariable(mMatches.empty() ? "esSearchNoMatches" :
-		(mLastQuery.empty() ? "esSearchBrowse" : "esSearchPicks")));
+	const auto keys = mSearchTheme->getElement("menu", "searchKeys", "menuKeyboard");
+	mMatchHeader->setText(mSearchTheme->getVariable(mChoices.words.empty() ? "esWordEmpty" :
+		mChoices.completing ? "esWordComplete" : mLastQuery.empty() ? "esWordStart" : "esWordNext"));
 	for (int i = 0; i < suggestionLimit; ++i)
 	{
-		bool visible = i < (int)mMatches.size();
-		mRowTitle[i]->setVisible(visible);
-		mRowSystem[i]->setVisible(visible);
+		bool visible = i < (int)mChoices.words.size();
+		mWordCards[i]->setVisible(visible);
+		mWordLabels[i]->setVisible(visible);
 		if (!visible) continue;
-		const auto& item = mCatalog[mMatches[i]];
 		bool selected = mSelectedMatch == i;
-		mRowTitle[i]->setText(item.title);
-		mRowSystem[i]->setText(item.system + "  ");
-		mRowTitle[i]->setAutoScroll(selected ? TextComponent::HORIZONTAL : TextComponent::NONE);
-		mRowTitle[i]->setColor(selected ? ink : theme->Text.color);
-		mRowSystem[i]->setColor(selected ? ink : theme->TextSmall.color);
-		for (auto& label : {mRowTitle[i], mRowSystem[i]})
-		{
-			label->setBackgroundColor(selected ? accent : 0);
-			label->setRenderBackground(selected);
-		}
+		mWordCards[i]->setImagePath(keys->get<std::string>(selected ? "focusedPath" : "path"));
+		mWordLabels[i]->setText(mChoices.words[i]);
+		mWordLabels[i]->setAutoScroll(selected ? TextComponent::HORIZONTAL : TextComponent::NONE);
+		mWordLabels[i]->setColor(keys->get<unsigned int>(selected ? "selectedColor" : "color"));
 	}
-	mMatchCursor->setVisible(mSelectedMatch >= 0);
-	if (mSelectedMatch >= 0)
-	{
-		const float scale = mSize.x()/600.0f;
-		mMatchCursor->setPosition(25*scale, (99+24*mSelectedMatch)*scale);
-		mMatchCursor->setColor(ink);
-	}
-	mShortcuts->setText(mSearchTheme->getVariable(mSelectedMatch >= 0 ? "esPickControls" :
-		mMatches.empty() ? "esNoPickControls" : "esSearchShortcuts"));
+	mShortcuts->setText(mSearchTheme->getVariable(mSelectedMatch >= 0 ? "esWordControls" :
+		mChoices.words.empty() ? "esNoPickControls" : "esSearchShortcuts"));
 }
 
 void GuiTextEditPopupKeyboard::focusMatch(int row)
@@ -553,12 +520,22 @@ void GuiTextEditPopupKeyboard::focusMatch(int row)
 
 bool GuiTextEditPopupKeyboard::matchInput(InputConfig* config, Input input)
 {
-	bool toggle = config->isMappedTo("r2", input);
-	bool up = config->isMappedLike("up", input);
-	bool down = config->isMappedLike("down", input);
+	if (config->isMappedTo("l2", input))
+	{
+		if (input.value) mQuickPressed = !mChoices.words.empty();
+		else if (mQuickPressed)
+		{
+			mQuickPressed = false;
+			acceptWord(0);
+		}
+		return true;
+	}
+	const bool toggle = config->isMappedTo("r2", input);
+	const bool up = config->isMappedLike("up", input);
+	const bool down = config->isMappedLike("down", input);
 	if (mSelectedMatch < 0)
 	{
-		if (mMatches.empty() || (!toggle && !(up && mGrid.getSelectedComponent() == mKeyboardGrid && mKeyboardGrid->getCursor().y() == 0)))
+		if (mChoices.words.empty() || (!toggle && !(up && mGrid.getSelectedComponent() == mKeyboardGrid && mKeyboardGrid->getCursor().y() == 0)))
 			return false;
 		if (input.value) focusMatch(0);
 		return true;
@@ -566,38 +543,35 @@ bool GuiTextEditPopupKeyboard::matchInput(InputConfig* config, Input input)
 	if (config->isMappedTo(BUTTON_OK, input))
 	{
 		if (input.value) mPickPressed = true;
-		else if (mPickPressed)
-		{
-			mPickGame(mCatalog[mMatches[mSelectedMatch]]);
-			delete this;
-		}
+		else if (mPickPressed) acceptWord(mSelectedMatch);
 		return true;
 	}
-	if (toggle || config->isMappedTo(BUTTON_BACK, input) || (down && mSelectedMatch+1 == (int)mMatches.size()))
+	if (toggle || down || config->isMappedTo(BUTTON_BACK, input))
 	{
 		if (input.value) focusMatch(-1);
 		return true;
 	}
-	if (up || down)
+	const bool left = config->isMappedLike("left", input);
+	const bool right = config->isMappedLike("right", input);
+	if (input.value && (left || right))
 	{
-		if (input.value) focusMatch(std::max(0, mSelectedMatch + (down ? 1 : -1)));
-		return true;
+		const int count = (int)mChoices.words.size();
+		focusMatch((mSelectedMatch + count + (right ? 1 : -1)) % count);
 	}
-	// START applies the typed filter and X clears it through the usual keyboard handlers.
 	return !config->isMappedTo("start", input) && !config->isMappedTo("x", input);
 }
 
 void GuiTextEditPopupKeyboard::update(int deltaTime)
 {
 	GuiComponent::update(deltaTime);
-	if (mPickGame && mText->getValue() != mLastQuery) refreshMatches();
+	if (mVocabulary && (mText->getValue() != mLastQuery || mText->getCursor() != mLastCursor)) refreshMatches();
 	if (mHint)
 		mHint->setVisible(mText->getValue().empty());
 }
 
 bool GuiTextEditPopupKeyboard::input(InputConfig* config, Input input)
 {
-	if (mPickGame && matchInput(config, input)) return true;
+	if (mVocabulary && matchInput(config, input)) return true;
 	if (GuiComponent::input(config, input))
 		return true;
 

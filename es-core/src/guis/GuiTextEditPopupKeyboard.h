@@ -6,6 +6,7 @@
 #include "components/TextEditComponent.h"
 #include "components/TextComponent.h"
 #include <functional>
+#include "utils/WordCompletion.h"
 
 class GuiTextEditPopupKeyboard : public GuiComponent
 {
@@ -15,9 +16,7 @@ public:
 		const std::shared_ptr<ThemeData>& searchTheme = nullptr, const std::string& scope = "");
 	static void openSearch(Window* window, const std::shared_ptr<ThemeData>& theme, const std::string& scope,
 		const std::string& title, const std::string& value, const std::function<void(const std::string&)>& apply);
-	struct SearchEntry { std::string title, foldedTitle, system, path, lastPlayed; };
-	using PickGame = std::function<void(const SearchEntry&)>;
-	void enableSuggestions(std::vector<SearchEntry> catalog, PickGame pick);
+	void enableWords(WordCompletion vocabulary);
 	void update(int deltaTime) override;
 
 	bool input(InputConfig* config, Input input);
@@ -62,14 +61,15 @@ private:
 	std::shared_ptr<ThemeData> mSearchTheme;
 	std::shared_ptr<TextComponent> mScope, mHint, mShortcuts;
 	static constexpr int suggestionLimit = 3;
-	std::vector<SearchEntry> mCatalog;
-	std::vector<size_t> mMatches;
-	PickGame mPickGame;
-	std::shared_ptr<TextComponent> mMatchHeader, mMatchCursor;
-	std::shared_ptr<TextComponent> mRowTitle[suggestionLimit], mRowSystem[suggestionLimit];
+	std::unique_ptr<WordCompletion> mVocabulary;
+	WordCompletion::Choices mChoices;
+	std::shared_ptr<TextComponent> mMatchHeader, mWordLabels[suggestionLimit];
+	std::shared_ptr<NinePatchComponent> mWordCards[suggestionLimit];
 	std::string mLastQuery;
+	size_t mLastCursor = 0;
 	int mSelectedMatch = -1;
-	bool mPickPressed = false;
+	bool mPickPressed = false, mQuickPressed = false;
+	void acceptWord(size_t index);
 	void refreshMatches();
 	void styleMatches();
 	void focusMatch(int row);
