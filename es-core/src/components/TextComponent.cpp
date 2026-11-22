@@ -226,6 +226,9 @@ void TextComponent::render(const Transform4x4f& parentTrans)
 		break;
 	}
 
+	// Marquees start at the first line even when short titles align to the bottom.
+	if (mAutoScroll == AutoScrollType::VERTICAL)
+		yOff = std::max(0.0f, yOff);
 	Vector3f off(mPadding.x(), mPadding.y() + yOff, 0);
 
 	if (Settings::DebugText() || (Settings::DebugMouse() && mIsMouseOver))
