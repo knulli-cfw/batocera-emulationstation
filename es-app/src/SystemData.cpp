@@ -1511,6 +1511,7 @@ void SystemData::updateDisplayedGameCount()
 		delete mGameCountInfo;
 
 	mGameCountInfo = nullptr;
+	mCollectionPreviewsDirty = true;
 
 	// A favorite or a capture changed: the home's slides, suggestions and recent items are made again (the
 	// ones before them still show meanwhile)
@@ -2424,8 +2425,49 @@ bool SystemData::nextSuggestion()
 	return mSuggestions.next(homeRandom());
 }
 
+bool SystemData::usesRandomCollectionPreview()
+{
+	return isCollection() && (getName() == "all" || getName() == "favorites") &&
+		mTheme && mTheme->getVariable("esRandomCollectionPreview") == "true";
+}
+
+// The deck stores collection paths, never pointers. Refresh only when the library changes.
+FileData* SystemData::collectionPreview(bool advance)
+{
+	if (mRootFolder == nullptr)
+		return nullptr;
+
+	if (mCollectionPreviewsDirty)
+	{
+		std::vector<std::string> candidates;
+		std::unordered_set<std::string> seen;
+		FileData* latest = getConsoleLastPlayedGame();
+		std::string latestPath;
+		for (auto game : mRootFolder->getFilesRecursive(GAME, true))
+		{
+			auto source = game->getSourceFileData();
+			if (source == nullptr || isUtilitySystem(source->getSystem()) ||
+				(getName() == "favorites" && !source->getFavorite()) || !seen.insert(source->getPath()).second)
+				continue;
+			if (latest != nullptr && source->getPath() == latest->getSourceFileData()->getPath())
+				latestPath = game->getPath();
+			else
+				candidates.push_back(game->getPath());
+		}
+		if (candidates.empty() && !latestPath.empty())
+			candidates.push_back(latestPath);
+		mCollectionPreviews.reset(candidates, homeRandom());
+		mCollectionPreviewsDirty = false;
+	}
+	if (advance)
+		mCollectionPreviews.next(homeRandom());
+	return mCollectionPreviews.empty() ? nullptr : findByPath(mCollectionPreviews.current());
+}
+
 FileData* SystemData::getContinueGame()
 {
+	if (usesRandomCollectionPreview())
+		return collectionPreview(false);
 	return isUtilitySystem(this) ? nullptr : getLastPlayedGame(true);
 }
 
@@ -2626,13 +2668,16 @@ BindableProperty SystemData::getProperty(const std::string& name)
 
 	if (name == "lastPlayed" || name == "continue")
 	{
-		FileData* game = getLastPlayedGame(name == "continue");
+		FileData* game = name == "continue" ? getContinueGame() : getLastPlayedGame();
 		return game != nullptr ? BindableProperty((IBindable*)game) : BindableProperty::Null;
 	}
 
 	// Only a game that still resolves: the panel never offers a game X cannot start
 	if (name == "hasLastPlayed")
 		return getLastPlayedGame() != nullptr;
+
+	if (name == "randomCollectionPreview")
+		return usesRandomCollectionPreview();
 
 	if (name == "hasContinue")
 		return getContinueGame() != nullptr;

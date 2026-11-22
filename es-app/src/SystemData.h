@@ -118,6 +118,8 @@ public:
 	FileData* getLastPlayedGame(bool orChefPick = false);
 	// What X continues: getLastPlayedGame(true), nothing on a utility system
 	FileData* getContinueGame();
+	bool usesRandomCollectionPreview();
+	FileData* collectionPreview(bool advance);
 	static bool isUtilitySystem(SystemData* system);
 	// The game played last on the console (tools and screenshots left out)
 	static FileData* getConsoleLastPlayedGame();
@@ -330,6 +332,8 @@ private:
 	bool mSlidesReady;
 	int mSlidesVersion;
 	HomeSlides::Deck mSuggestions;
+	HomeSlides::Deck mCollectionPreviews;
+	bool mCollectionPreviewsDirty = true;
 	bool mSuggestionsReady;
 	bool mHomeDirty;		// to be made (again)
 	int mHomeGeneration;	// counts the changes, so a list made before the last one is made once more
