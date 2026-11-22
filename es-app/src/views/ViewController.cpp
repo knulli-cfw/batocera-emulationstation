@@ -734,6 +734,15 @@ void ViewController::launch(FileData* game, LaunchGameOptions options, Vector3f 
 		mWindow->setCustomSplashScreen(game->getImagePath(), game->getName(), game);
 
 	std::string transition_style = Settings::GameTransitionStyle();
+	auto system = game->getSourceFileData()->getSystem();
+	const auto theme = system->getTheme();
+	const bool stationaryLaunch = theme && !SystemData::isUtilitySystem(system) &&
+		theme->getVariable("esGameLaunchTransition") == "shortFade";
+	const bool useShortFade = stationaryLaunch &&
+		(transition_style.empty() || transition_style == "auto" || transition_style == "fade" || transition_style == "fast fade");
+	if (useShortFade)
+		transition_style = "fast fade";
+
 	if (transition_style.empty() || transition_style == "auto")
 		transition_style = Settings::TransitionStyle();
 
@@ -753,13 +762,16 @@ void ViewController::launch(FileData* game, LaunchGameOptions options, Vector3f 
 	//if (transition_style == "slide" && mCurrentView->isKindOf<GridGameListView>())
 		//transition_style = "fade";
 
-	if (transition_style == "fade" || transition_style == "fast fade")
+	const bool instantFade = stationaryLaunch && transition_style == "instant";
+	if (instantFade || transition_style == "fade" || transition_style == "fast fade")
 	{
-		int fadeDuration = (transition_style == "fast fade") ? 400 : 800; // Halve the duration for fast fade
-		// fade out, launch game, fade back in
-		auto fadeFunc = [this](float t) { mFadeOpacity = Math::lerp(0.0f, 1.0f, t); };
+		const int fadeDuration = instantFade ? 1 : useShortFade ? 220 : (transition_style == "fast fade" ? 400 : 800);
+		const int returnDuration = instantFade ? 1 : useShortFade ? 180 : 800;
+		auto fadeFunc = [this, useShortFade](float t) {
+			mFadeOpacity = useShortFade ? t * t * (3.0f - 2.0f * t) : t;
+		};
 
-		setAnimation(new LambdaAnimation(fadeFunc, fadeDuration), 0, [this, game, fadeFunc, options]
+		setAnimation(new LambdaAnimation(fadeFunc, fadeDuration), 0, [this, game, fadeFunc, options, returnDuration]
 		{
 			if (doLaunchGame(game, options))
 			{
@@ -770,7 +782,7 @@ void ViewController::launch(FileData* game, LaunchGameOptions options, Vector3f 
 			}
 			else
 			{
-				setAnimation(new LambdaAnimation(fadeFunc, 800), 0, [this] { GuiComponent::isLaunchTransitionRunning = false; mLockInput = false; mWindow->closeSplashScreen(); }, true, 3);
+				setAnimation(new LambdaAnimation(fadeFunc, returnDuration), 0, [this] { GuiComponent::isLaunchTransitionRunning = false; mLockInput = false; mWindow->closeSplashScreen(); }, true, 3);
 				this->onFileChanged(game, FILE_METADATA_CHANGED);
 			}
 		});
