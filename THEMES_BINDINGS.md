@@ -14,6 +14,12 @@ They can't be use in "if" attributes which requires static theme variables.
 
 You can also use dynamic variables in the "enabled" attribute in the storyboards animation element ( <animation enabled="{global:cheevos}" [...] /> ).
 
+With the theme variable `esBindShownOnly` (or the es_settings key `BindShownOnly`, see THEMES.md), a hidden
+container's elements are not bound while it is hidden: its own visibility is bound first, and its elements when
+it shows. A view can hold the layouts and parts of other cases in containers without binding all of them each
+time. The videos in a hidden container are bound all the same (a video keeps playing what it was bound to,
+shown or not; give it its own visibility).
+
 The Binding engine supports standard operators evaluation ( +, -, *, /, &&, ||, ! ) and also simple evaluation methods.
 
 Be careful : Dynamic variables  should not be confused with static variables. Static Variables use the $ sign ( ${variableName} ). Static variables are evaluated when the theme loads only.
@@ -34,6 +40,7 @@ command                     string
 group                       string                 Name of the group
 collection                  bool
 subSystems                  int                    Number of susbystems (collections / groups)
+tab                         int                    Index of the system's tab on a tabbed system grid, -1 without tabs (THEMES.md, Tabs)
 total                       int                    Number of games / elements
 played                      int
 favorites                   int
@@ -42,6 +49,12 @@ gamesPlayed                 int
 mostPlayed                  int
 gameTime                    string
 lastPlayedDate              string
+lastPlayed                  game                   The game played last ({system:lastPlayed:name}); empty if none. A collection leaves out tools, emulators and screenshots
+continue                    game                   lastPlayed, else the suggested game (with a {system:continue:video} video in the view; THEMES.md, Tabs), else the best-rated favorite (else the best-rated game)
+hasLastPlayed               bool                   lastPlayed exists and still resolves to a game
+hasContinue                 bool                   continue resolves and is not on tools, emulators or screenshots (X does nothing there)
+slides                      string                 The captures of the system's card, one path per line: favorites with a screenshot, else the 12 best-rated games with one (THEMES.md, Slides)
+recent1 ... recent8         game                   On tools, emulators and screenshots only: their items, tools and emulators by last run, screenshots newest first (by file date), then the never run by name ({system:recent1:name}, {system:recent1:image})
 image                       path
 showManual                  bool
 showSaveStates              bool
@@ -83,6 +96,7 @@ placeholder                 bool                  True if it's a placeholder ( i
 playerCount                 int
 hasManual                   bool
 hasSaveState                bool
+saveStatesSupported         bool                  True if the emulator and core the game runs with keep save states (false on a folder)
 hasKeyboardMapping          bool
 gametime                    int	                  time played in seconds
 desc                        string
@@ -112,6 +126,8 @@ arcadesystemname            string
 players                     string
 playcount                   int
 lastplayed                  date
+lastplayedTime              string                "HH:MM" of lastplayed, empty if never played
+lastplayedDays              int                   calendar days since lastplayed: 0 today, 1 yesterday, -1 never
 crc32                       string
 md5                         string	
 lang                        string
@@ -123,6 +139,8 @@ type                        string
 stars                       string                returns a string composed of rating stars
 nameShort                   string                name, before any parenthesis
 nameExtra                   string                name, after any parenthesis
+cleanName                   string                name without the trailing tags of dump sets: (USA), (En,Fr), (Rev 1), (v1.1), (Beta), [!]...; " : " as ": "
+imageRatio                  float                 the image's width over its height (4:3 is 1.33, a DS's two screens 0.67); 0 without an image
 ```
 
 **global:**
@@ -141,6 +159,8 @@ screenWidth                 int
 screenHeight                int
 screenRatio                 string
 vertical                    bool
+lastPlayed                  game                  The game played last on the console, tools, emulators and screenshots left out ({global:lastPlayed:system:fullName})
+homeColumn                  int                   The level the home's columns show (1 the first column, 2 the grid), 0 without columns (THEMES.md, Columns)
 ```	
 
 **systemrandom:**

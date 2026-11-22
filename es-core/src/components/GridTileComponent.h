@@ -9,7 +9,7 @@
 #include "resources/TextureResource.h"
 #include "renderers/Renderer.h"
 
-class VideoComponent;
+class VideoVlcComponent;
 
 struct GridImageProperties
 {
@@ -25,6 +25,7 @@ public:
 		origin = Vector2f(0.5f, 0.5f);
 		color = colorEnd = 0xFFFFFFFF;		
 		sizeMode = "maxSize";
+		keepOrientation = false;
 		roundCorners = 0;
 	}
 
@@ -38,6 +39,8 @@ public:
 
 		image->setPosition(offsetPos.x() + pos.x() * parentSize.x(), offsetPos.y() + pos.y() * parentSize.y());
 		
+		image->setKeepOrientation(keepOrientation);
+
 		if (!disableSize && sizeMode == "size")
 			image->setSize(size.x() * parentSize.x(), size.y() * parentSize.y());
 		else if (sizeMode == "minSize")
@@ -65,6 +68,9 @@ public:
 	unsigned int colorEnd;
 
 	std::string  sizeMode;
+	// imageSizeMode "screen": "size" (the picture takes the tile's shape, a screen's), but a picture turned the
+	// other way keeps its orientation (ScreenShape::fit)
+	bool         keepOrientation;
 
 	Renderer::ShaderInfo customShader;
 
@@ -257,6 +263,9 @@ public:
 
 	void	updateBindings(IBindable* bindable) override;
 	bool    hasItemTemplate() { return mHasItemTemplate; }
+	// Starts the item template's storyboards of an event of the grid's own ("unfocus": the cursor's item while
+	// the grid has no focus), on the elements that have one
+	void	playStoryboard(const std::string& event);
 
 private:
 	void	handleStoryBoard(bool activate);
@@ -267,6 +276,8 @@ private:
 	void	createCheevos();
 	void	createImageOverlay();
 	void	stopVideo();
+	void setPreviewVisible(bool visible);
+	void playExtraStoryboard(const std::string& event);
 
 	void resize();
 
@@ -299,14 +310,14 @@ private:
 
 	Vector3f mAnimPosition;
 
-	VideoComponent* mVideo;
+	VideoVlcComponent* mVideo;
 	ImageComponent* mImage;
 	ImageComponent* mMarquee;
 	ImageComponent* mFavorite;
 	ImageComponent* mCheevos;
 	ImageComponent* mImageOverlay;
 
-	bool mVideoPlaying;	
+	bool mPreviewVisible;
 	bool mHasStandardMarquee;
 	bool mHasItemTemplate;
 };

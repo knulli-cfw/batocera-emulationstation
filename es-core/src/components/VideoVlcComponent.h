@@ -5,23 +5,33 @@
 #include "VideoComponent.h"
 #include "ThemeData.h"
 #include "renderers/Renderer.h"
+#include <atomic>
 #include <mutex>
 
 struct libvlc_instance_t;
 struct libvlc_media_t;
 struct libvlc_media_player_t;
 
+// The frames VLC draws for one playback. Shared by the component and the player's worker (VideoVlcComponent's
+// PlayerWorker), so the buffers outlive a player that is still being stopped after the component let go.
 struct VideoContext 
 {
 	VideoContext()
 	{
 		surfaces[0] = nullptr;
 		surfaces[1] = nullptr;
-		component = nullptr;
 		valid = false;
+		displayed = false;
+		width = height = 0;
 		hasFrame[0] = false;
 		hasFrame[1] = false;
 		surfaceId = 0;
+	}
+
+	~VideoContext()
+	{
+		delete[] surfaces[0];
+		delete[] surfaces[1];
 	}
 
 	int					surfaceId;
@@ -29,9 +39,19 @@ struct VideoContext
 	std::mutex			mutexes[2];
 	bool				hasFrame[2];
 
-	VideoComponent*		component;
-	bool				valid;	
+	bool				valid;
+	unsigned int		width, height;	// of the buffers
+	// Set by VLC's display callback; the UI thread starts showing the video (VideoVlcComponent::checkDisplayed)
+	std::atomic<bool>	displayed;
+
+	// UI thread only, while the video waits to show: the light of its newest frames (VideoLight) and when the
+	// first one came
+	int					light = -1, lastLight = -1;
+	bool				firstShown = false;
+	unsigned int		firstShownTicks = 0;
 };
+
+struct PlayerStart;
 
 
 namespace VideoVlcFlags
@@ -58,6 +78,9 @@ class VideoVlcComponent : public VideoComponent
 
 public:
 	static void init();
+	// Waits, at most ms, until the players stopped so far released their audio and video outputs (before a
+	// game runs): false when some still stop
+	static bool waitForPlayers(int ms);
 
 	VideoVlcComponent(Window* window);
 	virtual ~VideoVlcComponent();
@@ -88,6 +111,10 @@ public:
 
 	void setEffect(VideoVlcFlags::VideoVlcEffect effect) { mEffect = effect; }
 
+	// A resumed player may exist before its first frame has reached the renderer.
+	bool drawsExclusiveFrame() override;
+	bool hasVisibleFrame() const { return mIsPlaying && mFadeIn > 0 && mTexture != nullptr; }
+
 	bool getLinearSmooth() { return mLinearSmooth; }
 	void setLinearSmooth(bool value = true) { mLinearSmooth = value; }
 
@@ -98,6 +125,14 @@ public:
 	void onPaddingChanged() override;
 	
 	Vector2f getSize() const override;
+
+	// What VLC read of a video's file: its first video track's size and whether it has sound
+	struct Probe
+	{
+		bool         readable;
+		unsigned int width, height;
+		bool         audio;
+	};
 
 private:
 	// Calculates the correct mSize from our resizing information (set by setResize/setMaxSize).
@@ -119,6 +154,22 @@ private:
 
 	void setupContext();
 	void freeContext();
+	void releasePlayback();
+
+	// startVideo asks VLC to read the file's tracks on its own thread; each frame checkParse looks whether it
+	// has, then playback starts (startPlayback). Until then the snapshot or what is under the video shows and
+	// the UI thread does not wait. A file read once is not parsed again while its size and date stay the same.
+	void checkParse();
+	void startPlayback(const Probe& probe);
+	void checkStart();
+	void checkDisplayed();
+	bool uploadFrame();
+	bool waitsForLight();
+	void releaseHeldAudio();
+	// With no effect the video comes in over its snapshot in place: the snapshot stays whole under it
+	bool coversSnapshot() override { return mEffect == VideoVlcFlags::VideoVlcEffect::NONE; }
+	static bool findProbe(const std::string& path, Probe& probe);
+	static void keepProbe(const std::string& path, const Probe& probe);
 
 private:
 	void crop(float left, float top, float right, float bot);
@@ -126,7 +177,10 @@ private:
 	static libvlc_instance_t*		mVLC;
 	libvlc_media_t*					mMedia;
 	libvlc_media_player_t*			mMediaPlayer;
-	VideoContext					mContext;
+	bool							mParsing;
+	unsigned int					mParseEnd;	// SDL ticks
+	std::shared_ptr<PlayerStart>	mStart;		// a player being made on the worker
+	std::shared_ptr<VideoContext>	mContext;
 	std::shared_ptr<TextureResource> mTexture;
 
 	std::string					    mSubtitlePath;
@@ -134,6 +188,7 @@ private:
 	Renderer::ShaderInfo			mCustomShader;
 
 	VideoVlcFlags::VideoVlcEffect	mEffect;
+	bool							mAudioHeld = false;	// its sound muted until its picture shows
 
 	unsigned int					mColorShift;
 	int								mElapsed;

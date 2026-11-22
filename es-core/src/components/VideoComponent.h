@@ -89,6 +89,13 @@ public:
 	// setMaxSize() and setResize() are mutually exclusive.
 	virtual void setResize(float width, float height) = 0;
 	inline void setResize(const Vector2f& size) { setResize(size.x(), size.y()); }
+	// With setResize (both sides): a video turned the other way than the size keeps its orientation
+	// (ScreenShape::fit)
+	void setKeepOrientation(bool keep) { mKeepOrientation = keep; }
+
+	// Off the screen though its view shows (a column panned away): it stops, sound and all, as when hidden
+	void setInView(bool inView) { mInView = inView; }
+	bool isInView() const { return mInView; }
 
 	// Resize the video to be as large as possible but fit within a box of this size.
 	// Can be set before or after a video is loaded.
@@ -109,6 +116,11 @@ public:
 	}
 
 	virtual void onVideoStarted();
+	// Whether the video comes in over its snapshot in place, the snapshot whole under it until it is in (a
+	// crossfade); otherwise the snapshot fades out as the video comes in
+	bool usesExclusiveSnapshot() const { return mExclusiveSnapshot; }
+	virtual bool drawsExclusiveFrame() { return false; }
+	virtual bool coversSnapshot() { return false; }
 
 	const MaxSizeInfo getMaxSizeInfo()
 	{
@@ -163,6 +175,11 @@ public:
 
 	bool showSnapshots();
 
+	// A video file that could not be read (VLC parse failed or timed out) is not tried again while it keeps
+	// its size; it counts as no video, so the snapshot shows
+	static void markUnplayable(const std::string& path);
+	static bool isUnplayable(const std::string& path);
+
 protected:
 	std::shared_ptr<IPlaylist> mPlaylist;
 	std::function<bool()> mVideoEnded;
@@ -212,8 +229,15 @@ protected:
 	bool							mIsPlaying;		
 	bool							mScreensaverActive;
 	bool							mScreensaverMode;
+	bool							mIdlePause;		// a theme's video: stops for the idle pause (Window::isIdlePaused)
+	bool							mIdleStopped;	// stopped by it at the end of a loop, until input
 	bool							mTargetIsMax;
 	bool							mTargetIsMin;
+	bool							mKeepOrientation;
+	bool							mInView = true;
+	bool mExclusiveSnapshot = false;
+	// how long the video takes to come in over its snapshot (the theme's fadeTime)
+	int								mFadeTimeMs = 400;
 
 	bool							mIsWaitingForVideoToStart;
 

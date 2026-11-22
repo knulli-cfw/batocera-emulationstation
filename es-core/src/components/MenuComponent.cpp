@@ -12,7 +12,7 @@ MenuComponent::MenuComponent(Window* window,
 	const std::string& title, const std::shared_ptr<Font>& titleFont,
 	const std::string& subTitle) 
 	: GuiComponent(window),
-	mBackground(window), mGrid(window, Vector2i(1, 3))
+	mBackground(window), mGrid(window, Vector2i(1, 4))
 {
 	mMaxHeight = 0;
 
@@ -97,7 +97,7 @@ void MenuComponent::addMenuIcon(Window* window, ComponentListRow& row, const std
 		auto icon = std::make_shared<ImageComponent>(window, true);
 		icon->setImage(iconPath);
 		icon->setColorShift(theme->Text.color);
-		icon->setResize(0, theme->Text.font->getLetterHeight() * 1.25f);
+		icon->setResize(0, theme->Row.iconSize > 0 ? theme->Row.iconSize : theme->Text.font->getLetterHeight() * 1.25f);
 		row.addElement(icon, false);
 
 		// spacer between icon and text
@@ -328,7 +328,80 @@ float MenuComponent::getHeaderGridHeight() const
 float MenuComponent::getButtonGridHeight() const
 {
 	auto menuTheme = ThemeData::getMenuTheme();
+
+	// A footer under no buttons takes their band
+	if (mFooter && !mButtonGrid)
+		return 0;
+
 	return (mButtonGrid ? mButtonGrid->getSize().y() : menuTheme->Text.font->getHeight() + BUTTON_GRID_VERT_PADDING);	
+}
+
+float MenuComponent::getFooterHeight() const
+{
+	return mFooter ? mFooter->getFont()->getHeight() + BUTTON_GRID_VERT_PADDING : 0;
+}
+
+void MenuComponent::setFooter(const std::string& text)
+{
+	auto theme = ThemeData::getMenuTheme();
+
+	if (mFooter == nullptr)
+	{
+		mFooter = std::make_shared<TextComponent>(mWindow, text, theme->Footer.font, theme->Footer.color, ALIGN_CENTER);
+		mGrid.setEntry(mFooter, Vector2i(0, 3), false, true);
+	}
+	else
+		mFooter->setText(text);
+
+	updateSize();
+	onSizeChanged();
+}
+
+// The back prompt right of the menu's title (menuPrompt): the theme's button image and BACK as a word
+void MenuComponent::showBackPrompt()
+{
+	auto theme = ThemeData::getMenuTheme();
+	if (mBackIcon != nullptr)
+		return;
+
+	std::string label = Utils::String::toLower(_("BACK"));
+	if (!label.empty())
+	{
+		size_t next = Utils::String::nextCursor(label, 0);
+		label = Utils::String::toUpper(label.substr(0, next)) + label.substr(next);
+	}
+
+	mBackIcon = std::make_shared<ImageComponent>(mWindow, true);
+	mBackIcon->setImage(theme->Prompt.path);
+	mBackIcon->setIsLinear(true);
+
+	mBackLabel = std::make_shared<TextComponent>(mWindow, label, theme->Prompt.font, theme->Prompt.color, ALIGN_LEFT);
+
+	addChild(mBackIcon.get());
+	addChild(mBackLabel.get());
+	mBackIcon->setZIndex(20);
+	mBackLabel->setZIndex(20);
+
+	updateBackPrompt();
+}
+
+void MenuComponent::updateBackPrompt()
+{
+	if (mBackIcon == nullptr || mBackLabel == nullptr)
+		return;
+
+	auto font = mBackLabel->getFont();
+	float iconHeight = Math::round(font->getLetterHeight() * 1.6f);
+	float gap = Math::round(font->getLetterHeight() * 0.5f);
+	float right = mSize.x() - ThemeData::getMenuTheme()->Row.padding;
+	float middle = Math::round(getHeaderGridHeight() / 2.0f);
+
+	mBackLabel->setSize(0, 0);
+	auto labelSize = mBackLabel->getSize();
+	mBackLabel->setPosition(right - labelSize.x(), Math::round(middle - labelSize.y() / 2.0f));
+
+	mBackIcon->setResize(0, iconHeight);
+	mBackIcon->setPosition(right - labelSize.x() - gap - mBackIcon->getSize().x(), Math::round(middle - iconHeight / 2.0f));
 }
 
 void MenuComponent::updateSize()
@@ -342,10 +415,10 @@ void MenuComponent::updateSize()
 
 	const float maxHeight = mMaxHeight <= 0 ? Renderer::getScreenHeight() * 0.75f : mMaxHeight;
 
-	float height = TITLE_HEIGHT + mList->getTotalRowHeight() + getButtonGridHeight() + 2;
+	float height = TITLE_HEIGHT + mList->getTotalRowHeight() + getButtonGridHeight() + getFooterHeight() + 2;
 	if(height > maxHeight)
 	{
-		height = TITLE_HEIGHT + getButtonGridHeight();
+		height = TITLE_HEIGHT + getButtonGridHeight() + getFooterHeight();
 		int i = 0;
 		while(i < mList->size())
 		{
@@ -384,6 +457,7 @@ void MenuComponent::onSizeChanged()
 	// update grid row/col sizes
 	mGrid.setRowHeight(0, TITLE_HEIGHT, false);
 	mGrid.setRowHeight(2, getButtonGridHeight(), false);
+	mGrid.setRowHeight(3, getFooterHeight(), false);
 
 	mGrid.setSize(mSize);
 
@@ -394,6 +468,8 @@ void MenuComponent::onSizeChanged()
 		mTitleImage->setPosition(getPosition().x() + mSize.x() / 2.0f, getPosition().y() + TITLE_HEIGHT / 2.0f);
 		mTitleImage->setMaxSize(mSize.x() * 0.85f, TITLE_HEIGHT);
 	}
+
+	updateBackPrompt();
 }
 
 void MenuComponent::clearButtons()
@@ -405,6 +481,14 @@ void MenuComponent::clearButtons()
 
 void MenuComponent::addButton(const std::string& name, const std::string& helpText, const std::function<void()>& callback)
 {
+	// A theme's back prompt in the header (menuPrompt) stands for the BACK button: every menu already goes
+	// back with the pad's back button
+	if (!ThemeData::getMenuTheme()->Prompt.path.empty() && name == _("BACK"))
+	{
+		showBackPrompt();
+		return;
+	}
+
 	mButtons.push_back(std::make_shared<ButtonComponent>(mWindow, Utils::String::toUpper(name), helpText, callback));
 	updateGrid();
 	updateSize();

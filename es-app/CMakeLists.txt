@@ -19,6 +19,7 @@ set(ES_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/src/ThreadedHasher.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/ThreadedBluetooth.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/SystemRandomPlaylist.h
+	${CMAKE_CURRENT_SOURCE_DIR}/src/HomeSlides.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/LangParser.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/KeyboardMapping.h	
 	${CMAKE_CURRENT_SOURCE_DIR}/src/services/HttpServerThread.h
@@ -149,6 +150,7 @@ set(ES_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/ThreadedHasher.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/ThreadedBluetooth.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/SystemRandomPlaylist.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/HomeSlides.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/LangParser.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/KeyboardMapping.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/services/HttpServerThread.cpp	

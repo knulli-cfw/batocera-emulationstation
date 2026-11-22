@@ -1,4 +1,6 @@
 #include "components/ImageComponent.h"
+#include "components/ImageAspectCheck.h"
+#include "components/ScreenShape.h"
 
 #include "resources/TextureResource.h"
 #include "Log.h"
@@ -34,7 +36,7 @@ Vector2f ImageComponent::getSize() const
 }
 
 ImageComponent::ImageComponent(Window* window, bool forceLoad, bool dynamic) : GuiComponent(window),
-	mTargetIsMax(false), mTargetIsMin(false), mFlipX(false), mFlipY(false), mTargetSize(0, 0), mColorShift(0xFFFFFFFF),
+	mTargetIsMax(false), mTargetIsMin(false), mKeepOrientation(false), mFlipX(false), mFlipY(false), mTargetSize(0, 0), mColorShift(0xFFFFFFFF),
 	mColorShiftEnd(0xFFFFFFFF), mColorGradientHorizontal(true), mForceLoad(forceLoad), mDynamic(dynamic),
 	mFadeOpacity(0), mFading(false), mRotateByTargetSize(false), mTopLeftCrop(0.0f, 0.0f), mBottomRightCrop(1.0f, 1.0f),
 	mReflection(0.0f, 0.0f), mSharedTexture(true)
@@ -78,6 +80,15 @@ void ImageComponent::setSize(float w, float h)
 
 	if (mChildren.size() && clientSize  != getClientRect())
 		recalcChildrenLayout();
+}
+
+void ImageComponent::setKeepOrientation(bool keep)
+{
+	if (mKeepOrientation == keep)
+		return;
+
+	mKeepOrientation = keep;
+	resize();
 }
 
 void ImageComponent::resize()
@@ -163,6 +174,9 @@ void ImageComponent::resize()
 			// if both components are set, we just stretch
 			// if no components are set, we don't resize at all
 			mSize = targetSize == Vector2f::Zero() ? textureSize : targetSize;
+
+			if (mKeepOrientation && targetSize.x() > 0 && targetSize.y() > 0)
+				mSize = ScreenShape::fit(targetSize, textureSize);
 
 			// if only one component is set, we resize in a way that maintains aspect ratio
 			// for SVG rasterization, we always calculate width from rounded height (see comment above)
@@ -692,6 +706,8 @@ void ImageComponent::render(const Transform4x4f& parentTrans)
 
 		mVertices->saturation = mSaturation;
 		mVertices->customShader = mCustomShader.path.empty() ? nullptr : &mCustomShader;						
+
+		ImageAspectCheck::check(this, mPath, mVertices, mTexture->getSize(), trans);
 
 		if (mRoundCorners > 0 && mRoundCornerStencil.size() > 0)
 		{

@@ -1,17 +1,59 @@
 #include "guis/GuiInfoPopup.h"
 
 #include "components/ComponentGrid.h"
+#include "components/ImageComponent.h"
 #include "components/NinePatchComponent.h"
 #include "components/TextComponent.h"
 #include <SDL_timer.h>
 #include "TextToSpeech.h"
 
 GuiInfoPopup::GuiInfoPopup(Window* window, std::string message, int duration) :
-	GuiComponent(window), mMessage(message), mDuration(duration), mRunning(true), mFadeOut(0)
+	GuiComponent(window), mMessage(message), mDuration(duration), mRunning(true), mFadeOut(0),
+	mGrid(nullptr), mFrame(nullptr), mThemed(false), mBackgroundColor(0), mBorderColor(0), mCornerRadius(0)
 {
 	auto theme = ThemeData::getMenuTheme();
 
 	TextToSpeech::getInstance()->say(message, true);
+
+	// we only init the actual time when we first start to render
+	mStartTime = 0;
+
+	const Window::PopupStyle& style = window->getNoticeStyle();
+	if (style.enabled && style.font)
+	{
+		// The theme's box: as tall as its style, as wide as the text needs up to the style's width; the icon, then
+		// the text on one line (cut with an ellipsis). The window places it.
+		mThemed = true;
+		mBackgroundColor = style.backgroundColor;
+		mBorderColor = style.borderColor;
+		mCornerRadius = style.cornerRadius;
+
+		float height = style.size.y();
+		float padding = Math::round(height * 0.4f);
+		float gap = Math::round(height * 0.28f);
+		float icon = style.iconPath.empty() ? 0.0f : (style.iconSize > 0 ? style.iconSize : Math::round(height * 0.5f));
+		float textX = padding + (icon > 0 ? icon + gap : 0.0f);
+		float textWidth = Math::max(0.0f, Math::min(style.font->sizeText(message).x(), style.size.x() - textX - padding));
+
+		if (icon > 0)
+		{
+			mIcon = std::make_shared<ImageComponent>(window);
+			mIcon->setImage(style.iconPath);
+			mIcon->setOrigin(0.5f, 0.5f);
+			mIcon->setMaxSize(icon, icon);
+			mIcon->setPosition(padding + icon / 2.0f, height / 2.0f);
+			addChild(mIcon.get());
+		}
+
+		mText = std::make_shared<TextComponent>(window, message, style.font, style.color, ALIGN_LEFT);
+		mText->setMultiLine(TextComponent::MultiLineType::SINGLELINE);
+		mText->setPosition(textX, 0);
+		mText->setSize(textWidth, height);
+		addChild(mText.get());
+
+		mSize = Vector2f(textX + textWidth + padding, height);
+		return;
+	}
 
 	mFrame = new NinePatchComponent(window);
 	float maxWidth = Renderer::getScreenWidth() * 0.9f;
@@ -57,9 +99,6 @@ GuiInfoPopup::GuiInfoPopup(Window* window, std::string message, int duration) :
 	mFrame->fitTo(mSize, Vector3f::Zero(), Vector2f(-32, -32));
 	addChild(mFrame);
 
-	// we only init the actual time when we first start to render
-	mStartTime = 0;
-
 	mGrid = new ComponentGrid(window, Vector2i(1, 3));
 	mGrid->setSize(mSize);
 	mGrid->setEntry(s, Vector2i(0, 1), false, true);
@@ -75,7 +114,25 @@ void GuiInfoPopup::render(const Transform4x4f& /*parentTrans*/)
 	Transform4x4f trans = getTransform() * Transform4x4f::Identity();
 
 	Renderer::setMatrix(trans);
+
+	if (mThemed)
+	{
+		auto withOpacity = [this](unsigned int color) { return (color & 0xFFFFFF00) | ((color & 0xFF) * getOpacity() / 255); };
+		Renderer::drawSolidRectangle(0, 0, mSize.x(), mSize.y(), withOpacity(mBackgroundColor), withOpacity(mBorderColor),
+			(mBorderColor & 0xFF) ? 1.0f : 0.0f, mCornerRadius);
+	}
+
 	renderChildren(trans);	
+}
+
+void GuiInfoPopup::shorten(int ms)
+{
+	if (!mRunning || mStartTime == 0)
+		return;
+
+	int elapsed = SDL_GetTicks() - mStartTime;
+	if (mDuration - elapsed > ms)
+		mDuration = elapsed + ms;
 }
 
 void GuiInfoPopup::update(int deltaTime)
@@ -111,5 +168,8 @@ void GuiInfoPopup::update(int deltaTime)
 	alpha = (int) (Math::easeOutCubic(alpha / 255.0f) * 255.0f);
 
 	setOpacity((unsigned char)alpha);
-	setScale(alpha / 255.0f);
+
+	// a theme's box fades in place
+	if (!mThemed)
+		setScale(alpha / 255.0f);
 }

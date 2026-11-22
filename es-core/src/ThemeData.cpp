@@ -13,6 +13,7 @@
 #include "components/WebImageComponent.h"
 #include "components/RatingComponent.h"
 #include "components/RectangleComponent.h"
+#include "components/SlideshowComponent.h"
 
 #include "utils/FileSystemUtil.h"
 #include "utils/StringUtil.h"
@@ -29,7 +30,7 @@
 
 std::set<std::string> ThemeData::sSupportedItemTemplate { "imagegrid", "carousel", "gamecarousel", "textlist" };
 std::set<std::string> ThemeData::sSupportedViews        { "system", "basic", "detailed", "grid", "video", "gamecarousel", "menu", "screen", "splash" };
-std::set<std::string> ThemeData::sSupportedFeatures     { "video", "carousel", "gamecarousel", "z-index", "visible", "manufacturer" };
+std::set<std::string> ThemeData::sSupportedFeatures     { "video", "carousel", "gamecarousel", "z-index", "visible", "manufacturer", "systemtabs", "slideshow" };
 
 static std::set<std::string> _autoExtraTypes            { "stackpanel", "container", "screenshader", "clock", "networkIcon", "webimage", "batteryText", "batteryIcon", "rectangle" };
 
@@ -99,6 +100,31 @@ std::map<std::string, std::map<std::string, ThemeData::ElementPropertyType>> The
 		{ "visible", BOOLEAN },
 		{ "padding", NORMALIZED_RECT },
 		{ "clipChildren", BOOLEAN },
+		{ "zIndex", FLOAT } } },
+
+	{ "slideshow", {
+		{ "pos", NORMALIZED_PAIR },
+		{ "size", NORMALIZED_PAIR },
+		{ "x", FLOAT },
+		{ "y", FLOAT },
+		{ "h", FLOAT },
+		{ "w", FLOAT },
+		{ "origin", NORMALIZED_PAIR },
+		{ "path", STRING },					// the captures, one per line ({system:slides})
+		{ "interval", FLOAT },				// seconds on each capture
+		{ "duration", FLOAT },				// seconds of the slide to the next one
+		{ "color", COLOR },
+		{ "saturation", FLOAT },
+		{ "roundCorners", FLOAT },
+		{ "roi", NORMALIZED_RECT },			// the part of a capture to centre, fractions of it: x y w h
+		{ "dots", BOOLEAN },
+		{ "maxDots", FLOAT },
+		{ "dotSize", FLOAT },				// fraction of the screen height
+		{ "dotsOffset", NORMALIZED_PAIR },	// from the top-right corner, fractions of the screen
+		{ "dotColor", COLOR },
+		{ "dotSelectedColor", COLOR },
+		{ "opacity", FLOAT },
+		{ "visible", BOOLEAN },
 		{ "zIndex", FLOAT } } },
 
 	{ "screenshader", {
@@ -175,6 +201,7 @@ std::map<std::string, std::map<std::string, ThemeData::ElementPropertyType>> The
 
 		{ "autoLayout", NORMALIZED_PAIR },
 		{ "autoLayoutSelectedZoom", FLOAT },
+		{ "peekSize", FLOAT },
 		{ "animateSelection", BOOLEAN },
 		{ "imageSource", STRING },				// image, thumbnail, marquee
 		{ "zIndex", FLOAT },
@@ -186,6 +213,7 @@ std::map<std::string, std::map<std::string, ThemeData::ElementPropertyType>> The
 		{ "scrollSound", PATH },
 
 		{ "scrollbarColor", COLOR },
+		{ "scrollbarTrackColor", COLOR },
 		{ "scrollbarSize", FLOAT },
 		{ "scrollbarCorner", FLOAT },
 		{ "scrollbarAlignment", STRING },		// left, right, outer left, outer right
@@ -209,7 +237,25 @@ std::map<std::string, std::map<std::string, ThemeData::ElementPropertyType>> The
 	{ "clock", {} }, // Inherits text
 
 	{ "notification", {
-		{ "y", FLOAT } } },
+		{ "vertical", BOOLEAN },
+		{ "y", FLOAT },
+		// with a size: the info popups' look and place ("notification") or the volume and brightness meters' ("meters")
+		{ "pos", NORMALIZED_PAIR },
+		{ "origin", NORMALIZED_PAIR },
+		{ "size", NORMALIZED_PAIR },
+		{ "fontPath", PATH },
+		{ "fontSize", FLOAT },
+		{ "color", COLOR },
+		{ "backgroundColor", COLOR },
+		{ "borderColor", COLOR },
+		{ "trackColor", COLOR },
+		{ "trackBorderColor", COLOR },
+		{ "fillColor", COLOR },
+		{ "cornerSize", FLOAT },
+		{ "iconPath", PATH },
+		{ "iconSize", FLOAT },
+		{ "spacing", FLOAT },
+		{ "maxCount", FLOAT } } },
 
 	{ "networkIcon", {  // Inherits image
 		{ "networkIcon", PATH },
@@ -541,6 +587,8 @@ std::map<std::string, std::map<std::string, ThemeData::ElementPropertyType>> The
 		// video properties
 		{ "maxSize", NORMALIZED_PAIR },
 		{ "minSize", NORMALIZED_PAIR },
+		{ "keepOrientation", BOOLEAN },			// with size: a video or snapshot turned the other way keeps its orientation
+		{ "fadeTime", FLOAT },					// seconds the video takes to come in over its snapshot (0.4)
 		{ "default", PATH },
 		{ "path", PATH },
 		{ "delay", FLOAT },
@@ -549,12 +597,14 @@ std::map<std::string, std::map<std::string, ThemeData::ElementPropertyType>> The
 		{ "color", COLOR },
 		{ "snapshotSource", STRING },			// image, thumbnail, marquee
 		{ "defaultSnapshot", PATH },
+		{ "snapshot", PATH },					// the picture shown until the video plays (a bound capture)
 		{ "loops", FLOAT },						// Number of loops to do -1 (default) is infinite 
 		{ "audio", BOOLEAN },
 		{ "linearSmooth", BOOLEAN },
 		{ "saturation", FLOAT },
 		{ "onclick", STRING },
 		{ "showSnapshotNoVideo", BOOLEAN },
+		{ "exclusiveSnapshot", BOOLEAN },
 		{ "showSnapshotDelay", BOOLEAN } } },
 
 	{ "carousel", {
@@ -607,6 +657,12 @@ std::map<std::string, std::map<std::string, ThemeData::ElementPropertyType>> The
 	{ "menuText", {
 		{ "fontPath", PATH },
 		{ "fontSize", FLOAT },
+		{ "rowHeight", FLOAT },
+		{ "rowPadding", FLOAT },
+		{ "iconSize", FLOAT },
+		{ "fullRows", BOOLEAN },
+		{ "valueSpacing", FLOAT },
+		{ "atBottom", BOOLEAN },
 		{ "separatorColor", COLOR },
 		{ "selectorColor", COLOR },
 		{ "selectorColorEnd", COLOR },
@@ -652,7 +708,31 @@ std::map<std::string, std::map<std::string, ThemeData::ElementPropertyType>> The
 		{ "pathOff", PATH } } },
 	{ "menuTextEdit",{
 		{ "active", PATH },
-		{ "inactive", PATH } } },
+		{ "inactive", PATH },
+		{ "fontPath", PATH },
+		{ "fontSize", FLOAT },
+		{ "caretColor", COLOR } } },
+	{ "menuPrompt",{
+		{ "path", PATH },
+		{ "fontPath", PATH },
+		{ "fontSize", FLOAT },
+		{ "color", COLOR } } },
+	{ "menuTile",{
+		{ "path", PATH },
+		{ "selectedPath", PATH },
+		{ "cornerSize", NORMALIZED_PAIR } } },
+	{ "menuKeyboard",{
+		{ "path", PATH },
+		{ "focusedPath", PATH },
+		{ "activePath", PATH },
+		{ "cornerSize", NORMALIZED_PAIR },
+		{ "spacing", FLOAT },
+		{ "fontPath", PATH },
+		{ "fontSize", FLOAT },
+		{ "color", COLOR },
+		{ "selectedColor", COLOR },
+		{ "wordKeys", BOOLEAN },
+		{ "focusKeys", BOOLEAN } } },
 	{ "menuSlider",{
 		{ "path", PATH } } },
 	{ "menuButton",{
@@ -1949,6 +2029,19 @@ void ThemeData::parseElement(const pugi::xml_node& root, const std::map<std::str
 				if (!overwrite && element.properties.find(name) != element.properties.cend())
 					continue;
 
+				// <itemTemplate replace="true">: it replaces the element's earlier templates, so an include can
+				// redefine the items of a grid it overrides. Without it the first template stays the one used.
+				// The other children are copied into a new vector (each copy owns its storyboards).
+				if (overwrite && node.attribute("replace").as_bool())
+				{
+					std::vector<std::pair<std::string, ThemeElement>> kept;
+					for (const auto& child : element.children)
+						if (child.first != "itemTemplate")
+							kept.push_back(child);
+
+					element.children.swap(kept);
+				}
+
 				element.children.push_back(std::pair<std::string, ThemeElement>("itemTemplate", ThemeElement()));
 				std::pair<std::string, ThemeElement>& item = element.children.back();
 				item.second.extra = 99;
@@ -2152,6 +2245,8 @@ GuiComponent* ThemeData::createExtraComponent(Window* window, const ThemeElement
 		comp = new RatingComponent(window);
 	else if (elem.type == "rectangle")
 		comp = new RectangleComponent(window);
+	else if (elem.type == "slideshow")
+		comp = new SlideshowComponent(window);
 
 	if (comp != nullptr)
 	{
@@ -2270,6 +2365,8 @@ std::string ThemeData::getThemeFromCurrentSet(const std::string& system)
 
 ThemeData::ThemeMenu::ThemeMenu(ThemeData* theme)
 {
+	Row.valueSpacing = Renderer::getScreenWidth() * 0.005f;
+
 	Title.font = Font::get(FONT_SIZE_LARGE, Font::getDefaultPath(), true);
 	Footer.font = Font::get(FONT_SIZE_SMALL, Font::getDefaultPath(), true);
 	Text.font = Font::get(FONT_SIZE_MEDIUM, Font::getDefaultPath(), true);
@@ -2337,6 +2434,8 @@ ThemeData::ThemeMenu::ThemeMenu(ThemeData* theme)
 			Footer.color = elem->get<unsigned int>("color");
 		if (elem->has("selectorColor"))
 			Footer.selectorColor = elem->get<unsigned int>("selectorColor");
+		if (elem->has("atBottom"))
+			FooterAtBottom = elem->get<bool>("atBottom");
 	}
 
 	elem = theme->getElement("menu", "menutextsmall", "menuTextSmall");
@@ -2386,6 +2485,25 @@ ThemeData::ThemeMenu::ThemeMenu(ThemeData* theme)
 			Text.selectorGradientColor = elem->get<unsigned int>("selectorColorEnd");
 		if (elem->has("selectorGradientType"))
 			Text.selectorGradientType = (elem->get<std::string>("selectorGradientType").compare("horizontal"));
+
+		if (elem->has("rowHeight"))
+			Row.height = elem->get<float>("rowHeight") * Renderer::getScreenHeight();
+		if (elem->has("rowPadding"))
+			Row.padding = elem->get<float>("rowPadding") * Renderer::getScreenWidth();
+		if (elem->has("iconSize"))
+			Row.iconSize = elem->get<float>("iconSize") * Renderer::getScreenHeight();
+		if (elem->has("fullRows"))
+			Row.fullRows = elem->get<bool>("fullRows");
+		if (elem->has("valueSpacing"))
+			Row.valueSpacing = elem->get<float>("valueSpacing") * Renderer::getScreenWidth();
+	}
+
+	elem = theme->getElement("menu", "menuprompt", "menuPrompt");
+	if (elem && elem->has("path") && ResourceManager::getInstance()->fileExists(elem->get<std::string>("path")))
+	{
+		Prompt.path = elem->get<std::string>("path");
+		Prompt.font = (elem->has("fontPath") || elem->has("fontSize")) ? Font::getFromTheme(elem, ThemeFlags::ALL, Font::get(FONT_SIZE_SMALL), true) : TextSmall.font;
+		Prompt.color = elem->has("color") ? elem->get<unsigned int>("color") : TextSmall.color;
 	}
 
 
@@ -2437,6 +2555,43 @@ ThemeData::ThemeMenu::ThemeMenu(ThemeData* theme)
 			Icons.textinput_ninepatch_active = elem->get<std::string>("active");
 		if (elem->has("inactive") && ResourceManager::getInstance()->fileExists(elem->get<std::string>("inactive")))
 			Icons.textinput_ninepatch = elem->get<std::string>("inactive");
+		if (elem->has("fontPath") || elem->has("fontSize"))
+			TextEdit.font = Font::getFromTheme(elem, ThemeFlags::ALL, Font::get(FONT_SIZE_MEDIUM), true);
+		if (elem->has("caretColor"))
+			TextEdit.caretColor = elem->get<unsigned int>("caretColor");
+	}
+
+	elem = theme->getElement("menu", "menutile", "menuTile");
+	if (elem && elem->has("path") && elem->has("selectedPath") &&
+		ResourceManager::getInstance()->fileExists(elem->get<std::string>("path")) &&
+		ResourceManager::getInstance()->fileExists(elem->get<std::string>("selectedPath")))
+	{
+		Tile.path = elem->get<std::string>("path");
+		Tile.selectedPath = elem->get<std::string>("selectedPath");
+		if (elem->has("cornerSize"))
+			Tile.cornerSize = elem->get<Vector2f>("cornerSize");
+	}
+
+	elem = theme->getElement("menu", "menukeyboard", "menuKeyboard");
+	if (elem && elem->has("path") && elem->has("focusedPath") &&
+		ResourceManager::getInstance()->fileExists(elem->get<std::string>("path")) &&
+		ResourceManager::getInstance()->fileExists(elem->get<std::string>("focusedPath")))
+	{
+		Keyboard.path = elem->get<std::string>("path");
+		Keyboard.focusedPath = elem->get<std::string>("focusedPath");
+		if (elem->has("activePath") && ResourceManager::getInstance()->fileExists(elem->get<std::string>("activePath")))
+			Keyboard.activePath = elem->get<std::string>("activePath");
+		if (elem->has("cornerSize"))
+			Keyboard.cornerSize = elem->get<Vector2f>("cornerSize");
+		if (elem->has("spacing"))
+			Keyboard.spacing = elem->get<float>("spacing") * Renderer::getScreenWidth();
+		Keyboard.color = elem->has("color") ? elem->get<unsigned int>("color") : Text.color;
+		Keyboard.selectedColor = elem->has("selectedColor") ? elem->get<unsigned int>("selectedColor") : Text.selectedColor;
+		Keyboard.font = (elem->has("fontPath") || elem->has("fontSize")) ? Font::getFromTheme(elem, ThemeFlags::ALL, Font::get(FONT_SIZE_MEDIUM), true) : Text.font;
+		if (elem->has("wordKeys"))
+			Keyboard.wordKeys = elem->get<bool>("wordKeys");
+		if (elem->has("focusKeys"))
+			Keyboard.focusKeys = elem->get<bool>("focusKeys");
 	}
 
 	elem = theme->getElement("menu", "menuswitch", "menuSwitch");
@@ -2561,6 +2716,23 @@ ThemeData::ThemeElement::ThemeElement(const ThemeElement& src)
 
 	for (auto sb : src.mStoryBoards)
 		mStoryBoards[sb.first] = new ThemeStoryboard(*sb.second);
+}
+
+// Copy-and-swap: the copy owns its storyboards (the copy constructor clones them), and the element's
+// old ones are deleted with the temporary. The implicit assignment shared the storyboard pointers.
+ThemeData::ThemeElement& ThemeData::ThemeElement::operator=(const ThemeElement& src)
+{
+	if (this != &src)
+	{
+		ThemeElement copy(src);
+		std::swap(extra, copy.extra);
+		type.swap(copy.type);
+		properties.swap(copy.properties);
+		children.swap(copy.children);
+		mStoryBoards.swap(copy.mStoryBoards);
+	}
+
+	return *this;
 }
 
 ThemeData::ThemeElement::~ThemeElement()

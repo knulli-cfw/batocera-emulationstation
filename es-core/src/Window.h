@@ -62,11 +62,25 @@ public:
 	void render();
 
 	bool init(bool initRenderer = true, bool initInputManager = true);
-	void deinit(bool deinitRenderer = true);
+	bool deinit(bool deinitRenderer = true, bool forGame = false);
 
 	void normalizeNextUpdate();
 
 	inline bool isSleeping() const { return mSleeping; }
+	unsigned int getTimeSinceLastInput() const { return mTimeSinceLastInput; }
+
+	// The home and the game lists, with nothing over them, draw a frame only when it changes
+	// (Settings "RenderOnChange")
+	bool drawsOnlyChanges();
+
+	// Idle pause: after "IdlePause" seconds without input (0: never), the views' videos stop at the end of
+	// their loop ("IdlePauseVideo") and their slideshows stop moving ("IdlePauseSlides"); input resumes them
+	//
+	// A theme asks for these with its variables (Settings left at "auto", or -1 for IdlePause):
+	// esRenderOnChange (true), esIdlePause (seconds) and esBindShownOnly (true, BindingManager); without
+	// them ES draws every frame, has no idle pause and binds every element.
+	enum IdlePart { IDLE_VIDEO, IDLE_SLIDES };
+	bool isIdlePaused(IdlePart part) const { return part == IDLE_VIDEO ? mIdleVideo : mIdleSlides; }
 	bool getAllowSleep();
 	void setAllowSleep(bool sleep);
 	
@@ -88,11 +102,45 @@ public:
 	bool cancelScreenSaver();
 	void renderScreenSaver();
 
+	// Back from a system suspend (the time asleep counts in CLOCK_BOOTTIME, not in CLOCK_MONOTONIC or SDL's
+	// ticks): the screen saver stops and the idle times start over, as on a key, so the view shows at once
+	// (the key that woke the system never reaches ES). Called on every turn of the main loop.
+	void checkSystemResume();
+
 	void postToUiThread(const std::function<void()>& func, void* data = nullptr);
 	void unregisterPostedFunctions(void* data);
 	void reactivateGui();
 
 	void onThemeChanged(const std::shared_ptr<ThemeData>& theme);
+
+	// A theme's look and place for the info popups and for the volume and brightness meters: the screen view's
+	// notification elements "notification" and "meters", when they have a size (in pixels here)
+	struct PopupStyle
+	{
+		PopupStyle() : enabled(false), vertical(false), origin(0, 0), color(0xFFFFFFFF), backgroundColor(0x0D1A2BF2), borderColor(0),
+			trackColor(0xFFFFFF40), trackBorderColor(0), fillColor(0xFFFFFFFF), cornerRadius(0), iconSize(0), spacing(0), maxCount(0) {}
+
+		bool enabled;
+		bool vertical;
+		Vector2f pos;
+		Vector2f origin;
+		Vector2f size;
+		std::shared_ptr<Font> font;
+		std::string iconPath;
+		unsigned int color;
+		unsigned int backgroundColor;
+		unsigned int borderColor;
+		unsigned int trackColor;
+		unsigned int trackBorderColor;
+		unsigned int fillColor;
+		float cornerRadius;
+		float iconSize;
+		float spacing;
+		int maxCount;
+	};
+
+	const PopupStyle& getNoticeStyle() const { return mNoticeStyle; }
+	const PopupStyle& getMeterStyle() const { return mMeterStyle; }
 
 	std::shared_ptr<BatteryIndicatorComponent>	getBatteryIndicator() { return mBatteryIndicator; }
 
@@ -153,6 +201,7 @@ private:
 
 	int mFrameTimeElapsed;
 	int mFrameCountElapsed;
+	int mFrameDrawnStart;
 	int mAverageDeltaTime;
 
 	std::unique_ptr<TextCache> mFrameDataText;
@@ -161,15 +210,28 @@ private:
 	std::shared_ptr<TextComponent>	mClock;
 	std::shared_ptr<ControllerActivityComponent>	mControllerActivity;
 	std::shared_ptr<VolumeInfoComponent> mVolumeInfo;
+	std::shared_ptr<VolumeInfoComponent> mBrightnessInfo;
 	std::shared_ptr<BatteryIndicatorComponent>	mBatteryIndicator;	
 
 	float mNotificationOffsetY = 0.02f;
+	PopupStyle mNoticeStyle;
+	PopupStyle mMeterStyle;
+
+	// The info popups shown at once (a theme's style can cap them; the others wait)
+	int shownNotificationCount() const;
 
 	bool mNormalizeNextUpdate;
 
 	bool mAllowSleep;
 	bool mSleeping;
 	unsigned int mTimeSinceLastInput;
+	bool mIdleVideo;
+	bool mIdleSlides;
+	bool mRenderOnChange;	// the setting, or the theme's choice
+	int  mIdlePauseSeconds;
+	long long mSuspendedMs;	// CLOCK_BOOTTIME less CLOCK_MONOTONIC at the last check; -1 before the first
+	void updateIdlePause();
+	void applyThemeOptions(const std::shared_ptr<ThemeData>& theme);
 
 	bool mRenderedHelpPrompts;
 

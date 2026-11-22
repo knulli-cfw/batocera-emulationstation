@@ -14,12 +14,15 @@
 #include "Genres.h"
 #include "utils/Platform.h"
 #include "PowerSaver.h"
+#include "math/Misc.h"
+#include "renderers/Renderer.h"
 #include "Settings.h"
 #include "SystemData.h"
 #include "SystemScreenSaver.h"
 #include <SDL_events.h>
 #include <SDL_main.h>
 #include <SDL_timer.h>
+#include <SDL_video.h>
 #include <iostream>
 #include <time.h>
 #include "LocaleES.h"
@@ -42,6 +45,8 @@
 #include "watchers/WatchersManager.h"
 #include "HttpReq.h"
 #include "QuickResume.h"
+#include "BindingManager.h"
+#include "FileData.h"
 
 #ifdef WIN32
 #include <Windows.h>
@@ -293,6 +298,13 @@ bool loadSystemConfigFile(Window* window, const char** errorString)
 			"VISIT EMULATIONSTATION.ORG FOR MORE INFORMATION.";
 		return false;
 	}
+
+	// {global:lastPlayed}: the game played last on the console
+	BindingManager::registerGlobalProperty("lastPlayed", []
+	{
+		FileData* game = SystemData::getConsoleLastPlayedGame();
+		return game != nullptr ? BindableProperty((IBindable*)game) : BindableProperty::Null;
+	});
 
 #ifdef KNULLI
 	ApiSystem::getInstance()->callBatoceraPreGameListsHook();
@@ -660,10 +672,19 @@ int main(int argc, char* argv[])
 	int lastTime = SDL_GetTicks();
 	int ps_time = SDL_GetTicks();
 
+	// How long a frame shows on the display: a frame not drawn (RenderOnChange) waits that long instead
+	int frameTime = 16;
+	{
+		SDL_DisplayMode displayMode;
+		if (Renderer::getSDLWindow() != nullptr && SDL_GetWindowDisplayMode(Renderer::getSDLWindow(), &displayMode) == 0 && displayMode.refresh_rate > 0)
+			frameTime = Math::max(1, 1000 / displayMode.refresh_rate);
+	}
+
 	bool running = true;
 
 	while(running)
 	{
+		int frameStart = SDL_GetTicks();
 #ifdef WIN32	
 		int processStart = SDL_GetTicks();
 #endif
@@ -707,6 +728,8 @@ int main(int argc, char* argv[])
 		  //	ps_time = SDL_GetTicks();
 		}
 
+		window.checkSystemResume();
+
 		if (window.isSleeping())
 		{
 			lastTime = SDL_GetTicks();
@@ -723,6 +746,12 @@ int main(int argc, char* argv[])
 			deltaTime = 1000;
 
 		TRYCATCH("Window.update" ,window.update(deltaTime))	
+
+		// The home and the game lists draw a frame only when it changes
+		bool onlyChanges = window.drawsOnlyChanges();
+		if (onlyChanges)
+			Renderer::beginFrame();
+
 		TRYCATCH("Window.render", window.render())
 
 /*
@@ -737,7 +766,16 @@ int main(int argc, char* argv[])
 #endif
 */
 
-		Renderer::swapBuffers();
+		if (!onlyChanges)
+			Renderer::swapBuffers();
+		else if (!Renderer::endFrame())
+		{
+			// The screen keeps its frame: wait as long as showing one would have, or until an event (input is
+			// answered at once)
+			int spent = (int)SDL_GetTicks() - frameStart;
+			if (spent >= 0 && spent < frameTime)
+				SDL_WaitEventTimeout(nullptr, frameTime - spent);
+		}
 
 		Log::flush();
 	}

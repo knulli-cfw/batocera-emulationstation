@@ -13,7 +13,7 @@
 
 #define BLINKTIME	1000
 
-TextEditComponent::TextEditComponent(Window* window) : GuiComponent(window),
+TextEditComponent::TextEditComponent(Window* window, const std::shared_ptr<Font>& font) : GuiComponent(window),
 	mBox(window, ":/textinput_ninepatch.png"), mFocused(false), 
 	mScrollOffset(0.0f, 0.0f), mCursor(0), mEditing(false), mFont(Font::get(FONT_SIZE_MEDIUM, FONT_PATH_LIGHT)), 
 	mCursorRepeatDir(0)
@@ -23,6 +23,11 @@ TextEditComponent::TextEditComponent(Window* window) : GuiComponent(window),
 
 	auto theme = ThemeData::getMenuTheme();
 	mBox.setImagePath(ThemeData::getMenuTheme()->Icons.textinput_ninepatch);
+
+	if (font)
+		mFont = font;
+	else if (theme->TextEdit.font != nullptr)
+		mFont = theme->TextEdit.font;
 
 	addChild(&mBox);
 	
@@ -363,8 +368,13 @@ void TextEditComponent::render(const Transform4x4f& parentTrans)
 		{
 			float cursorHeight = mFont->getHeight() * 0.8f;
 
+			// A theme's caret colour is kept while the field is not edited: the on-screen keyboard types into it
+			// from its keys, so the caret shows where the next letter goes
+			auto caretColor = ThemeData::getMenuTheme()->TextEdit.caretColor;
 			auto cursorColor = (ThemeData::getMenuTheme()->Text.color & 0xFFFFFF00) | getOpacity();
-			if (!mEditing)
+			if (caretColor != 0)
+				cursorColor = (caretColor & 0xFFFFFF00) | (unsigned char)((caretColor & 0xFF) * getOpacity() / 255.0f);
+			else if (!mEditing)
 				cursorColor = (ThemeData::getMenuTheme()->Text.color & 0xFFFFFF00) | (unsigned char) (getOpacity() * 0.25f);
 
 			Renderer::drawRect(cursorPos.x(), cursorPos.y() + (mFont->getHeight() - cursorHeight) / 2, 2.0f, cursorHeight, cursorColor, cursorColor); // 0x000000FF

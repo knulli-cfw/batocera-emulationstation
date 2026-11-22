@@ -97,6 +97,7 @@ public:
 	std::string getSelectedUserData();
 	
 	float getTotalRowHeight() const;
+	float getShownHeight() const;
 	inline float getRowHeight(int row) const { return getRowHeight(mEntries.at(row).data); }
 
 	inline void setCursorChangedCallback(const std::function<void(CursorState state)>& callback) { mCursorChangedCallback = callback; };

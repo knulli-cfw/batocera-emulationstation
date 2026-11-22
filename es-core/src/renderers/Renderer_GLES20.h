@@ -53,6 +53,7 @@ namespace Renderer
 		void		 postProcessShader(const std::string& path, const float _x, const float _y, const float _w, const float _h, const std::map<std::string, std::string>& parameters, unsigned int* data = nullptr);
 
 		size_t		 getTotalMemUsage() override;
+		bool		 readPixels(int _x, int _y, int _w, int _h, unsigned char* _rgba) override;
 
 		bool		 supportShaders() { return true; }
 		bool		 shaderSupportsCornerSize(const std::string& shader) override;

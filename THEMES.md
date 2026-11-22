@@ -726,6 +726,101 @@ This kind of view is used for retrocompatibility with Retropie themes, but is de
 	- Displays details of the system currently selected in the carousel.
 * You can use extra elements (elements with `extra="true"`) to add your own backgrounds, etc.  They will be displayed behind the carousel, and scroll relative to the carousel.
 
+##### Tabs (system grid)
+
+A system grid (`imagegrid name="imagegrid"`) can be split into tabs with the theme variable `systemtabs`.
+Its value lists the tabs in order, separated by `;`, each as a name, `=` and the names of its systems,
+separated by `,`:
+
+```xml
+<variables>
+	<systemtabs>COLLECTIONS=all,favorites,recent;8-BIT=atari2600,nes,mastersystem;MORE=dos,pico8,*</systemtabs>
+</variables>
+```
+
+* The grid shows the systems of one tab, in the listed order. L1/R1 (`pageup`/`pagedown`) show the previous
+  or next tab that has systems, wrapping around; the grid comes back to the system last selected in that tab.
+* Each visible system is in one tab: the first that lists it. Visible systems that no tab lists go to the
+  tab with `*`, or to the last tab. Hidden and empty systems are left out, and so are tabs with no system.
+* Going to a system (back from its game list, at start-up) shows its tab.
+* X continues the selected system's game, `{system:continue}`: the one played last, else the suggested game
+  (below), else its best-rated favorite; with none, and on tools, emulators and screenshots
+  (`{system:hasContinue}` false), X does nothing. B does not open the navigation bar, which lists every system.
+* Suggestions, only when the system view has a `<video>` whose path is `{system:continue:video}` (any other
+  theme keeps `{system:continue}`, `{system:hasContinue}` and X as above): on a system never played,
+  `{system:continue}` is a random favorite with a preview video, each once before any repeats. A system with
+  favorites but none with a video gets no suggestion (its best-rated favorite, as above); only a system with no
+  favorite at all suggests its 12 best-rated games with a video. Games of tools, emulators and screenshots and
+  videos under 1 KB are left out. The video plays once (each suggestion stays at least 5 seconds) and the view
+  moves on to the next one, binding the panel again, so the other bindings and X follow the video; a list made
+  again (a game changed) keeps the current suggestion while it is still in it. The last game's video loops.
+* `{system:tab}` is the index of the system's tab in the list (0 for the first), -1 without tabs, so the
+  theme can draw the tab row (`"./tabs/" + {system:tab} + ".png"`).
+* A tab with more systems than the grid shows at once (`autoLayout` columns × rows) uses
+  `<imagegrid name="imagegrid-dense">` instead, when the theme has one (another layout, say); its items keep
+  the template of `imagegrid`.
+* ES versions with tabs support the feature `systemtabs`: put the tabbed view inside
+  `<feature supported="systemtabs">` so other versions keep the theme's own system view.
+* `<itemTemplate replace="true">` replaces the templates an earlier definition of the same element had, so an
+  include can redefine the items of a theme's grid. Without `replace="true"` the first template stays the one used,
+  as before.
+
+##### Columns (tabbed system grid)
+
+A tabbed grid can be laid out as columns that slide sideways, with three theme variables, each a fraction of
+the screen (none or 0: no columns):
+
+```xml
+<variables>
+	<esColumnPan>0.3125</esColumnPan>		<!-- the first column's width -->
+	<esColumnSlide>0.6875</esColumnSlide>	<!-- how far right of the home a game list opens -->
+	<esColumnHeader>0.0542</esColumnHeader>	<!-- the band at the top that stays in place -->
+</variables>
+```
+
+* The system view is laid out wider than the screen: a first column at the left (`esColumnPan` wide, the tabs
+  drawn by the theme with `{system:tab}`), the grid after it and a last column past the screen's right edge.
+* Level 1: the first column has the focus. Up and down show the previous or next tab (without wrapping) and
+  the grid follows at once; right or A give the grid the focus.
+* Level 2: the grid has the focus and the view pans left by `esColumnPan`, eased out (360 ms). B, or left
+  in the grid's first column, give the focus back to the first column (the view pans back). Right in the
+  grid's last column (or on its last item) opens the system's games, as A does. L1/R1 still change the tab.
+* `{global:homeColumn}` is the level shown (1 or 2; 0 without columns), switched as the pan starts, for
+  what the theme draws differently (the tabs framed while they have the focus, say). While the grid does not
+  have the focus, its selected item shows as the others (its `deactivate` storyboards), then plays the item
+  template's `unfocus` storyboards (a lighter border on the remembered item, say).
+* A game list opens `esColumnSlide` to the right of the home at level 2: both slide left by it (360 ms, eased
+  out), so the home's last column and the list's first share what is left of the screen. There the leaving
+  view's elements fade out over the first 35 % of the way and the coming one's fade in from 30 to 70 %. B, or
+  left in the game grid's first column, slide back; L1/R1 slide back to the previous or next tab.
+* Which part of the views an element is comes from where the theme puts it: a full-screen element is the
+  background (it stays in place; a game list's fades in and out over the home's), one inside the top
+  `esColumnHeader` band stays in place and fades with the shared column (a status line), one that starts in
+  the shared column fades, the rest slides.
+* With the power saver's instant mode there is no pan and no slide.
+
+##### Slides (system grid)
+
+`{system:slides}` lists a system's captures, one path per line, for a `slideshow` in the grid's item template
+(see `slideshow`): its favorites that have a screenshot, else its 12 best-rated games that have one, the systems
+grouped in it included, by rating. Collections, tools, emulators and screenshots have none. The theme variable
+`systemslides` picks the capture each card shows first and leaves out the ones that do not fit (title screens,
+menus, duplicates), one game per line: `+` (first) or `-` (left out), the game's own system, a space and its
+path as the gamelist writes it; `%`, `=`, `<`, `>` and `$` written as `%25`, `%3D`, `%3C`, `%3E` and `%24`.
+`~` leaves a game's video out of the panel's suggestions (a black and white recording on a colour console):
+
+```xml
+<variables>
+	<systemslides>
+		+snes ./Some Game.sfc
+		-snes ./Some Title Screen.sfc
+		~gbc ./Some Game Recorded On A Game Boy.zip
+	</systemslides>
+</variables>
+```
+
+ES versions with slides support the feature `slideshow`.
+
 #### menu
 * `helpsystem name="help"` - ALL
 	- The help system style for this view. If not defined, menus will have the same helpsystem as defined in system view.
@@ -738,11 +833,19 @@ This kind of view is used for retrocompatibility with Retropie themes, but is de
 	- Image for the slider knob in menus
 * `menuButton name="menubutton"` - PATH | FILLEDPATH
 	- Images for menu buttons
-* `menuText name="menutext"` - FONTPATH | FONTSIZE | COLOR
+* `menuTextEdit name="menutextedit"` - ACTIVE | INACTIVE | FONTPATH | FONTSIZE | CARETCOLOR
+	- The text field of the on-screen keyboard and other text popups
+* `menuPrompt name="menuprompt"` - PATH | FONTPATH | FONTSIZE | COLOR
+	- The back prompt right of a menu's title, instead of a BACK button
+* `menuTile name="menutile"` - PATH | SELECTEDPATH | CORNERSIZE
+	- The tiles of a menu's image grid (the save states)
+* `menuKeyboard name="menukeyboard"` - PATH | FOCUSEDPATH | ACTIVEPATH | CORNERSIZE | SPACING | FONTPATH | FONTSIZE | COLOR | SELECTEDCOLOR | WORDKEYS | FOCUSKEYS
+	- The on-screen keyboard's keys
+* `menuText name="menutext"` - FONTPATH | FONTSIZE | COLOR | ROWHEIGHT | ROWPADDING | ICONSIZE | FULLROWS | VALUESPACING
 	- text for all menu entries
 * `menuText name="menutitle"` - FONTPATH | FONTSIZE | COLOR
 	- text for menu titles
-* `menuText name="menufooter"` - FONTPATH | FONTSIZE | COLOR
+* `menuText name="menufooter"` - FONTPATH | FONTSIZE | COLOR | ATBOTTOM
 	- text for menu footers or subtitles
 * `menuTextSmall name="menutextsmall"` - FONTPATH | FONTSIZE | COLOR
 	- text for menu entries in smallerfont
@@ -876,6 +979,8 @@ Can be created as an extra.
     - BATOCERA 5.24 : Number of column and rows in the grid (integer values).
 * `autoLayoutSelectedZoom` - type: FLOAT. 
     - BATOCERA 5.24: Zoom factor to apply when a tile is selected.    
+* `peekSize` - type: FLOAT.
+    - How far past its bottom edge (its right edge when it scrolls horizontally) the grid draws, in screen height (width): the row after the last whole one peeks in, cut there. The cursor still scrolls by whole rows, and a row scrolling in comes from that place.
 * `imageSource` - type: STRING.
     - BATOCERA 5.24: Selects the image to display. `thumbnail` by default, can also be set to `image` or `marquee`. 
 * `showVideoAtDelay` - type: FLOAT.
@@ -913,6 +1018,9 @@ Can be created as an extra.
     - BATOCERA 5.24: Selects if the background is over the full tile or only the image. `full` by default, can also be set to `image`. 
 * `imageSizeMode` - type: STRING.
     - BATOCERA 5.24: Selects the image sizing mode. `maxSize` by default, can also be set to `minSize` (outer zoom) or `size` (stretch). 
+      `screen` stretches like `size` (a capture at its screen's shape: a TV game's at 4:3), but a picture turned the
+      other way than the tile (an upright game's capture in a landscape tile) keeps its orientation: it takes the
+      tile's shape turned, as tall (or as wide) as the tile, centred. The selected tile's video too.
 * `reflexion` - type: NORMALIZED_PAIR.
 	- BATOCERA 5.24: table reflexion effect. First item is top position alpha, second is bottom alpha.
     
@@ -920,11 +1028,18 @@ Can be created as an extra.
 
 Can be created as an extra.
 
+A file VLC cannot read (empty, truncated, not a video; it has 2 seconds to read the tracks) is no video: the
+snapshot shows, and the file is not tried again until its size changes.
+
 * `pos` - type: NORMALIZED_PAIR.
 * `size` - type: NORMALIZED_PAIR.
 	- If only one axis is specified (and the other is zero), the other will be automatically calculated in accordance with the video's aspect ratio.
 * `maxSize` - type: NORMALIZED_PAIR.
 	- The video will be resized as large as possible so that it fits within this size and maintains its aspect ratio.  Use this instead of `size` when you don't know what kind of video you're using so it doesn't get grossly oversized on one axis (e.g. with a game's video metadata).
+* `keepOrientation` - type: BOOLEAN.
+	- With `size`: a video (and its snapshot) turned the other way than the size keeps its orientation: it takes the size's shape turned (a TV game's 4:3, an upright one's 3:4), centred.  Default is false.
+* `fadeTime` - type: FLOAT.
+	- Seconds the video takes to come in over its snapshot (with `effect` none, a crossfade in place; on a grid tile's `gridtile.video` too).  Default is 0.4.
 * `origin` - type: NORMALIZED_PAIR.
 	- Where on the image `pos` refers to.  For example, an origin of `0.5 0.5` and a `pos` of `0.5 0.5` would place the image exactly in the middle of the screen.  If the "POSITION" and "SIZE" attributes are themable, "ORIGIN" is implied.
 * `rotation` - type: FLOAT.
@@ -1106,6 +1221,57 @@ Can be created as an extra.
 
 EmulationStation borrows the concept of "nine patches" from Android (or "9-Slices"). Currently the implementation is very simple and hard-coded to only use 48x48px images (16x16px for each "patch"). Check the `data/resources` directory for some examples (button.png, frame.png).
 
+#### slideshow
+
+Can be created as an extra, or in an `itemTemplate`.
+
+Captures shown one at a time at whole-pixel scales: the smallest of 1/4, 1/2, 1, 2, 3 and 4 at which the
+capture's region of interest covers the element, centred (on the capture's pixel grid at 2x and up), so pixel
+art stays sharp. In a grid's item template it moves only on the selected item: every `interval` seconds the
+next capture slides in from the right in `duration` seconds, and the other items show the first capture. It
+stops under the screen saver, while the view is hidden and with the idle pause (Idle pause, below); a capture
+that does not load (gone, not an image) is asked for once more, then skipped. Child elements (a screen filter, a
+frame) are drawn over the captures, the dots over them.
+
+* `pos`, `size`, `x`, `y`, `w`, `h`, `origin`, `opacity`, `visible`, `zIndex` - as for `image`.
+* `path` - type: STRING.
+    - The captures, one path per line; usually bound: `{system:slides}`.
+* `interval` - type: FLOAT.
+    - Seconds on each capture (default 4).
+* `duration` - type: FLOAT.
+    - Seconds of the slide to the next capture (default 0.6).
+* `color` - type: COLOR.
+    - Multiplied with the captures (a Game Boy's green, say).
+* `saturation` - type: FLOAT.
+    - 0 (grey) to 1 (default).
+* `roundCorners` - type: FLOAT.
+    - Corner radius of the element: pixels, or a fraction of its size below 1.
+* `roi` - type: NORMALIZED_RECT.
+    - The part of each capture to centre, as fractions of it: x y w h (default 0 0 1 1; `0 0 1 0.5` for the
+      top screen of a DS capture).
+* `dots`, `maxDots`, `dotSize`, `dotsOffset`, `dotColor`, `dotSelectedColor` - BOOLEAN, FLOAT, FLOAT,
+  NORMALIZED_PAIR, COLOR, COLOR.
+    - The position dots, on the selected item only: at most `maxDots` (default 9) in a window that follows the
+      current capture, smaller at an end with more captures beyond. `dotSize` is a fraction of the screen height
+      (default 4 px at 480), `dotsOffset` the distance of the row from the element's top-right corner, as
+      fractions of the screen (default 9 px, 9 px). The current dot is wider.
+
+##### Drawing only what changes
+
+With `RenderOnChange` (es_settings, default true), the home and the game lists, with nothing over them, draw
+and show a frame only when it differs from the frame on screen or a texture it uses changed (a video's new
+frame), and at least once a second; otherwise the screen keeps its frame and ES waits for the next frame's time
+or an event. `RenderOnChangeVerify` (for tests) draws every frame and logs any frame the cache would have left
+out whose pixels changed; `DrawFramerate` shows the frames drawn per second.
+
+##### Idle pause
+
+After `IdlePause` seconds without input (es_settings, default 60; 0 never), the videos of the views stop at the
+end of their loop and show their snapshot or what is under them (`IdlePauseVideo`, default true; the system
+view's panel moves on to no other suggestion), and slideshows finish the change under way and stay on their
+capture (`IdlePauseSlides`, default true). Any input resumes them; so does a resume from system suspend, which
+also leaves the screen saver. The screen saver's videos are not paused.
+
 #### rating
 
 * `pos` - type: NORMALIZED_PAIR.
@@ -1276,6 +1442,19 @@ BATOCERA 5.24
 	- Default is 878787FF. Color of the selector bar.
 * `selectorColorEnd` - type: NORMALIZED_PAIR. 
     - Bottom color for the gradient of the "selector bar."
+* `atBottom` - type: BOOLEAN. (`menufooter` only)
+	- Full-screen menus show the main menu's version line at their bottom, short (name, version, board), instead of
+	  under the title. Default is false.
+* `rowHeight` - type: FLOAT. (`menutext` only)
+	- A list row's least height, as a fraction of the screen height (groups keep their own). Default: the row's content.
+* `rowPadding` - type: FLOAT. (`menutext` only)
+	- The margin left and right inside list rows, as a fraction of the screen width. Default is 10 pixels.
+* `iconSize` - type: FLOAT. (`menutext` only)
+	- The height of the rows' icons (menuIcons), as a fraction of the screen height. Default: 1.25 times the text's letter height.
+* `fullRows` - type: BOOLEAN. (`menutext` only)
+	- Lists show whole rows only: they scroll by rows and leave out a row they cannot show whole. Default is false.
+* `valueSpacing` - type: FLOAT. (`menutext` only)
+	- The space between a row's value and its chevron, as a fraction of the screen width. Default is 0.005.
 	
 
 #### menuSwitch
@@ -1304,13 +1483,75 @@ BATOCERA 5.24 - replace the textbox background images in OSK
   - Image path when the textbox is not selected
 * `active` - type: PATH. 
   - Image path when the textbox is selected.
+* `fontPath` - type: PATH.
+  - The text's font. Default is ES's light font.
+* `fontSize` - type: FLOAT.
+  - The text's size, as a fraction of the screen height.
+* `caretColor` - type: COLOR.
+  - The caret's colour, kept at full strength while the field is not edited (the on-screen keyboard types into
+    it from its keys). Default: the menu text's colour, dimmed while the field is not edited.
+
+#### menuPrompt
+
+A back prompt right of a menu's title (`menuPrompt name="menuprompt"`), instead of the BACK button at its bottom:
+the image and BACK in the catalogue, written with a first capital. Without `path` menus keep their BACK button.
+
+* `path` - type: PATH.
+  - The back button's image, as high as 1.6 times the text's letter height.
+* `fontPath` - type: PATH.
+* `fontSize` - type: FLOAT.
+  - Default: `menutextsmall`'s font.
+* `color` - type: COLOR.
+  - Default: `menutextsmall`'s colour.
+
+#### menuTile
+
+The tiles of a menu's image grid, the save states' (`menuTile name="menutile"`). Without `path` and `selectedPath`
+the tiles keep their stock look, the selected one filled with `menutext`'s `selectorColor`. With them the grid
+leaves 8 pixels between tiles and draws both images as they are.
+
+* `path` - type: PATH.
+  - A tile's background (ninepatch).
+* `selectedPath` - type: PATH.
+  - The selected tile's background.
+* `cornerSize` - type: NORMALIZED_PAIR.
+  - The images' corner size, in pixels. Default is `16 16`.
+
+#### menuKeyboard
+
+The on-screen keyboard's keys (`menuKeyboard name="menukeyboard"`). Without `path` and `focusedPath` the keyboard
+keeps its stock look. The images are ninepatches drawn as they are, with no tint.
+
+* `path` - type: PATH.
+  - A key.
+* `focusedPath` - type: PATH.
+  - The focused key.
+* `activePath` - type: PATH.
+  - SHIFT or ALT while on. Default: `path` tinted.
+* `cornerSize` - type: NORMALIZED_PAIR.
+  - The images' corner size, in pixels. Default is `16 16`.
+* `spacing` - type: FLOAT.
+  - The space between two keys, as a fraction of the screen width.
+* `fontPath` - type: PATH.
+* `fontSize` - type: FLOAT.
+  - The letters' font. Words (below, RESET and CANCEL) take the `menutextsmall` font. Default: `menutext`'s.
+* `color` - type: COLOR.
+  - The labels' colour. Default: `menutext`'s colour.
+* `selectedColor` - type: COLOR.
+  - The focused key's label colour. Default: `menutext`'s `selectedColor`.
+* `wordKeys` - type: BOOLEAN.
+  - Name the delete, space and accept keys (`DELETE`, `SPACE`, `ACCEPT` in the catalogue) instead of their glyphs,
+    and write every word key with a first capital. Default is false.
+* `focusKeys` - type: BOOLEAN.
+  - Open the keyboard on its first letter key instead of the text field, for pads. Default is false.
 
 #### menuIcons
 
 BATOCERA 5.24 - Add images to menuitems
 
 * `*` - type: PATH. 
-  - Element name must be the image name in the list : iconSystem, iconUpdates, iconControllers, iconGames, iconUI, iconSound, iconNetwork, iconScraper, iconAdvanced, iconQuit, iconRetroachievements, iconKodi, iconRestart, iconShutdown, iconFastShutdown
+  - Element name must be the image name in the list : iconSystem, iconUpdates, iconControllers, iconGames, iconUI, iconSound, iconNetwork, iconScraper, iconAdvanced, iconQuit, iconRetroachievements, iconKodi, iconRestart, iconShutdown, iconFastShutdown,
+    iconNewGame and iconAutoSave (the save states' tiles that start a new game and a new autosave)
 
 #### controllerActivity
 
@@ -1353,6 +1594,43 @@ BATOCERA 5.24 - controllerActivity element must be defined in screen view
 * `zIndex` - type: FLOAT.
 
   - z-index value for component.  Components will be rendered in order of z-index value from low to high.
+
+#### notification
+
+Defined in the screen view.  `<notification name="notification">` styles the info popups (a message, a song's
+title, a notice sent through the API); `<notification name="meters">` the volume and brightness meters.  Without a
+size, ES draws its default ones.
+
+* `y` - type: FLOAT.
+
+  - "notification" only: top of the background jobs' notifications (top right), as a fraction of the screen's height.  Default is 0.02.
+
+* `size` - type: NORMALIZED_PAIR.
+
+  - A popup's largest width and its height (a meter's width and height).
+
+* `pos`, `origin` - type: NORMALIZED_PAIR.
+
+  - Where the first popup goes and which of its points sits there (`1 0`: its top right corner).  Popups go one
+    under the other, `spacing` apart; with both meters showing, they go side by side around that place.
+
+* `fontPath`, `fontSize` - The text (a meter's level).
+
+* `color`, `backgroundColor`, `borderColor` - type: COLOR.
+
+  - The text and the glyphs, the box under them and its 1 px border (none when transparent).
+
+* `cornerSize` - type: FLOAT.  The box's corner radius, as a fraction of the screen's height (meters: half their height by default).
+
+* `iconPath` - type: PATH.  "notification": an icon before the text.
+
+* `iconSize` - type: FLOAT.  The icon's or the meter glyph's size, as a fraction of the screen's height.
+
+* `spacing` - type: FLOAT.  The gap between popups, as a fraction of the screen's height.
+
+* `maxCount` - type: FLOAT.  "notification": popups shown at once; the next one shows when one ends, and the first gives way after 2.5 s when others wait.
+
+* `trackColor`, `fillColor` - type: COLOR.  "meters": the bar's track and its fill up to the level.
 
   
 
@@ -1491,3 +1769,35 @@ Show Empty Systems
 ==================
 
 If you are creating per-system logos and would like to see what all systems look like in your theme on a live install without having to actually have ROMs in each system's folder, simply go to Main Menu → Game Collection Settings → Show Empty Systems
+
+## Handheld game lists, saves and word completion
+
+These variables are read by the frontend. Existing themes can keep their usual controls and keyboard. The following example belongs in a theme's variables block.
+
+```xml
+<variables>
+  <esGameListXAction>savestates</esGameListXAction>
+  <esGameLaunchTransition>shortFade</esGameLaunchTransition>
+  <esSingleNewGame>true</esSingleNewGame>
+  <esSaveToday>Today</esSaveToday>
+  <esSaveYesterday>Yesterday</esSaveYesterday>
+  <esSaveUnknownDate>Unknown date</esSaveUnknownDate>
+  <esWordComplete>Complete word</esWordComplete>
+  <esWordStart>Frequent words</esWordStart>
+  <esWordNext>Next word</esWordNext>
+</variables>
+```
+
+* With `esGameListXAction=savestates`, X opens the selected game's states and A launches directly. A game without state support can display `esNoSaveStatesText`. The theme's short fade applies to automatic/fade launch transitions. Explicit instant or slide choices retain precedence.
+* The word keyboard draws suggestions from titles in the search scope. L2 inserts the first word. R2 focuses the word cards, left/right selects and A inserts the word at the cursor. After a space, the cards suggest words that follow the previous one. Suggestions keep the keyboard open. Enable the on-screen keyboard to exercise this path.
+* Set `esRandomCollectionPreview` and `esRotateCollectionPreview` to `true` for collection panels, and `esRotateConsolePreview` for a system's panel. Bind its media and text to the same `system:continue` game. Named save dates, the collection panel and the meter's optional `trackBorderColor` can be used independently.
+* The KNULLI-specific resume adapter is optional. If installed, it must recognize explicit slots including `-2` for a fresh libretro session. Without it, ES uses its regular launcher.
+
+To run the standalone word-completion regression on Linux, from the repository root:
+
+```sh
+c++ -std=c++14 -O1 -ffunction-sections -fdata-sections -Wl,--gc-sections -Ies-core/src \
+    tests/word-completion.cpp es-core/src/utils/WordCompletion.cpp es-core/src/utils/StringUtil.cpp \
+    -o /tmp/es-word-completion
+LC_ALL=C.UTF-8 /tmp/es-word-completion
+```

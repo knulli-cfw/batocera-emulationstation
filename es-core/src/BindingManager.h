@@ -4,6 +4,7 @@
 
 #include <string>
 #include <vector>
+#include <functional>
 
 class GuiComponent;
 class IBindable;
@@ -107,7 +108,17 @@ class BindingManager
 public:
 	static void          updateBindings(GuiComponent* comp, IBindable* system, bool recursive = true);
 
+	// Adds a {global:name} property, read when bindings update (the app registers what es-core cannot see)
+	static void          registerGlobalProperty(const std::string& name, const std::function<BindableProperty()>& getter);
+
+	// A hidden container's elements are left unbound until it shows (the theme asks: Window::onThemeChanged);
+	// its videos are bound all the same
+	static void          setBindShownOnly(bool value) { mBindShownOnly = value; }
+	static bool          bindsShownOnly() { return mBindShownOnly; }
+
 private:
+	static bool          mBindShownOnly;
+	static void          bindVideos(GuiComponent* comp, IBindable* bindable);
 	static void          bindValues(IBindable* current, std::string& xp, bool showDefaultText, std::string& evaluableExpression);
 	static std::string   updateBoundExpression(std::string& xp, IBindable* bindable, bool showDefaultText);
 };

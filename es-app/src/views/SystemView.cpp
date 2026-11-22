@@ -1,4 +1,5 @@
 #include "views/SystemView.h"
+#include "components/VideoLeadIn.h"
 
 #include "animations/LambdaAnimation.h"
 #include "guis/GuiMsgBox.h"
@@ -23,11 +24,26 @@
 #include "CollectionSystemManager.h"
 #include "resources/TextureDataManager.h"
 #include "guis/GuiTextEditPopup.h"
-#include "guis/GuiTextEditPopupKeyboard.h"
+#include "guis/GuiGamelistOptions.h"
 #include "TextToSpeech.h"
 #include "BindingManager.h"
 #include "guis/GuiRetroAchievements.h"
 #include "components/CarouselComponent.h"
+
+#include <set>
+#include <SDL_timer.h>
+
+std::map<std::string, int> SystemView::sSystemTabs;
+namespace
+{
+	std::vector<SystemData*> consoleOrder;
+	std::vector<std::pair<std::string, std::string>> tabNeighbors;
+}
+int SystemView::sShownColumn = 0;
+
+// The pan between a column layout's first column and its grid, eased out: it moves in the frame after the
+// press and slows down to its place
+static const int COLUMN_PAN_MS = 360;
 
 SystemView::SystemView(Window* window) : GuiComponent(window),
 	mViewNeedsReload(true),
@@ -53,6 +69,20 @@ SystemView::SystemView(Window* window) : GuiComponent(window),
 	mPressedCursor = -1;
 	mPressedPoint = Vector2i(-1, -1);
 
+	mActiveTab = 0;
+	mSuggestionEnded = nullptr;
+	mShownSystem = nullptr;
+	mContinueShownAt = 0;
+
+	mColumnLevel = 1;
+	mColumnPan = 0;
+	mColumnPanFrom = 0;
+	mColumnPanTo = 0;
+	mColumnPanTime = -1;
+	mColumnFade = 1;
+
+	BindingManager::registerGlobalProperty("homeColumn", [] { return BindableProperty(SystemView::getShownColumn()); });
+
 	setSize((float)Renderer::getScreenWidth(), (float)Renderer::getScreenHeight());
 	populate();
 }
@@ -68,20 +98,43 @@ SystemView::~SystemView()
 	clearEntries();
 }
 
-void SystemView::clearEntries()
+void SystemView::clearEntries(bool keepExtras)
 {
+	if (!keepExtras)
+		clearParkedExtras();
+
 	for (auto& entry : mEntries)
 	{
 		setExtraRequired(entry, false);
 
-		for (auto extra : entry.backgroundExtras)
-			delete extra;
+		if (keepExtras)
+		{
+			// Hidden (videos stop, slideshows go back to their first capture) until the tab shows again
+			for (auto extra : entry.backgroundExtras)
+				extra->onHide();
+
+			mParkedExtras[entry.object] = entry.backgroundExtras;
+		}
+		else
+		{
+			for (auto extra : entry.backgroundExtras)
+				delete extra;
+		}
 
 		entry.backgroundExtras.clear();
 	}
 
 	mEntries.clear();
 	mCarousel.clear();
+}
+
+void SystemView::clearParkedExtras()
+{
+	for (auto& parked : mParkedExtras)
+		for (auto extra : parked.second)
+			delete extra;
+
+	mParkedExtras.clear();
 }
 
 void SystemView::reloadTheme(SystemData* system)
@@ -126,9 +179,42 @@ void SystemView::reloadTheme(SystemData* system)
 	loadExtras(system);	
 }
 
+static void forEachVideo(GuiComponent* comp, const std::function<void(VideoComponent*)>& func)
+{
+	if (comp->isKindOf<VideoComponent>())
+		func((VideoComponent*)comp);
+
+	for (int i = 0; i < comp->getChildCount(); i++)
+		forEachVideo(comp->getChild(i), func);
+}
+
 void SystemView::loadExtras(SystemData* system)
 {
 	auto it = std::find_if(mEntries.begin(), mEntries.end(), [system](const SystemViewData& ss) { return ss.object == system; });
+
+	// Back to a tab shown before: its extras as they were (making them from the theme again takes long)
+	auto parked = mParkedExtras.find(system);
+	if (parked != mParkedExtras.cend())
+	{
+		if (it != mEntries.cend())
+		{
+			for (auto extra : it->backgroundExtras)
+				delete extra;
+
+			it->backgroundExtras = parked->second;
+		}
+		else
+		{
+			SystemViewData data;
+			data.object = system;
+			data.backgroundExtras = parked->second;
+			mEntries.push_back(data);
+		}
+
+		mParkedExtras.erase(parked);
+		return;
+	}
+
 	if (it != mEntries.cend())
 	{
 		// delete any existing extras
@@ -137,7 +223,53 @@ void SystemView::loadExtras(SystemData* system)
 
 		it->backgroundExtras.clear();
 	}
-	
+
+	auto extras = makeExtras(system, true);
+
+	if (it == mEntries.cend())
+	{
+		SystemViewData data;
+		data.object = system;
+		data.backgroundExtras = extras;
+		mEntries.push_back(data);
+	}
+	else
+		it->backgroundExtras = extras;
+
+	SystemRandomPlaylist::resetCache();
+	showColumnVideos();
+}
+
+static const unsigned int PREPARE_AFTER_IDLE_MS = 1500;
+
+// Tabs: once the home is idle (no input for a while), the extras of the other tabs' systems are made ahead,
+// one system per frame, and kept for their tab (mParkedExtras): a tab then shows without making them
+void SystemView::prepareOtherTabs()
+{
+	if (!hasTabs() || mViewNeedsReload || mWindow->getTimeSinceLastInput() < PREPARE_AFTER_IDLE_MS || mWindow->peekGui() != ViewController::get())
+		return;
+
+	for (auto& tab : mTabs)
+	{
+		for (auto system : tab.systems)
+		{
+			if (system->getTheme() == nullptr || mParkedExtras.find(system) != mParkedExtras.cend())
+				continue;
+
+			if (std::find_if(mEntries.cbegin(), mEntries.cend(), [system](const SystemViewData& e) { return e.object == system; }) != mEntries.cend())
+				continue;
+
+			mParkedExtras[system] = makeExtras(system, false);
+			return;
+		}
+	}
+}
+
+std::vector<GuiComponent*> SystemView::makeExtras(SystemData* system, bool preload)
+{
+	// The same files for every system's elements: checked once
+	Utils::FileSystem::FileSystemCacheActivator fsc;
+
 	size_t vram = Settings::getInstance()->getInt("MaxVRAM") * 1024 * 1024;
 	size_t size = TextureResource::getTotalMemUsage();
 
@@ -160,7 +292,7 @@ void SystemView::loadExtras(SystemData* system)
 		{
 			// Preload image if there's enough VRAM space				
 			auto tex = ((ImageComponent*)extra)->getTexture();
-			if (tex && !tex->isLoaded())
+			if (preload && tex && !tex->isLoaded())
 			{
 				auto texSize = tex->getEstimatedVRAMUsage();
 				if (size + texSize < vram)
@@ -191,50 +323,78 @@ void SystemView::loadExtras(SystemData* system)
 		}
 	}
 
+	// The panel's videos of {system:continue:video}, in a container or not: see onContinueVideoEnded. Only a
+	// view that plays one gets suggestions (SystemData::setPanelVideo); any other keeps {system:continue}
+	bool panelVideo = false;
+	for (auto extra : extras)
+	{
+		forEachVideo(extra, [this, system, &panelVideo](VideoComponent* video)
+		{
+			auto expressions = video->getBindingExpressions();
+			auto path = expressions.find("path");
+			if (path != expressions.cend() && path->second.find("{system:continue:video}") != std::string::npos)
+			{
+				video->setOnVideoEnded([this, system, video]() { return onContinueVideoEnded(system, video); });
+				panelVideo = true;
+			}
+		});
+	}
+
+	system->setPanelVideo(panelVideo);
+
 	// sort the extras by z-index
 	std::stable_sort(extras.begin(), extras.end(), [](GuiComponent* a, GuiComponent* b) { return b->getZIndex() > a->getZIndex(); });
-
-	if (it == mEntries.cend())
-	{
-		SystemViewData data;
-		data.object = system;
-		data.backgroundExtras = extras;
-		mEntries.push_back(data);
-	}
-	else
-		it->backgroundExtras = extras;
-
-	SystemRandomPlaylist::resetCache();
+	return extras;
 }
 
 
-void SystemView::populate()
+void SystemView::populate(bool keepExtras)
 {
 	TextureLoader::paused = true;
 
-	clearEntries();
-	
-	for (auto system : SystemData::sSystemVector)
+	// The systems' elements check the same files: once each
+	Utils::FileSystem::FileSystemCacheActivator fsc;
+
+	clearEntries(keepExtras && !mViewNeedsReload);
+
+	// The view's elements come from the first system with a theme
+	if (mViewNeedsReload)
 	{
-		const std::shared_ptr<ThemeData>& theme = system->getTheme();
-		if (theme == nullptr)
-			continue;
-
-		if (mViewNeedsReload)
-			getViewElements(theme);
-
-		if (system->isVisible())
+		for (auto system : SystemData::sSystemVector)
 		{
-			mCarousel.add(system->getName(), system, true);
-			loadExtras(system);
+			if (system->getTheme() == nullptr)
+				continue;
 
-			auto carousel = mCarousel.asCarousel();
-			if (carousel)
-			{
-				auto logo = carousel->getLogo(mCarousel.size() - 1);
-				if (logo)
-					ensureTexture(logo.get(), true);
-			}
+			getViewElements(system->getTheme());
+			break;
+		}
+	}
+
+	// With tabs, only the systems of the shown tab
+	std::vector<SystemData*> systems;
+	if (buildTabs())
+	{
+		applyTabGrid();
+		systems = mTabs[mActiveTab].systems;
+	}
+	else
+	{
+		for (auto system : SystemData::sSystemVector)
+			if (system->getTheme() != nullptr && system->isVisible())
+				systems.push_back(system);
+	}
+
+	for (auto system : systems)
+	{
+		mCarousel.add(system->getName(), system, true);
+		loadExtras(system);
+
+		auto carousel = mCarousel.asCarousel();
+		if (carousel)
+		{
+			auto logo = carousel->getLogo(mCarousel.size() - 1);
+			if (logo)
+				ensureTexture(logo.get(), true);
 		}
 	}
 
@@ -264,10 +424,43 @@ void SystemView::populate()
 	auto grid = mCarousel.asGrid();
 	if (grid)
 		grid->preloadTiles();
+
+	// Columns: the pan and the level shown as they were (a tab change keeps them)
+	if (hasColumns())
+	{
+		if (mColumnPanTime < 0)
+			mColumnPan = columnPanTarget(mColumnLevel);
+
+		if (sShownColumn == 0)
+			showColumnLevel(mColumnLevel);
+	}
+	else
+	{
+		mColumnPan = 0;
+		mColumnPanTime = -1;
+		sShownColumn = 0;
+		if (grid)
+			grid->setCursorShown(true);
+	}
 }
 
 void SystemView::goToSystem(SystemData* system, bool animate)
 {
+	// With tabs, show the system's tab first
+	if (system != nullptr && hasTabs())
+	{
+		auto it = sSystemTabs.find(system->getName());
+		if (it != sSystemTabs.cend() && it->second != mActiveTab)
+		{
+			auto current = getSelected();
+			if (current != nullptr)
+				mTabCursors[mActiveTab] = current->getName();
+
+			mActiveTab = it->second;
+			populate();
+		}
+	}
+
 	mLastCursor = -1;
 	mCarousel.setCursor(system);
 
@@ -363,10 +556,8 @@ void SystemView::showQuickSearch()
 			ViewController::get()->goToGameList(all, false);
 		};
 
-		if (Settings::getInstance()->getBool("UseOSK"))
-			mWindow->pushGui(new GuiTextEditPopupKeyboard(mWindow, _("QUICK SEARCH"), "", updateVal, false));
-		else
-			mWindow->pushGui(new GuiTextEditPopup(mWindow, _("QUICK SEARCH"), "", updateVal, false));
+		GuiGamelistOptions::openGameSearch(mWindow, all,
+			_("QUICK SEARCH"), "", updateVal);
 	}
 }
 
@@ -396,6 +587,79 @@ bool SystemView::input(InputConfig* config, Input input)
 	{
 		showQuickSearch();
 		return true;
+	}
+
+	// Right enters the category rail's selection. On cards, horizontal input
+	// stays in this grid and wraps, including repeated input across both ends.
+	if (hasColumns() && mColumnLevel == 2 && mCarousel.asGrid() &&
+	    mCarousel.asGrid()->cycleCardInput(config, input))
+		return true;
+	if (hasColumns() && input.value != 0)
+	{
+		auto grid = mCarousel.asGrid();
+
+		if (mColumnLevel == 1)
+		{
+			if (grid && (config->isMappedTo("l2", input) || config->isMappedTo("r2", input)))
+			{
+				if (grid->canPageRows())
+				{
+					setColumnLevel(2, true);
+					grid->pageRows(config->isMappedTo("l2", input) ? -1 : 1);
+				}
+				return true;
+			}
+			if (config->isMappedLike("up", input))
+			{
+				moveTab(-1, false);
+				return true;
+			}
+
+			if (config->isMappedLike("down", input))
+			{
+				moveTab(1, false);
+				return true;
+			}
+
+			if (config->isMappedLike("right", input) || config->isMappedTo(BUTTON_OK, input))
+			{
+				setColumnLevel(2, true);
+				return true;
+			}
+
+			if (config->isMappedLike("left", input))
+				return true;
+		}
+		else if (grid != nullptr)
+		{
+			if (config->isMappedTo("l2", input) || config->isMappedTo("r2", input))
+			{
+				grid->pageRows(config->isMappedTo("l2", input) ? -1 : 1);
+				return true;
+			}
+			if (config->isMappedTo(BUTTON_BACK, input))
+			{
+				setColumnLevel(1, true);
+				return true;
+			}
+
+		}
+	}
+
+	// Tabs: L1/R1 show the previous or next tab
+	if (hasTabs() && input.value != 0)
+	{
+		if (config->isMappedTo("pageup", input))
+		{
+			moveTab(-1);
+			return true;
+		}
+
+		if (config->isMappedTo("pagedown", input))
+		{
+			moveTab(1);
+			return true;
+		}
 	}
 
 	// Move selection fast using group (manufacturers)
@@ -476,6 +740,40 @@ bool SystemView::input(InputConfig* config, Input input)
 
 	if (input.value != 0)
 	{
+		// The rail selects a category. Continue belongs to a focused console card.
+		if (hasTabs() && hasColumns() && mColumnLevel == 1 && config->isMappedTo("x", input))
+			return true;
+
+		if (hasTabs() && config->isMappedTo("x", input))
+		{
+			SystemData* system = getSelected();
+			FileData* game = system != nullptr ? system->getContinueGame() : nullptr;
+
+			// If a library change invalidated the visible pick, rebind before accepting X.
+			if (system != nullptr && (system->usesRandomCollectionPreview() || system->rotatesHomePreview()) &&
+				(system != mShownSystem || game == nullptr || game->getPath() != mShownContinue))
+			{
+				updateExtraTextBinding();
+				return true;
+			}
+
+			// The game the panel shows, should the suggestion have changed since it was bound
+			if (game != nullptr && system == mShownSystem && !mShownContinue.empty() && game->getPath() != mShownContinue)
+			{
+				FileData* shown = system->getRootFolder()->FindByPath(mShownContinue);
+				if (shown != nullptr)
+					game = shown;
+			}
+
+			if (game != nullptr)
+			{
+				mCarousel.stopScrolling();
+				ViewController::get()->launch(game);
+			}
+
+			return true;
+		}
+
 		bool netPlay = SystemData::isNetplayActivated() && SystemConf::getInstance()->getBool("global.netplay");
 		if (netPlay && config->isMappedTo("x", input))
 		{
@@ -532,7 +830,8 @@ bool SystemView::input(InputConfig* config, Input input)
 
 bool SystemView::showNavigationBar()
 {
-	if (!SystemData::IsManufacturerSupported)
+	// The bar lists every system, the tabbed grid only one tab's: L1/R1 move between tabs instead
+	if (!SystemData::IsManufacturerSupported || hasTabs())
 		return false;
 
 	auto sortMode = Settings::getInstance()->getString("SortSystems");
@@ -620,6 +919,72 @@ void SystemView::showNavigationBar(const std::string& title, const std::function
 
 void SystemView::update(int deltaTime)
 {
+	// The pan between the columns
+	if (mColumnPanTime >= 0)
+	{
+		mColumnPanTime += deltaTime;
+
+		float t = Math::min(1.0f, (float)mColumnPanTime / (float)COLUMN_PAN_MS);
+		mColumnPan = Math::lerp(mColumnPanFrom, mColumnPanTo, Math::easeOutCubic(t));
+
+		if (t >= 1.0f)
+			mColumnPanTime = -1;
+	}
+
+	prepareOtherTabs();
+
+	// A system's slides and suggestions, made off the UI thread, arrived: its card and the panel bind them
+	for (auto& entry : mEntries)
+	{
+		SystemData* system = entry.object;
+		if (!system->pollHomeLists())
+			continue;
+
+		int version = system->getSlidesVersion();
+		auto it = mSlidesBound.find(system);
+		if ((it == mSlidesBound.cend() || it->second != version) && mCarousel.isGrid())
+			mCarousel.asGrid()->updateTileBindings(system);
+
+		mSlidesBound[system] = version;
+
+		if (system == getSelected())
+			updateExtraTextBinding();
+	}
+
+	// VLC reports EOF during rendering. Rebind on the next update, while the same card is still visible.
+	if (mSuggestionEnded != nullptr)
+	{
+		auto system = mSuggestionEnded;
+		mSuggestionEnded = nullptr;
+		if (system == getSelected() && system == mShownSystem && mEndedPreviewPath == mShownContinue)
+		{
+			if (system->rotatesHomePreview())
+			{
+				if (homePanelActive() && system->hasOtherHomePreview())
+				{
+					system->homePreview(true);
+					updateExtraTextBinding();
+				}
+			}
+			else if (system->nextSuggestion())
+				updateExtraTextBinding();
+		}
+	}
+	// An image-only or unplayable entry has no EOF. Give its still eight visible seconds.
+	if (mHomePreviewPlayback && homePanelActive() && mShownSystem->hasOtherHomePreview())
+	{
+		mStillElapsed += deltaTime;
+		if (mStillElapsed >= 8000)
+		{
+			mStillElapsed = 0;
+			if (mShownVideo.empty() || !Utils::FileSystem::exists(mShownVideo) || VideoComponent::isUnplayable(mShownVideo))
+			{
+				mShownSystem->homePreview(true);
+				updateExtraTextBinding();
+			}
+		}
+	}
+
 	mCarousel.update(deltaTime);
 	mSystemInfo.update(deltaTime);
 
@@ -642,6 +1007,41 @@ void SystemView::update(int deltaTime)
 	}
 }
 
+// The panel's video of {system:continue}: the last game's loops; on a system never played, a suggestion's
+// ends and the panel moves on to the next suggestion (in update). A suggestion stays at least
+// MIN_SUGGESTION_MS: a video that ends at once loops until then rather than start VLC again every few frames.
+static const unsigned int MIN_SUGGESTION_MS = 5000;
+
+bool SystemView::homePanelActive()
+{
+	return mShownSystem && mShownSystem == getSelected() && isShowing() && (!hasColumns() || mColumnLevel == 2) &&
+		!mScreensaverActive && !GuiComponent::isLaunchTransitionRunning && mWindow->peekGui() == ViewController::get() &&
+		!mWindow->isIdlePaused(Window::IDLE_VIDEO);
+}
+
+bool SystemView::onContinueVideoEnded(SystemData* system, VideoComponent* video)
+{
+	if (system && system->rotatesHomePreview())
+	{
+		if (!homePanelActive() || system != mShownSystem || !mHomePreviewPlayback ||
+			video->getVideoPath() != mShownVideo || !system->hasOtherHomePreview())
+			return true;
+		mSuggestionEnded = system;
+		mEndedPreviewPath = mShownContinue;
+		return false;
+	}
+
+	if (system == nullptr || system != getSelected() || system->getLastPlayedGame() != nullptr || !system->hasOtherSuggestion())
+		return true;
+
+	if (SDL_GetTicks() - mContinueShownAt < MIN_SUGGESTION_MS)
+		return true;
+
+	mSuggestionEnded = system;
+	mEndedPreviewPath = mShownContinue;
+	return false;
+}
+
 void SystemView::updateExtraTextBinding()
 {
 	int mCursor = mCarousel.getCursorIndex();
@@ -652,8 +1052,30 @@ void SystemView::updateExtraTextBinding()
 	if (system == nullptr)
 		return;
 
+	// The extras check the same files again and again (firstfile(), each image's path) and look for the same
+	// games ({system:continue:...}, {global:lastPlayed:...}): once is enough
+	Utils::FileSystem::FileSystemCacheActivator fsc;
+	SystemData::FindPass findPass;
+
+	if (system != mShownSystem && (system->rotatesHomePreview() || system->usesRandomCollectionPreview()))
+		system->enterHomePreview();
+
 	for (auto extra : mEntries[mCursor].backgroundExtras)
 		BindingManager::updateBindings(extra, system);
+
+	// The game the panel now shows, for X, and since when
+	FileData* shown = system->getContinueGame();
+	std::string path = shown != nullptr ? shown->getPath() : "";
+	mHomePreviewPlayback = shown && system->rotatesHomePreview() &&
+		system->getTheme()->getVariable("animateSystems") == "1";
+	mShownVideo = mHomePreviewPlayback ? shown->getVideoPath() : "";
+	if (system != mShownSystem || path != mShownContinue)
+	{
+		mShownSystem = system;
+		mShownContinue = path;
+		mContinueShownAt = SDL_GetTicks();
+		mStillElapsed = 0;
+	}
 }
 
 void SystemView::onCursorChanged(const CursorState& state)
@@ -663,10 +1085,19 @@ void SystemView::onCursorChanged(const CursorState& state)
 
 	int mCursor = mCarousel.getCursorIndex();
 
+	if (hasColumns() && mColumnLevel == 2 &&
+	    columnPanTarget(2) != (mColumnPanTime < 0 ? mColumnPan : mColumnPanTo))
+		setColumnLevel(2, true);
+
 	if (AudioManager::isInitialized())
 		AudioManager::getInstance()->changePlaylist(getSelected()->getTheme());
 
 	Utils::FileSystem::preloadFileSystemCache(mEntries.at(mCursor).object->getRootFolder()->getPath(), true);
+
+	// the card's last played game's video: its fade from black measured first, if not known yet (VideoLeadIn)
+	FileData* played = mEntries.at(mCursor).object->getLastPlayedGame();
+	if (played != nullptr)
+		VideoLeadIn::request(played->getVideoPath(), true);
 
 	// update help style
 	updateHelpPrompts();
@@ -880,6 +1311,16 @@ void SystemView::render(const Transform4x4f& parentTrans)
 	if (!Renderer::isVisibleOnScreen(rect))
 		return;
 
+	// Columns: the view's content pans; its background and header stay in place
+	bool columns = hasColumns();
+	Transform4x4f panned = trans;
+	if (columns && mColumnPan != 0)
+		panned.translate(Vector3f(-mColumnPan, 0, 0));
+
+	Transform4x4f screen = ViewController::get()->getScreenTransform();
+	if (columns)
+		renderInPlace(screen, ColumnLayout::BACKGROUND);
+
 	auto carouselZindex = mCarousel.getZIndex();
 	auto systemInfoZIndex = mSystemInfo.getZIndex();
 	auto minMax = std::minmax(carouselZindex, systemInfoZIndex);
@@ -887,21 +1328,157 @@ void SystemView::render(const Transform4x4f& parentTrans)
 	renderExtras(trans, INT16_MIN, minMax.first);
 
 	for (auto sb : mStaticBackgrounds)
-		sb->render(trans);
+		renderExtra(sb, trans);
 
 	if (mCarousel.getZIndex() > mSystemInfo.getZIndex())
-		renderInfoBar(trans);	
+		renderInfoBar(panned);
 	else
-		renderCarousel(trans);
+		renderCarousel(panned);
 
 	renderExtras(trans, minMax.first, minMax.second);
 
 	if (mCarousel.getZIndex() > mSystemInfo.getZIndex())
-		renderCarousel(trans);	
+		renderCarousel(panned);
 	else
-		renderInfoBar(trans);
+		renderInfoBar(panned);
 
 	renderExtras(trans, minMax.second, INT16_MAX);
+
+	if (columns)
+		renderInPlace(screen, ColumnLayout::HEADER);
+}
+
+ColumnLayout::Role SystemView::columnRole(GuiComponent* extra)
+{
+	// The shared column: the screen's right part at level 2 (what the game list leaves of the screen), past the
+	// first column and the grid
+	float right = mColumns.pan + Renderer::getScreenWidth();
+	float left = mColumns.hasSlide() ? mColumns.pan + mColumns.slide : right;
+	return mColumns.roleOf(extra, left, right);
+}
+
+// An extra as the columns draw it: panned with the view (the header and the background are drawn in place by
+// render), the shared column at the slide's fade
+void SystemView::renderExtra(GuiComponent* extra, const Transform4x4f& trans)
+{
+	if (!hasColumns())
+	{
+		extra->render(trans);
+		return;
+	}
+
+	auto role = columnRole(extra);
+	if (role == ColumnLayout::BACKGROUND || role == ColumnLayout::HEADER)
+		return;
+
+	Transform4x4f panned = trans;
+	if (mColumnPan != 0)
+		panned.translate(Vector3f(-mColumnPan, 0, 0));
+
+	ColumnLayout::renderAt(extra, panned, ColumnLayout::opacityOf(role, mColumnFade, false));
+}
+
+// The selected system's background (never faded: the game list's fades over it) or header, in place
+void SystemView::renderInPlace(const Transform4x4f& screen, ColumnLayout::Role role)
+{
+	int cursor = mCarousel.getCursorIndex();
+	if (cursor < 0 || cursor >= (int)mEntries.size())
+		return;
+
+	for (auto sb : mStaticBackgrounds)
+		if (sb->isVisible() && columnRole(sb) == role)
+			ColumnLayout::renderAt(sb, screen, ColumnLayout::opacityOf(role, mColumnFade, false));
+
+	for (auto extra : mEntries[cursor].backgroundExtras)
+		if (extra->isVisible() && columnRole(extra) == role)
+			ColumnLayout::renderAt(extra, screen, ColumnLayout::opacityOf(role, mColumnFade, false));
+}
+
+bool SystemView::hasColumns()
+{
+	return mColumns.pan > 0 && hasTabs();
+}
+
+float SystemView::columnPanTarget(int level)
+{
+	if (level != 2 || mCarousel.size() == 0)
+		return 0;
+	auto theme = getSelected()->getTheme();
+	return theme && theme->getVariable("esColumnKeepTabs") == "true" ? 0 : mColumns.pan;
+}
+
+void SystemView::setColumnLevel(int level, bool animate)
+{
+	if (!hasColumns())
+		return;
+
+	level = level == 2 ? 2 : 1;
+	float target = columnPanTarget(level);
+
+	if (level != mColumnLevel)
+	{
+		mSuggestionEnded = nullptr;
+		mStillElapsed = 0;
+		if (level == 2 && getSelected() && getSelected()->rotatesHomePreview())
+			mShownSystem = nullptr;
+	}
+	mColumnLevel = level;
+
+	if (!animate || Settings::PowerSaverMode() == "instant")
+	{
+		mColumnPan = target;
+		mColumnPanTime = -1;
+		showColumnLevel(level);
+		return;
+	}
+
+	if (mColumnPan == target && mColumnPanTime < 0)
+	{
+		showColumnLevel(level);
+		return;
+	}
+
+	// The theme and the grid's cursor show the new level at once, the pan follows
+	mColumnPanFrom = mColumnPan;
+	mColumnPanTo = target;
+	mColumnPanTime = 0;
+	showColumnLevel(level);
+}
+
+// The level the theme ({global:homeColumn}) and the grid's cursor show
+void SystemView::showColumnLevel(int level)
+{
+	sShownColumn = level;
+
+	auto grid = mCarousel.asGrid();
+	if (grid != nullptr)
+		grid->setCursorShown(level == 2);
+
+	showColumnVideos();
+	updateExtraTextBinding();
+}
+
+void SystemView::showColumnVideos()
+{
+	bool inView = !hasColumns() || mColumnLevel == 2;
+
+	std::function<void(GuiComponent*)> mark = [&mark, inView](GuiComponent* component)
+	{
+		VideoComponent* video = dynamic_cast<VideoComponent*>(component);
+		if (video != nullptr)
+			video->setInView(inView);
+
+		for (unsigned int i = 0; i < component->getChildCount(); i++)
+			mark(component->getChild(i));
+	};
+
+	for (auto& entry : mEntries)
+		for (auto extra : entry.backgroundExtras)
+			mark(extra);
+
+	for (auto& parked : mParkedExtras)
+		for (auto extra : parked.second)
+			mark(extra);
 }
 
 std::vector<HelpPrompt> SystemView::getHelpPrompts()
@@ -912,7 +1489,16 @@ std::vector<HelpPrompt> SystemView::getHelpPrompts()
 
 	bool netPlay = SystemData::isNetplayActivated() && SystemConf::getInstance()->getBool("global.netplay");
 
-	if (netPlay)
+	if (hasTabs())
+	{
+		SystemData* system = getSelected();
+		if ((!hasColumns() || mColumnLevel == 2) && system != nullptr && system->getContinueGame() != nullptr)
+			prompts.push_back(HelpPrompt("x", _("CONTINUE")));
+
+		if (SystemData::getSystem("all") != nullptr)
+			prompts.push_back(HelpPrompt("y", _("SEARCH"), [&] { showQuickSearch(); }));
+	}
+	else if (netPlay)
 	{
 		prompts.push_back(HelpPrompt("x", _("NETPLAY"), [&] { showNetplay(); }));
 		prompts.push_back(HelpPrompt("y", _("SEARCH") + std::string("/") + _("RANDOM"), [&] { showQuickSearch(); })); // QUICK 
@@ -924,7 +1510,7 @@ std::vector<HelpPrompt> SystemView::getHelpPrompts()
 			prompts.push_back(HelpPrompt("y", _("SEARCH"), [&] { showQuickSearch(); })); // QUICK 
 	}
 
-	if (SystemData::IsManufacturerSupported)
+	if (SystemData::IsManufacturerSupported && !hasTabs())
 		prompts.push_back(HelpPrompt("b", _("NAVIGATION BAR"), [&] { showNavigationBar(); }));
 
 #ifdef _ENABLE_FILEMANAGER_
@@ -961,6 +1547,9 @@ void  SystemView::getViewElements(const std::shared_ptr<ThemeData>& theme)
 {
 	LOG(LogDebug) << "SystemView::getViewElements()";
 
+	mTabDefinition = theme->getVariable("systemtabs");
+	mColumns.read(theme);
+
 	const ThemeData::ThemeElement* textListElem = theme->getElement("system", "textlist", "textlist");
 	if (textListElem)
 	{
@@ -990,6 +1579,8 @@ void  SystemView::getViewElements(const std::shared_ptr<ThemeData>& theme)
 			getDefaultElements();
 
 			mCarousel.applyTheme(theme, "system", "imagegrid", ThemeFlags::ALL);
+			mGridTheme = theme;
+			mGridElement = "imagegrid";
 		}
 		else
 		{
@@ -1065,6 +1656,200 @@ void  SystemView::getViewElements(const std::shared_ptr<ThemeData>& theme)
 	std::stable_sort(mStaticBackgrounds.begin(), mStaticBackgrounds.end(), [](GuiComponent* a, GuiComponent* b) { return b->getZIndex() > a->getZIndex(); });
 
 	mViewNeedsReload = false;
+}
+
+// Tabs come from the theme variable "systemtabs", which only a system grid uses:
+//   <systemtabs>NAME=system,system,...;NAME=...;NAME=system,*</systemtabs>
+// in the order shown. Each visible system is in one tab: the first that lists it, else the tab
+// with "*" (else the last one). L1/R1 move between the tabs that have systems.
+bool SystemView::buildTabs()
+{
+	mTabs.clear();
+	sSystemTabs.clear();
+	consoleOrder.clear();
+	tabNeighbors.clear();
+
+	if (mTabDefinition.empty() || !mCarousel.isGrid())
+		return false;
+
+	std::vector<SystemData*> visible;
+	for (auto system : SystemData::sSystemVector)
+		if (system->getTheme() != nullptr && system->isVisible())
+			visible.push_back(system);
+
+	std::set<SystemData*> placed;
+	int wildcard = -1;
+
+	for (auto definition : Utils::String::split(mTabDefinition, ';', true))
+	{
+		if (Utils::String::trim(definition).empty())
+			continue;
+
+		SystemViewTab tab;
+
+		auto equal = definition.find('=');
+		tab.name = Utils::String::trim(definition.substr(0, equal));
+
+		if (equal != std::string::npos)
+		{
+			for (auto name : Utils::String::split(definition.substr(equal + 1), ',', true))
+			{
+				name = Utils::String::trim(name);
+				if (name == "*")
+				{
+					wildcard = (int)mTabs.size();
+					continue;
+				}
+
+				for (auto system : visible)
+					if (system->getName() == name && placed.insert(system).second)
+						tab.systems.push_back(system);
+			}
+		}
+
+		mTabs.push_back(tab);
+	}
+
+	if (mTabs.empty())
+		return false;
+
+	if (wildcard < 0)
+		wildcard = (int)mTabs.size() - 1;
+
+	for (auto system : visible)
+		if (placed.insert(system).second)
+			mTabs[wildcard].systems.push_back(system);
+
+	int firstFilled = -1;
+	for (int i = 0; i < (int)mTabs.size(); i++)
+	{
+		for (auto system : mTabs[i].systems)
+			sSystemTabs[system->getName()] = i;
+
+		if (firstFilled < 0 && !mTabs[i].systems.empty())
+			firstFilled = i;
+	}
+
+	if (firstFilled < 0)
+	{
+		mTabs.clear();
+		sSystemTabs.clear();
+		return false;
+	}
+
+	// Navigation and its labels share the same order of visible, nonempty tabs.
+	std::vector<int> filled;
+	const std::string excludedTab = mGridTheme ? mGridTheme->getVariable("esConsoleCycleSkipTab") : "";
+	for (size_t i = 0; i < mTabs.size(); ++i)
+	{
+		if (mTabs[i].systems.empty()) continue;
+		filled.push_back(static_cast<int>(i));
+		if (mTabs[i].name == excludedTab) continue;
+		for (auto system : mTabs[i].systems)
+			if (system->isGameSystem() && !system->isCollection())
+				consoleOrder.push_back(system);
+	}
+	tabNeighbors.resize(mTabs.size());
+	for (size_t i = 0; i < filled.size(); ++i)
+		tabNeighbors[filled[i]] = {mTabs[filled[(i + filled.size() - 1) % filled.size()]].name,
+			mTabs[filled[(i + 1) % filled.size()]].name};
+
+	if (mActiveTab < 0 || mActiveTab >= (int)mTabs.size() || mTabs[mActiveTab].systems.empty())
+		mActiveTab = firstFilled;
+
+	return true;
+}
+
+bool SystemView::hasTabs()
+{
+	return !mTabs.empty() && mCarousel.isGrid();
+}
+
+SystemData* SystemView::adjacentConsole(SystemData* system, int direction)
+{
+	if (consoleOrder.empty()) return nullptr;
+	auto it = std::find(consoleOrder.begin(), consoleOrder.end(), system);
+	if (it == consoleOrder.end()) return direction < 0 ? consoleOrder.back() : consoleOrder.front();
+	const int count = static_cast<int>(consoleOrder.size());
+	return consoleOrder[(static_cast<int>(it - consoleOrder.begin()) + direction + count) % count];
+}
+
+std::string SystemView::adjacentTabName(SystemData* system, int direction)
+{
+	int tab = getSystemTab(system);
+	if (tab < 0 || tab >= static_cast<int>(tabNeighbors.size())) return "";
+	return direction < 0 ? tabNeighbors[tab].first : tabNeighbors[tab].second;
+}
+
+int SystemView::getSystemTab(SystemData* system)
+{
+	if (system == nullptr)
+		return -1;
+
+	auto it = sSystemTabs.find(system->getName());
+	return it == sSystemTabs.cend() ? -1 : it->second;
+}
+
+// A tab with more systems than the grid shows at once uses <imagegrid name="imagegrid-dense"> when
+// the theme has one (a layout with more rows, say); the items keep the "imagegrid" template.
+void SystemView::applyTabGrid()
+{
+	if (mGridTheme == nullptr || !mCarousel.isGrid())
+		return;
+
+	std::string element = "imagegrid";
+
+	const ThemeData::ThemeElement* grid = mGridTheme->getElement("system", "imagegrid", "imagegrid");
+	const ThemeData::ThemeElement* dense = mGridTheme->getElement("system", "imagegrid-dense", "imagegrid");
+	if (grid != nullptr && dense != nullptr && grid->has("autoLayout"))
+	{
+		auto layout = grid->get<Vector2f>("autoLayout");
+		if (layout.x() > 0 && layout.y() > 0 && mTabs[mActiveTab].systems.size() > layout.x() * layout.y())
+			element = "imagegrid-dense";
+	}
+
+	if (element == mGridElement)
+		return;
+
+	mCarousel.applyTheme(mGridTheme, "system", element, ThemeFlags::ALL);
+	mGridElement = element;
+}
+
+void SystemView::moveTab(int direction, bool wrap)
+{
+	int count = (int)mTabs.size();
+	int tab = mActiveTab;
+
+	for (int i = 0; i < count; i++)
+	{
+		if (!wrap && (tab + direction < 0 || tab + direction >= count))
+			return;
+
+		tab = (tab + direction + count) % count;
+		if (!mTabs[tab].systems.empty())
+			break;
+	}
+
+	if (tab == mActiveTab)
+		return;
+
+	mCarousel.stopScrolling();
+
+	auto current = getSelected();
+	if (current != nullptr)
+		mTabCursors[mActiveTab] = current->getName();
+
+	SystemData* select = mTabs[tab].systems.front();
+
+	auto last = mTabCursors.find(tab);
+	if (last != mTabCursors.cend())
+		for (auto system : mTabs[tab].systems)
+			if (system->getName() == last->second)
+				select = system;
+
+	mActiveTab = tab;
+	populate(true);
+	goToSystem(select, false);
 }
 
 //  Render system carousel
@@ -1245,23 +2030,23 @@ void SystemView::renderExtras(const Transform4x4f& trans, float lower, float upp
 				if (allPaths.find(value) == allPaths.cend())
 				{
 					if (extra->getTag() == "background" || extra->getTag().find("bg-") == 0 || extra->getTag().find("bg_") == 0)
-						extra->render(trans);
+						renderExtra(extra, trans);
 					else
 					{
 						auto opa = extra->getOpacity();
 						extra->setOpacity(mExtrasFadeOpacity * opa);
-						extra->render(trans);
+						renderExtra(extra, trans);
 						extra->setOpacity(opa);
 					}
 				}
 				else if (extra->isKindOf<ImageComponent>() && ((ImageComponent*)extra)->isTiled() && extra->getPosition() == Vector3f::Zero() && extra->getSize() == Vector2f(Renderer::getScreenWidth(), Renderer::getScreenHeight()))
-					extra->render(trans);
+					renderExtra(extra, trans);
 			}
 			else if (extra->isKindOf<TextComponent>() && allValues.find(value) == allValues.cend())
 			{
 				auto opa = extra->getOpacity();
 				extra->setOpacity(mExtrasFadeOpacity * opa);
-				extra->render(trans);
+				renderExtra(extra, trans);
 				extra->setOpacity(opa);
 			}
 		}
@@ -1349,7 +2134,7 @@ void SystemView::renderExtras(const Transform4x4f& trans, float lower, float upp
 					{
 						auto opa = extra->getOpacity();
 						extra->setOpacity((1.0f - mExtrasFadeOpacity) * opa);
-						extra->render(extra->isStaticExtra() ? trans : xt);
+						renderExtra(extra, extra->isStaticExtra() ? trans : xt);
 						extra->setOpacity(opa);
 						continue;
 					}
@@ -1357,7 +2142,7 @@ void SystemView::renderExtras(const Transform4x4f& trans, float lower, float upp
 					{
 						auto opa = extra->getOpacity();
 						extra->setOpacity((1.0f - mExtrasFadeOpacity) * opa);
-						extra->render(extra->isStaticExtra() ? trans : extrasTrans);
+						renderExtra(extra, extra->isStaticExtra() ? trans : extrasTrans);
 						extra->setOpacity(opa);
 						continue;
 					}
@@ -1366,7 +2151,7 @@ void SystemView::renderExtras(const Transform4x4f& trans, float lower, float upp
 				{
 					auto opa = extra->getOpacity();
 					extra->setOpacity((1.0f - mExtrasFadeOpacity) * opa);
-					extra->render(extra->isStaticExtra() ? trans : extrasTrans);
+					renderExtra(extra, extra->isStaticExtra() ? trans : extrasTrans);
 					extra->setOpacity(opa);
 					continue;
 				}
@@ -1399,13 +2184,13 @@ void SystemView::renderExtras(const Transform4x4f& trans, float lower, float upp
 					popClip = true;
 				}
 
-				extra->render(trans);
+				renderExtra(extra, trans);
 
 				if (popClip)
 					Renderer::popClipRect();
 			}
 			else
-				extra->render(extrasTrans);
+				renderExtra(extra, extrasTrans);
 		}
 
 		Renderer::popClipRect();
@@ -1463,6 +2248,22 @@ void SystemView::onShow()
 
 	mCarousel.onShow();
 
+	// What changed while hidden (a game played since, a favorite) shows at once
+	updateExtraTextBinding();
+
+	// The cards too, when a system's slides changed (a favorite added in a game list): those to make again are
+	// asked for now, off the UI thread, and update binds them when they arrive
+	for (auto& entry : mEntries)
+		entry.object->getSlides();
+
+	// every card's last played game's video: their fades from black measured ahead (VideoLeadIn)
+	for (auto& entry : mEntries)
+	{
+		FileData* played = entry.object->getLastPlayedGame();
+		if (played != nullptr)
+			VideoLeadIn::request(played->getVideoPath(), false);
+	}
+
 	activateExtras(mCarousel.getCursorIndex());
 
 	for (auto sb : mStaticBackgrounds)
@@ -1474,6 +2275,8 @@ void SystemView::onShow()
 
 void SystemView::onHide()
 {
+	mSuggestionEnded = nullptr;
+	mStillElapsed = 0;
 	GuiComponent::onHide();
 
 	mCarousel.onHide();
@@ -1489,6 +2292,9 @@ void SystemView::onScreenSaverActivate()
 	mScreensaverActive = true;
 	updateExtras([this](GuiComponent* p) { p->onScreenSaverActivate(); });
 
+	// The grid's items too: a slideshow on the selected one stops
+	mCarousel.onScreenSaverActivate();
+
 	for (auto sb : mStaticBackgrounds)
 		sb->onScreenSaverActivate();
 }
@@ -1497,6 +2303,8 @@ void SystemView::onScreenSaverDeactivate()
 {
 	mScreensaverActive = false;
 	updateExtras([this](GuiComponent* p) { p->onScreenSaverDeactivate(); });
+
+	mCarousel.onScreenSaverDeactivate();
 
 	for (auto sb : mStaticBackgrounds)
 		sb->onScreenSaverDeactivate();

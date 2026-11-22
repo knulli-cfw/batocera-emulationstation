@@ -17,21 +17,27 @@
 #include <SDL_events.h>
 #include "ThemeData.h"
 #include <mutex>
+#include <time.h>
 #include "components/AsyncNotificationComponent.h"
+#include "components/PostProcessShaderComponent.h"
 #include "components/ControllerActivityComponent.h"
 #include "components/BatteryIndicatorComponent.h"
 #include "guis/GuiMsgBox.h"
 #include "components/VolumeInfoComponent.h"
+#include "components/VideoVlcComponent.h"
+#include "components/VideoLeadIn.h"
+#include "components/BrightnessInfoComponent.h"
 #include "Splash.h"
 #include "PowerSaver.h"
 #include "renderers/Renderer.h"
+#include "BindingManager.h"
 
 #if WIN32
 #include <SDL_syswm.h>
 #endif
 
-Window::Window() : mNormalizeNextUpdate(false), mFrameTimeElapsed(0), mFrameCountElapsed(0), mAverageDeltaTime(10),
-  mAllowSleep(true), mSleeping(false), mTimeSinceLastInput(0), mScreenSaver(NULL), mRenderScreenSaver(false), mClockElapsed(0), mMouseCapture(nullptr), mMenuBackgroundShaderTextureCache(-1)
+Window::Window() : mNormalizeNextUpdate(false), mFrameTimeElapsed(0), mFrameCountElapsed(0), mFrameDrawnStart(0), mAverageDeltaTime(10),
+  mAllowSleep(true), mSleeping(false), mTimeSinceLastInput(0), mIdleVideo(false), mIdleSlides(false), mRenderOnChange(false), mIdlePauseSeconds(0), mSuspendedMs(-1), mScreenSaver(NULL), mRenderScreenSaver(false), mClockElapsed(0), mMouseCapture(nullptr), mMenuBackgroundShaderTextureCache(-1)
 {			
 	mTransitionOffset = 0;
 
@@ -113,6 +119,8 @@ bool Window::init(bool initRenderer, bool initInputManager)
 {
 	LOG(LogInfo) << "Window::init";
 
+	VideoLeadIn::pause(false);
+
 	if (initRenderer)
 	{
 		if (!Renderer::init())
@@ -137,7 +145,8 @@ bool Window::init(bool initRenderer, bool initInputManager)
 		mDefaultFonts.push_back(Font::get(FONT_SIZE_LARGE));
 	}
 
-	mBackgroundOverlay->setImage(":/scroll_gradient.png");
+	// The theme's fade behind menus (init runs again after each game): the built-in one until a theme sets one
+	mBackgroundOverlay->setImage(ThemeData::getMenuTheme()->Background.fadePath);
 	mBackgroundOverlay->setResize((float)Renderer::getScreenWidth(), (float)Renderer::getScreenHeight());
 
 	if (mClock == nullptr)
@@ -162,6 +171,11 @@ bool Window::init(bool initRenderer, bool initInputManager)
 	else
 		mVolumeInfo->reset();
 
+	if (mBrightnessInfo == nullptr)
+		mBrightnessInfo = std::make_shared<BrightnessInfoComponent>(this);
+	else
+		mBrightnessInfo->reset();
+
 	// update our help because font sizes probably changed
 	if (peekGui())
 		peekGui()->updateHelpPrompts();
@@ -181,7 +195,22 @@ void Window::reactivateGui()
 		peekGui()->updateHelpPrompts();
 }
 
-void Window::deinit(bool deinitRenderer)
+// A GUI drawn over the whole screen: as large as the screen, and so is one of its children (its menu, or
+// its background); a dialog is smaller, and so is a menu that is not full screen
+static bool coversScreen(GuiComponent* gui)
+{
+	auto covers = [](GuiComponent* comp) { return comp->getSize().x() >= Renderer::getScreenWidth() && comp->getSize().y() >= Renderer::getScreenHeight(); };
+	if (gui == nullptr || !covers(gui))
+		return false;
+
+	for (int i = 0; i < gui->getChildCount(); i++)
+		if (covers(gui->getChild(i)))
+			return true;
+
+	return false;
+}
+
+bool Window::deinit(bool deinitRenderer, bool forGame)
 {
 	resetMenuBackgroundShader();
 
@@ -192,6 +221,18 @@ void Window::deinit(bool deinitRenderer)
 	for(auto i = mGuiStack.cbegin(); i != mGuiStack.cend(); i++)
 		(*i)->onHide();
 
+	bool probeStopped = VideoLeadIn::pause(true);
+	bool playersStopped = VideoVlcComponent::waitForPlayers(1500);
+	if (forGame && (!playersStopped || !probeStopped))
+	{
+		VideoLeadIn::pause(false);
+		for (auto extra : mScreenExtras)
+			extra->onShow();
+		if (peekGui())
+			peekGui()->onShow();
+		return false;
+	}
+
 	if (deinitRenderer)
 		InputManager::getInstance()->deinit();
 
@@ -200,6 +241,7 @@ void Window::deinit(bool deinitRenderer)
 
 	if (deinitRenderer)
 		Renderer::deinit();
+	return true;
 }
 
 void Window::textInput(const char* text)
@@ -341,12 +383,32 @@ void Window::stopNotificationPopups()
 	PowerSaver::resume();
 }
 
+// With a theme's cap on the popups shown at once, the first one gives way after a while to those waiting; a
+// waiting one's time starts when it shows
+#define POPUP_WAITING_MS 2500
+
+int Window::shownNotificationCount() const
+{
+	int count = (int)mNotificationPopups.size();
+	if (mNoticeStyle.enabled && mNoticeStyle.maxCount > 0)
+		count = std::min(count, mNoticeStyle.maxCount);
+
+	return count;
+}
+
 void Window::updateNotificationPopups(int deltaTime)
 {
 	bool changed = false;
 
+	int shown = shownNotificationCount();
+	if (shown > 0 && shown < (int)mNotificationPopups.size())
+		mNotificationPopups.front()->shorten(POPUP_WAITING_MS);
+
 	for (int i = mNotificationPopups.size() - 1 ; i >= 0 ; i--)
 	{
+		if (i >= shown)
+			continue;
+
 		mNotificationPopups[i]->update(deltaTime);
 
 		if (!mNotificationPopups[i]->isRunning())
@@ -374,6 +436,32 @@ void Window::updateNotificationPopups(int deltaTime)
 
 void Window::layoutNotificationPopups()
 {
+	if (mNoticeStyle.enabled)
+	{
+		// From the theme's place, one under the other; one going away lets the next ones move up
+		float posY = mNoticeStyle.pos.y() - mNoticeStyle.size.y() * mNoticeStyle.origin.y();
+		int shown = shownNotificationCount();
+
+		for (int i = 0; i < shown; i++)
+		{
+			auto popup = mNotificationPopups[i];
+			float offset = popup->getSize().y() + mNoticeStyle.spacing;
+
+			float fadingOut = popup->getFadeOut();
+			if (fadingOut != 0)
+			{
+				fadingOut = fadingOut - 1;
+				fadingOut = Math::lerp(0, 1, fadingOut * fadingOut * fadingOut + 1);
+				posY -= offset * fadingOut;
+			}
+
+			popup->setPosition(Math::round(mNoticeStyle.pos.x() - popup->getSize().x() * mNoticeStyle.origin.x()), Math::round(posY), 0);
+			posY += offset;
+		}
+
+		return;
+	}
+
 	float posY = Renderer::getScreenHeight() * 0.02f;
 	int paddingY = (int)posY;
 
@@ -455,6 +543,9 @@ void Window::update(int deltaTime)
 	if (mVolumeInfo)
 		mVolumeInfo->update(deltaTime);
 
+	if (mBrightnessInfo)
+		mBrightnessInfo->update(deltaTime);
+
 	mFrameTimeElapsed += deltaTime;
 	mFrameCountElapsed++;
 	if (mFrameTimeElapsed > 500)
@@ -465,9 +556,10 @@ void Window::update(int deltaTime)
 		{
 			std::stringstream ss;
 
-			// fps
+			// fps, and the frames drawn (RenderOnChange draws only those that change)
 			ss << std::fixed << std::setprecision(1) << (1000.0f * (float)mFrameCountElapsed / (float)mFrameTimeElapsed) << "fps, ";
 			ss << std::fixed << std::setprecision(2) << ((float)mFrameTimeElapsed / (float)mFrameCountElapsed) << "ms";
+			ss << ", " << std::fixed << std::setprecision(1) << (1000.0f * (float)(Renderer::getCurrentFrame() - mFrameDrawnStart) / (float)mFrameTimeElapsed) << " drawn/s";
 
 			// vram
 			float textureVramUsageMb = TextureResource::getTotalMemUsage(false) / 1024.0f / 1024.0f;
@@ -482,6 +574,7 @@ void Window::update(int deltaTime)
 
 		mFrameTimeElapsed = 0;
 		mFrameCountElapsed = 0;
+		mFrameDrawnStart = Renderer::getCurrentFrame();
 	}
 
 	/* draw the clock */ 
@@ -512,6 +605,7 @@ void Window::update(int deltaTime)
 	}
 
 	mTimeSinceLastInput += deltaTime;
+	updateIdlePause();
 
 	if (peekGui())
 		peekGui()->update(deltaTime);
@@ -755,8 +849,9 @@ void Window::render()
 	// Render notifications
 	if (!mRenderScreenSaver)
 	{
-		for (auto popup : mNotificationPopups)
-			popup->render(transform);
+		if (!mNoticeStyle.enabled)
+			for (auto popup : mNotificationPopups)
+				popup->render(transform);
 
 		renderAsyncNotifications(transform);
 	}
@@ -767,12 +862,50 @@ void Window::render()
 
 	if (!mRenderScreenSaver)
 	{
+		// A full-screen menu covers the screen's extras (a status bar); a dialog does not, and a screen shader
+		// still applies
+		bool menuOver = false;
+		if (Renderer::ScreenSettings::fullScreenMenus())
+			for (size_t i = 1; i < mGuiStack.size() && !menuOver; i++)
+				menuOver = coversScreen(mGuiStack[i]);
+
 		for (auto extra : mScreenExtras)
-			extra->render(transform);
+			if (!menuOver || extra->isKindOf<PostProcessShaderComponent>())
+				extra->render(transform);
+
+		// A theme's popups go over the screen's extras (its status line)
+		if (mNoticeStyle.enabled)
+		{
+			int shown = shownNotificationCount();
+			for (int i = 0; i < shown; i++)
+				mNotificationPopups[i]->render(transform);
+		}
+	}
+
+	if (mMeterStyle.enabled && mVolumeInfo && mBrightnessInfo)
+	{
+		// The theme's place for one meter; both showing, side by side around it
+		bool both = mVolumeInfo->isShowing() && mBrightnessInfo->isShowing();
+		float width = mMeterStyle.size.x();
+		float x = mMeterStyle.pos.x() - (both ? 2 * width + mMeterStyle.spacing : width) * mMeterStyle.origin.x();
+		float y = mMeterStyle.pos.y() - mMeterStyle.size.y() * mMeterStyle.origin.y();
+
+		if (mVolumeInfo->isShowing())
+		{
+			mVolumeInfo->setPosition(Math::round(x), Math::round(y), 0);
+			if (both)
+				x += width + mMeterStyle.spacing;
+		}
+
+		if (mBrightnessInfo->isShowing())
+			mBrightnessInfo->setPosition(Math::round(x), Math::round(y), 0);
 	}
 
 	if (mVolumeInfo && Settings::VolumePopup())
 		mVolumeInfo->render(transform);
+
+	if (mBrightnessInfo && Settings::VolumePopup())
+		mBrightnessInfo->render(transform);
 
 	if (mTimeSinceLastInput >= screensaverTime && screensaverTime != 0)
 	{
@@ -908,6 +1041,71 @@ void Window::render()
 
 		Renderer::setScreenMargin(margin.x(), margin.y());
 	}
+}
+
+void Window::checkSystemResume()
+{
+#ifndef WIN32
+	struct timespec boot, mono;
+	if (clock_gettime(CLOCK_BOOTTIME, &boot) != 0 || clock_gettime(CLOCK_MONOTONIC, &mono) != 0)
+		return;
+
+	long long suspended = ((long long)boot.tv_sec - mono.tv_sec) * 1000 + (boot.tv_nsec - mono.tv_nsec) / 1000000;
+	bool resumed = mSuspendedMs >= 0 && suspended - mSuspendedMs > 1000;
+	mSuspendedMs = suspended;
+
+	if (!resumed)
+		return;
+
+	LOG(LogInfo) << "Window: back from a system suspend; the screen saver stops";
+	cancelScreenSaver();
+	updateIdlePause();
+	Renderer::invalidateFrame();
+#endif
+}
+
+bool Window::drawsOnlyChanges()
+{
+	return mGuiStack.size() == 1 && !mRenderScreenSaver && !mSleeping && mRenderOnChange;
+}
+
+// A setting left at "auto" follows the theme's variable; "true" or "false" holds for every theme
+static bool themeOption(const std::shared_ptr<ThemeData>& theme, const std::string& setting, const std::string& variable)
+{
+	std::string value = Settings::getInstance()->getString(setting);
+	if (value == "true" || value == "1")
+		return true;
+
+	if (value != "auto" && !value.empty())
+		return false;
+
+	if (theme == nullptr)
+		return false;
+
+	value = theme->getVariable(variable);
+	return value == "true" || value == "1";
+}
+
+void Window::applyThemeOptions(const std::shared_ptr<ThemeData>& theme)
+{
+	mRenderOnChange = themeOption(theme, "RenderOnChange", "esRenderOnChange");
+	BindingManager::setBindShownOnly(themeOption(theme, "BindShownOnly", "esBindShownOnly"));
+
+	mIdlePauseSeconds = Settings::getInstance()->getInt("IdlePause");
+	if (mIdlePauseSeconds < 0)
+		mIdlePauseSeconds = theme == nullptr ? 0 : Math::max(0, atoi(theme->getVariable("esIdlePause").c_str()));
+
+	LOG(LogInfo) << "Window: draws only changes " << (mRenderOnChange ? "yes" : "no") << ", idle pause " << mIdlePauseSeconds << " s, binds only shown containers " << (BindingManager::bindsShownOnly() ? "yes" : "no");
+	updateIdlePause();
+}
+
+void Window::updateIdlePause()
+{
+	int seconds = mIdlePauseSeconds;
+	bool idle = seconds > 0 && mTimeSinceLastInput >= (unsigned int)seconds * 1000;
+
+	mIdleVideo = idle && Settings::getInstance()->getBool("IdlePauseVideo");
+	mIdleSlides = idle && Settings::getInstance()->getBool("IdlePauseSlides");
 }
 
 void Window::normalizeNextUpdate()
@@ -1249,8 +1447,67 @@ void Window::processPostedFunctions()
 		TRYCATCH("processPostedFunction", func.func())
 }
 
+// A screen view's notification element with a size: the look and place of the popups it styles
+static Window::PopupStyle readPopupStyle(const ThemeData::ThemeElement* elem)
+{
+	Window::PopupStyle style;
+	if (elem == nullptr || !elem->has("size"))
+		return style;
+
+	Vector2f screen((float)Renderer::getScreenWidth(), (float)Renderer::getScreenHeight());
+	Vector2f size = elem->get<Vector2f>("size") * screen;
+	if (size.x() <= 0 || size.y() <= 0)
+		return style;
+
+	style.enabled = true;
+	style.vertical = elem->has("vertical") && elem->get<bool>("vertical");
+	style.size = Vector2f(Math::round(size.x()), Math::round(size.y()));
+	style.pos = elem->has("pos") ? elem->get<Vector2f>("pos") * screen : Vector2f::Zero();
+	style.font = Font::getFromTheme(elem, ThemeFlags::ALL, Font::get(FONT_SIZE_MINI));
+
+	if (elem->has("origin"))
+		style.origin = elem->get<Vector2f>("origin");
+
+	if (elem->has("color"))
+		style.color = elem->get<unsigned int>("color");
+
+	if (elem->has("backgroundColor"))
+		style.backgroundColor = elem->get<unsigned int>("backgroundColor");
+
+	if (elem->has("borderColor"))
+		style.borderColor = elem->get<unsigned int>("borderColor");
+
+	if (elem->has("trackBorderColor"))
+		style.trackBorderColor = elem->get<unsigned int>("trackBorderColor");
+
+	if (elem->has("trackColor"))
+		style.trackColor = elem->get<unsigned int>("trackColor");
+
+	if (elem->has("fillColor"))
+		style.fillColor = elem->get<unsigned int>("fillColor");
+
+	if (elem->has("cornerSize"))
+		style.cornerRadius = Math::round(elem->get<float>("cornerSize") * screen.y());
+
+	if (elem->has("iconPath"))
+		style.iconPath = elem->get<std::string>("iconPath");
+
+	if (elem->has("iconSize"))
+		style.iconSize = Math::round(elem->get<float>("iconSize") * screen.y());
+
+	if (elem->has("spacing"))
+		style.spacing = Math::round(elem->get<float>("spacing") * screen.y());
+
+	if (elem->has("maxCount"))
+		style.maxCount = std::max(0, (int)elem->get<float>("maxCount"));
+
+	return style;
+}
+
 void Window::onThemeChanged(const std::shared_ptr<ThemeData>& theme)
 {
+	applyThemeOptions(theme);
+
 	for (auto extra : mScreenExtras)
 		delete extra;
 
@@ -1270,6 +1527,9 @@ void Window::onThemeChanged(const std::shared_ptr<ThemeData>& theme)
 		// default value
 		mNotificationOffsetY = 0.02f;
 	}
+
+	mNoticeStyle = readPopupStyle(elem);
+	mMeterStyle = readPopupStyle(theme->getElement("screen", "meters", "notification"));
 
 	if (mClock)
 	{
@@ -1304,6 +1564,7 @@ void Window::onThemeChanged(const std::shared_ptr<ThemeData>& theme)
 		mBatteryIndicator->applyTheme(theme, "screen", "batteryIndicator", ThemeFlags::ALL);
 	
 	mVolumeInfo = std::make_shared<VolumeInfoComponent>(this);
+	mBrightnessInfo = std::make_shared<BrightnessInfoComponent>(this);
 }
 
 void Window::setGunCalibrationState(bool isCalibrating)

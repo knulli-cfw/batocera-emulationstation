@@ -137,6 +137,9 @@ namespace Renderer
 
 		virtual size_t		 getTotalMemUsage() { return (size_t) -1; };
 
+		// What is drawn so far in the frame, as RGBA rows from the bottom; false when the renderer cannot
+		virtual bool		 readPixels(int _x, int _y, int _w, int _h, unsigned char* _rgba) { return false; };
+
 		virtual bool		 supportShaders() { return false; }
 		virtual bool		 shaderSupportsCornerSize(const std::string& shader) { return false; };
 	};
@@ -199,6 +202,14 @@ namespace Renderer
 	void         setScissor        (const Rect& _scissor);
 	void         setSwapInterval   ();
 	void         swapBuffers       ();
+
+	// A frame drawn only when it changes: what is drawn between beginFrame and endFrame is kept, and
+	// endFrame draws and shows it only when it differs from the frame on screen (or a texture it uses
+	// changed since); false when the screen keeps the frame it shows
+	void         beginFrame        ();
+	bool         endFrame          ();
+	// The next frame is drawn whatever it holds (the screen may have lost the one it showed)
+	void         invalidateFrame   ();
 
 	void		 blurBehind		   (const float _x, const float _y, const float _w, const float _h, const float blurSize = 4.0f);
 	void		 postProcessShader (const std::string& path, const float _x, const float _y, const float _w, const float _h, const std::map<std::string, std::string>& parameters, unsigned int* data = nullptr);

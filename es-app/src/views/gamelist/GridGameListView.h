@@ -8,6 +8,8 @@
 #include "views/gamelist/ISimpleGameListView.h"
 #include "views/gamelist/BasicGameListView.h"
 #include "DetailedContainer.h"
+#include "components/TextComponent.h"
+#include <future>
 
 class VideoComponent;
 
@@ -24,6 +26,8 @@ public:
 	virtual void setCursorIndex(int index) override; 
 	virtual void resetLastCursor() override;
 	virtual void moveToRandomGame() override;
+	bool handleLetterAxis(InputConfig* config, Input input);
+	void onHide() override;
 	virtual bool onMouseWheel(int delta) override;
 
 	virtual bool input(InputConfig* config, Input input) override;
@@ -57,6 +61,18 @@ protected:
 
 private:
 	DetailedContainerHost mDetails;
+	using LetterStarts = std::vector<std::pair<int, std::string>>;
+	std::future<LetterStarts> mLetterBuild;
+	LetterStarts mLetterStarts;
+	TextComponent mLetterLabel;
+	TextComponent mPageProgress;
+	int mPageDirection = 0;
+	int mPageRepeat = 0;
+	int mLetterDirection = 0;
+	int mLetterRepeat = 0;
+	int mLetterDisplay = 0;
+	void jumpLetter(int direction);
+	void indexLetters(const std::vector<FileData*>& files, int offset);
 
 	void updateInfoPanel();
 	const std::string getImagePath(FileData* file);

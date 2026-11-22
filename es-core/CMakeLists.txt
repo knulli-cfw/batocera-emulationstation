@@ -63,6 +63,8 @@ set(CORE_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/DateTimeEditComponent.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/HelpComponent.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/GridTileComponent.h
+	${CMAKE_CURRENT_SOURCE_DIR}/src/components/SlideLayout.h
+	${CMAKE_CURRENT_SOURCE_DIR}/src/components/SlideshowComponent.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/IList.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/ImageComponent.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/ImageGridComponent.h
@@ -79,7 +81,9 @@ set(CORE_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/VideoComponent.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/VideoPlayerComponent.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/VideoVlcComponent.h
+	${CMAKE_CURRENT_SOURCE_DIR}/src/components/VideoLeadIn.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/VolumeInfoComponent.h
+	${CMAKE_CURRENT_SOURCE_DIR}/src/components/BrightnessInfoComponent.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/MultiLineMenuEntry.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/ScrollbarComponent.h	
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/ComponentTab.h
@@ -120,6 +124,7 @@ set(CORE_HEADERS
 	# Utils
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/FileSystemUtil.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/StringUtil.h
+	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/WordCompletion.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/StringListLock.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/TimeUtil.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/ThreadPool.h
@@ -201,6 +206,7 @@ set(CORE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/DateTimeEditComponent.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/HelpComponent.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/GridTileComponent.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/components/SlideshowComponent.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/ImageComponent.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/MenuComponent.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/NinePatchComponent.cpp
@@ -214,7 +220,9 @@ set(CORE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/VideoComponent.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/VideoPlayerComponent.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/VideoVlcComponent.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/components/VideoLeadIn.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/VolumeInfoComponent.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/components/BrightnessInfoComponent.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/ScrollbarComponent.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/MultiLineMenuEntry.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/components/ComponentTab.cpp
@@ -256,6 +264,7 @@ set(CORE_SOURCES
 	# Utils
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/FileSystemUtil.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/StringUtil.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/WordCompletion.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/StringListLock.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/TimeUtil.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils/ThreadPool.cpp	

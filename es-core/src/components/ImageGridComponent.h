@@ -104,6 +104,11 @@ public:
 
 	virtual void topWindow(bool isTop);
 	virtual void onShow();
+
+	// Binds the items' templates again (what they show changed)
+	void updateTileBindings();
+	// Only the item of that object
+	void updateTileBindings(const T& object);
 	virtual void onHide();
 	virtual void onScreenSaverActivate();
 	virtual void onScreenSaverDeactivate();
@@ -136,6 +141,37 @@ public:
 
 	void		preloadTiles();
 
+	// Whether the cursor's item shows selected: a grid whose view gave the focus to another column shows it as
+	// any other item (its "deactivate" storyboards, then its "unfocus" ones), and selected again once it has the
+	// focus back
+	void		setCursorShown(bool shown);
+	bool		isCursorShown() { return mCursorShown; }
+	// The cursor's column and the number of columns (rows of a horizontal grid)
+	int			getCursorColumn();
+	int			getColumnCount();
+	bool cycleCardInput(InputConfig* config, Input input)
+	{
+		bool left = config->isMappedLike("left", input);
+		if (!left && !config->isMappedLike("right", input)) return false;
+		listInput(input.value ? (left ? -1 : 1) : 0, true);
+		return true;
+	}
+	int pageRowCount()
+	{
+		const bool vertical = isVertical();
+		const float gap = vertical ? mMargin.y() : mMargin.x();
+		const float stride = (vertical ? mTileSize.y() : mTileSize.x()) + gap;
+		if (stride <= 0) return 1;
+		const float screen = vertical ? Renderer::getScreenHeight() : Renderer::getScreenWidth();
+		const float origin = vertical ? this->getPosition().y() : this->getPosition().x();
+		const float extent = vertical ? mSize.y() : mSize.x();
+		const float leading = vertical ? mPadding.y() : mPadding.x();
+		const float clip = std::min(screen - origin, extent + Math::round(mPeekSize * screen));
+		return std::max(1, static_cast<int>(std::floor((clip - leading + gap + 0.01f) / stride)));
+	}
+	bool canPageRows() { return static_cast<int>(mEntries.size()) > getColumnCount() * pageRowCount(); }
+	void pageRows(int direction);
+
 protected:
 	virtual void onCursorChanged(const CursorState& state) override;
 	virtual void onScroll(int /*amt*/) { if (!mScrollSound.empty()) Sound::get(mScrollSound)->play(); }
@@ -167,6 +203,7 @@ private:
 	bool mAnimateSelection;
 	Vector2f mAutoLayout;
 	float mAutoLayoutZoom;
+	float mPeekSize;	// screen fraction the grid draws past its far edge (the next row peeking in)
 	Vector4f mPadding;
 	Vector2f mMargin;
 	Vector2f mTileSize;
@@ -180,6 +217,7 @@ private:
 	std::string mName;
 
 	int mStartPosition;
+	int mPageStart = -1; // Explicit viewport for the duration of a shoulder page turn.
 
 	bool mAllowVideo;
 	float mVideoDelay;
@@ -206,6 +244,8 @@ private:
 	float mCameraOffset;
 
 	std::map<int, std::shared_ptr<GridTileComponent>> mScrollLoopTiles;
+
+	bool mCursorShown;
 
 	// Handle pointer types derived from IBindable
 	template <typename U = T>
@@ -380,7 +420,9 @@ void ImageGridComponent<T>::ensureVisibleTileExist()
 					}
 
 					mLastCursor = mCursor;
-					tile->setSelected(true, true, nullptr, true);
+					tile->setSelected(mCursorShown, true, nullptr, true);
+					if (!mCursorShown)
+						tile->playStoryboard("unfocus");
 				}
 
 				if (mShowing)
@@ -440,6 +482,7 @@ ImageGridComponent<T>::ImageGridComponent(Window* window) : IList<ImageGridData,
 	mGridSizeOverride = Vector2f::Zero();
 	mAutoLayout = Vector2f::Zero();
 	mAutoLayoutZoom = 1.0;
+	mPeekSize = 0.0f;
 
 	mVideoDelay = 750;
 	mAllowVideo = false;
@@ -464,6 +507,7 @@ ImageGridComponent<T>::ImageGridComponent(Window* window) : IList<ImageGridData,
 
 	mCenterSelection = CenterSelection::NEVER;
 	mScrollLoop = false;
+	mCursorShown = true;
 	mScrollDirection = SCROLL_VERTICALLY;
 
 	mCursorChangedCallback = nullptr;
@@ -629,6 +673,34 @@ void ImageGridComponent<T>::setOpacity(unsigned char opacity)
 }
 
 template<typename T>
+void ImageGridComponent<T>::updateTileBindings(const T& object)
+{
+	for (auto& entry : mEntries)
+	{
+		if (entry.data.tile == nullptr || !(entry.object == object))
+			continue;
+
+		IBindable* bindable = getBindable(entry);
+		if (bindable != nullptr)
+			entry.data.tile->updateBindings(bindable);
+	}
+}
+
+template<typename T>
+void ImageGridComponent<T>::updateTileBindings()
+{
+	for (auto& entry : mEntries)
+	{
+		if (entry.data.tile == nullptr)
+			continue;
+
+		IBindable* bindable = getBindable(entry);
+		if (bindable != nullptr)
+			entry.data.tile->updateBindings(bindable);
+	}
+}
+
+template<typename T>
 void ImageGridComponent<T>::onShow()
 {
 	GuiComponent::onShow();
@@ -731,6 +803,17 @@ void ImageGridComponent<T>::render(const Transform4x4f& parentTrans)
 	if (mAutoLayout == Vector2f::Zero() && mLastRowPartial) // If the last row is partial in Retropie, extend clip to show the entire last row 
 		size.y() = (mTileSize + mMargin).y() * (mGridDimension.y() - 2 * EXTRAITEMS);
 
+	// The row after the last whole one peeks in past the grid's far edge, cut there (it is one of the rows kept
+	// on each side for the scroll, so a row scrolling in comes from that place); the cursor still scrolls by
+	// whole rows
+	if (mPeekSize > 0.0f)
+	{
+		if (isVertical())
+			size.y() += (int)Math::round(mPeekSize * Renderer::getScreenHeight());
+		else
+			size.x() += (int)Math::round(mPeekSize * Renderer::getScreenWidth());
+	}
+
 	Renderer::pushClipRect(pos, size);
 
 	float dimScrollable = isVertical() ? mGridDimension.y() - 2 * EXTRAITEMS : mGridDimension.x() - 2 * EXTRAITEMS;
@@ -787,9 +870,27 @@ void ImageGridComponent<T>::render(const Transform4x4f& parentTrans)
 
 		auto scrollableSize = mTileSize + mMargin;
 
+		if (mScrollbar.hasTrack() && mPeekSize > 0.0f)
+		{
+			if (isVertical())
+				sz.y() += Math::round(mPeekSize * Renderer::getScreenHeight());
+			else
+				sz.x() += Math::round(mPeekSize * Renderer::getScreenWidth());
+		}
 		mScrollbar.setContainerBounds(pos, sz, isVertical());
-		mScrollbar.setRange(0, mTotalHeight + (isVertical() ? scrollableSize.y() : scrollableSize.y()), isVertical() ? scrollableSize.y() : scrollableSize.y());
-		mScrollbar.setScrollPosition(mCameraOffset);
+		const float stride = isVertical() ? scrollableSize.y() : scrollableSize.x();
+		if (mScrollbar.hasTrack())
+		{
+			const int columns = getColumnCount();
+			const int rows = (int(mEntries.size()) + columns - 1) / columns;
+			mScrollbar.setRange(0, rows, pageRowCount());
+			mScrollbar.setScrollPosition(stride > 0 ? mCameraOffset / stride : 0);
+		}
+		else
+		{
+			mScrollbar.setRange(0, mTotalHeight + stride, stride);
+			mScrollbar.setScrollPosition(mCameraOffset);
+		}
 		mScrollbar.render(parentTrans);
 	}
 }
@@ -861,6 +962,9 @@ void ImageGridComponent<T>::applyTheme(const std::shared_ptr<ThemeData>& theme, 
 
 		if (elem->has("autoLayoutSelectedZoom"))
 			mAutoLayoutZoom = elem->get<float>("autoLayoutSelectedZoom");
+
+		if (elem->has("peekSize"))
+			mPeekSize = Math::max(0.0f, elem->get<float>("peekSize"));
 
 		if (elem->has("imageSource"))
 		{
@@ -1066,7 +1170,7 @@ void ImageGridComponent<T>::onCursorChanged(const CursorState& state)
 	bool direction = mCursor >= mLastCursor;
 	bool isScrollLooping = false;
 
-	if (mScrollLoop)
+	if (mScrollLoop && mPageStart < 0)
 	{
 		int diff = direction ? mCursor - mLastCursor : mLastCursor - mCursor;
 		if (mScrollLoop && diff == mEntries.size() - 1)
@@ -1116,10 +1220,13 @@ void ImageGridComponent<T>::onCursorChanged(const CursorState& state)
 			if (!mAnimateSelection)
 			{
 				oldPos = Vector3f(0, 0);
-				mEntries[mCursor].data.tile->setSelected(true, true, &oldPos, true);
+				mEntries[mCursor].data.tile->setSelected(mCursorShown, true, &oldPos, true);
 			}
 			else
-				mEntries[mCursor].data.tile->setSelected(true, true, oldPos == Vector3f::Zero() ? nullptr : &oldPos, true);
+				mEntries[mCursor].data.tile->setSelected(mCursorShown, true, oldPos == Vector3f::Zero() ? nullptr : &oldPos, true);
+
+			if (!mCursorShown)
+				mEntries[mCursor].data.tile->playStoryboard("unfocus");
 
 			auto selected = mEntries[mCursor].data.tile;
 			auto old = mLastCursor >= 0 && mLastCursor < mEntries.size() ? mEntries[mLastCursor].data.tile : nullptr;
@@ -1137,7 +1244,9 @@ void ImageGridComponent<T>::onCursorChanged(const CursorState& state)
 
 	auto oldStartPosition = mStartPosition;
 
-	if (mCenterSelection == CenterSelection::NEVER)
+	if (mPageStart >= 0)
+		mStartPosition = mPageStart;
+	else if (mCenterSelection == CenterSelection::NEVER)
 	{
 		if (col == 0)
 			mStartPosition = 0;
@@ -1543,7 +1652,7 @@ bool ImageGridComponent<T>::onMouseClick(int button, bool pressed, int x, int y)
 						}
 
 						Vector3f oldPos = Vector3f::Zero();
-						mEntries[mCursor].data.tile->setSelected(true, true, mAnimateSelection ? nullptr : &oldPos, true);
+						mEntries[mCursor].data.tile->setSelected(mCursorShown, true, mAnimateSelection ? nullptr : &oldPos, true);
 					}
 
 					if (mCursorChangedCallback)
@@ -1667,7 +1776,7 @@ void ImageGridComponent<T>::onMouseMove(int x, int y)
 					}
 
 					Vector3f oldPos = Vector3f::Zero();
-					mEntries[mCursor].data.tile->setSelected(true, true, mAnimateSelection ? nullptr : &oldPos, true, false);
+					mEntries[mCursor].data.tile->setSelected(mCursorShown, true, mAnimateSelection ? nullptr : &oldPos, true, false);
 				}
 
 				if (mCursorChangedCallback)
@@ -1681,6 +1790,55 @@ void ImageGridComponent<T>::onMouseMove(int x, int y)
 		mEntriesDirty = true;
 		mPressedPoint = Vector2i(x, y);
 	}
+}
+
+template<typename T>
+void ImageGridComponent<T>::setCursorShown(bool shown)
+{
+	if (mCursorShown == shown)
+		return;
+
+	mCursorShown = shown;
+
+	if (mCursor >= 0 && mCursor < (int)mEntries.size() && mEntries[mCursor].data.tile != nullptr)
+	{
+		mEntries[mCursor].data.tile->setSelected(shown, true, nullptr, true);
+		if (!shown)
+			mEntries[mCursor].data.tile->playStoryboard("unfocus");
+	}
+}
+
+template<typename T>
+int ImageGridComponent<T>::getColumnCount()
+{
+	return Math::max(1, isVertical() ? mGridDimension.x() : mGridDimension.y());
+}
+
+template<typename T>
+void ImageGridComponent<T>::pageRows(int direction)
+{
+	if (mEntries.empty() || direction == 0) return;
+	const int columns = getColumnCount();
+	const int rows = pageRowCount();
+	const int count = static_cast<int>(mEntries.size());
+	const int totalRows = (count + columns - 1) / columns;
+	if (totalRows <= rows) return;
+	const int top = std::max(0, std::min(totalRows - 1, mStartPosition / columns));
+	const int nextTop = std::max(0, top + (direction > 0 ? rows : -rows));
+	if (nextTop == top || nextTop >= totalRows) return;
+	const int column = mCursor % columns;
+	const int offset = std::max(0, std::min(rows - 1, mCursor / columns - top));
+	const int lastRowInColumn = (count - 1 - column) / columns;
+	const int row = std::max(nextTop, std::min(nextTop + offset, lastRowInColumn));
+	mPageStart = nextTop * columns;
+	this->setCursorIndex(std::min(count - 1, row * columns + column));
+	mPageStart = -1;
+}
+
+template<typename T>
+int ImageGridComponent<T>::getCursorColumn()
+{
+	return mCursor < 0 ? 0 : mCursor % getColumnCount();
 }
 
 #endif // ES_CORE_COMPONENTS_IMAGE_GRID_COMPONENT_H

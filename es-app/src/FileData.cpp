@@ -634,6 +634,35 @@ std::string FileData::getlaunchCommand(LaunchGameOptions& options, bool includeC
 	if (monitorId >= 0 && command.find(" -system ") != std::string::npos)
 		command = command + " -monitor " + std::to_string(monitorId);
 
+#if KNULLI
+	// Resolve the default after gameStart sync. Record explicit sessions as well.
+	if (options.netPlayMode == DISABLED && SaveStateRepository::isEnabledForGame(this))
+	{
+		const std::string resume = Paths::getUserEmulationStationPath() + "/resume/emulatorlauncher";
+		for (const std::string name : {std::string("emulatorlauncher"), std::string("/usr/bin/emulatorlauncher")})
+		{
+			if (command.compare(0, name.size() + 1, name + " ") != 0 || !Utils::FileSystem::exists(resume))
+				continue;
+			auto state = options.saveStateInfo;
+			std::string launcher = Utils::FileSystem::getEscapedPath(resume);
+			if (!state)
+				return launcher + command.substr(name.size());
+			// A single new-game tile starts fresh even if sync delivers an auto state
+			// after the list opens. RetroArch keeps its configured auto-save-on-exit policy.
+			const auto theme = system->getTheme();
+			const bool freshAuto = state->slot == -1 && state->fileName.empty() && getEmulator() == "libretro" &&
+				theme && theme->getVariable("esSingleNewGame") == "true";
+			launcher += " --es-resume-slot=" + std::to_string(freshAuto ? -2 : state->slot);
+			command = launcher + command.substr(name.size());
+			// The active libretro core can open a slot directly, without staging a
+			// copy or renaming the player's automatic state before sync.
+			if (getEmulator() == "libretro" && (!state->config || state->config->isActiveConfig(this)))
+				return command;
+			break;
+		}
+	}
+#endif
+
 	if (SaveStateRepository::isEnabled(this))
 	{
 		if (options.saveStateInfo == nullptr)
@@ -704,14 +733,21 @@ bool FileData::launchGame(Window* window, LaunchGameOptions options)
 		return false;
 
 	// KNULLI - QUICK RESUME MODE >>>>>
-	QuickResume::setQuickResume(getlaunchCommand(false), getFullPath());
+	const std::string quickResumeCommand = getlaunchCommand(false);
 	// KNULLI - QUICK RESUME MODE <<<<<
 
 	AudioManager::getInstance()->deinit();
 	VolumeControl::getInstance()->deinit();
 
 	bool hideWindow = Settings::getInstance()->getBool("HideWindow");
-	window->deinit(hideWindow);
+	if (!window->deinit(hideWindow, true))
+	{
+		VolumeControl::getInstance()->init();
+		AudioManager::getInstance()->init();
+		window->displayNotificationMessage(_("VIDEO PREVIEW IS STILL STOPPING. PLEASE TRY AGAIN."));
+		return false;
+	}
+	QuickResume::setQuickResume(quickResumeCommand, getFullPath());
 	
 	const std::string rom = Utils::FileSystem::getEscapedPath(getPath());
 	const std::string basename = Utils::FileSystem::getStem(getPath());
@@ -1003,7 +1039,7 @@ const std::string& CollectionFileData::getName()
 	return mSourceFileData->getName();
 }
 
-const std::vector<FileData*> FolderData::getChildrenListToDisplay() 
+const std::vector<FileData*> FolderData::getChildrenListToDisplay(bool ignoreTextFilter)
 {
 	std::vector<FileData*> ret;
 
@@ -1066,7 +1102,7 @@ const std::vector<FileData*> FolderData::getChildrenListToDisplay()
 
 		if (idx != nullptr)
 		{
-			int score = idx->showFile(*it);
+			int score = idx->showFile(*it, ignoreTextFilter);
 			if (score == 0)
 				continue;
 
@@ -1088,7 +1124,7 @@ const std::vector<FileData*> FolderData::getChildrenListToDisplay()
 			auto fd = pFolder->findUniqueGameForFolder();
 			if (fd != nullptr)
 			{
-				if (idx != nullptr && !idx->showFile(fd))
+				if (idx != nullptr && !idx->showFile(fd, ignoreTextFilter))
 					continue;
 
 				if (!showHiddenFiles && fd->getHidden())
@@ -1112,7 +1148,7 @@ const std::vector<FileData*> FolderData::getChildrenListToDisplay()
 
 	const FileSorts::SortType& sort = FileSorts::getSortTypes().at(currentSortId);
 
-	if (idx != nullptr && idx->hasRelevency())
+	if (!ignoreTextFilter && idx != nullptr && idx->hasRelevency())
 	{
 		auto compf = sort.comparisonFunction;
 
@@ -1965,10 +2001,37 @@ BindableProperty FileData::getProperty(const std::string& name)
 		return Utils::FileSystem::exists(getMetadata(MetaDataId::Manual)) || Utils::FileSystem::exists(getMetadata(MetaDataId::Magazine)); // ? _("YES") : _("NO");
 	}
 
+	// Whether the game's own emulator and core keep save states (what the game list's X opens), whether it has
+	// one or not; false on a folder
+	if (name == "saveStatesSupported")
+		return SaveStateRepository::isEnabledForGame(this);
+
 	if (name == "hasSaveState" || name == "hassavestate" || name == "savestate")
 	{
 		bool hasSaveState = SaveStateRepository::isEnabled(this) && getSourceFileData()->getSystem()->getSaveStateRepository()->hasSaveStates(this);
 		return hasSaveState;
+	}
+
+	// When the game was last played: "HH:MM" and the calendar days since (0 today, -1 never)
+	if (name == "lastplayedTime" || name == "lastplayedDays")
+	{
+		std::string iso = getMetadata(MetaDataId::LastPlayed);
+		time_t played = iso.size() >= 15 && iso[8] == 'T' ? Utils::Time::stringToTime(iso) : 0;
+		if (played <= 0)
+			return name == "lastplayedDays" ? BindableProperty(-1) : BindableProperty::EmptyString;
+
+		if (name == "lastplayedTime")
+			return Utils::Time::timeToString(played, "%H:%M");
+
+		time_t now = time(nullptr);
+		tm day = *localtime(&played);
+		tm today = *localtime(&now);
+		day.tm_hour = today.tm_hour = 12;
+		day.tm_min = today.tm_min = day.tm_sec = today.tm_sec = 0;
+		day.tm_isdst = today.tm_isdst = -1;
+
+		int days = (int)Math::round((float)(difftime(mktime(&today), mktime(&day)) / 86400.0));
+		return Math::max(0, days);
 	}
 
 	if (name == "releaseyear" || name == "releaseYear")

@@ -18,10 +18,17 @@
 #include "utils/StringUtil.h"
 #include "utils/Randomizer.h"
 #include "views/ViewController.h"
+#include "views/SystemView.h"
 #include "ThreadedHasher.h"
 #include <unordered_set>
 #include <algorithm>
 #include <functional>
+#include <random>
+#include <atomic>
+#include <condition_variable>
+#include <deque>
+#include <mutex>
+#include <thread>
 #include "SaveStateRepository.h"
 #include "Paths.h"
 #include "SystemRandomPlaylist.h"
@@ -72,6 +79,13 @@ SystemData::SystemData(const SystemMetadata& meta, SystemEnvironmentData* envDat
 	mIsGroupSystem = groupedSystem;
 	mGameListHash = 0;
 	mGameCountInfo = nullptr;
+	mSlidesReady = false;
+	mSlidesVersion = 0;
+	mSuggestionsReady = false;
+	mHomeDirty = true;
+	mHomeGeneration = 0;
+	mPanelVideo = false;
+	mRecentCount = (size_t)-1;
 	mSortId = Settings::getInstance()->getInt(getName() + ".sort");
 	mUnlimitedRecursiveDepth = Settings::getInstance()->getBool(getName() + ".unlimited_recursive_depth");
 	int depth;
@@ -1429,6 +1443,8 @@ GameCountInfo* SystemData::getGameCountInfo()
 	mGameCountInfo->playTime = 0;
 	
 	int mostPlayCount = 0;
+	float chefScore = 0;
+	std::string lastPlayedStamp;
 
 	for (auto game : games)
 	{
@@ -1458,6 +1474,25 @@ GameCountInfo* SystemData::getGameCountInfo()
 		auto lastPlayed = game->getMetadata(MetaDataId::LastPlayed);
 		if (!lastPlayed.empty() && lastPlayed > mGameCountInfo->lastPlayedDate)
 			mGameCountInfo->lastPlayedDate = lastPlayed;
+
+		// A collection never continues a tool, an emulator or a screenshot
+		if (isCollection() && isUtilitySystem(game->getSourceFileData()->getSystem()))
+			continue;
+
+		// Only a real date (YYYYMMDDTHHMMSS): a game never played has the default "0"
+		if (lastPlayed.size() >= 15 && lastPlayed[8] == 'T' && lastPlayed > lastPlayedStamp)
+		{
+			lastPlayedStamp = lastPlayed;
+			mGameCountInfo->lastPlayedPath = game->getPath();
+		}
+
+		// Favorites first, then the rating (0 to 1)
+		float score = (game->getFavorite() ? 2.0f : 0.0f) + Utils::String::toFloat(game->getMetadata(MetaDataId::Rating));
+		if (score > chefScore)
+		{
+			chefScore = score;
+			mGameCountInfo->chefPickPath = game->getPath();
+		}
 	}
 
 	return mGameCountInfo;
@@ -1476,6 +1511,13 @@ void SystemData::updateDisplayedGameCount()
 		delete mGameCountInfo;
 
 	mGameCountInfo = nullptr;
+	mCollectionPreviewsDirty = true;
+
+	// A favorite or a capture changed: the home's slides, suggestions and recent items are made again (the
+	// ones before them still show meanwhile)
+	mHomeDirty = true;
+	mHomeGeneration++;
+	mRecentCount = (size_t)-1;
 }
 
 void SystemData::loadTheme()
@@ -2117,6 +2159,479 @@ BindableProperty BindableRandom::getProperty(const std::string& name)
 	return mRandom;
 }
 
+// Paths are kept rather than pointers: the counts are only reset when a game changes, and a game
+// can be removed in between.
+FileData* SystemData::getLastPlayedGame(bool orChefPick)
+{
+	GameCountInfo* info = getGameCountInfo();
+	if (info == nullptr || mRootFolder == nullptr)
+		return nullptr;
+
+	FileData* game = info->lastPlayedPath.empty() ? nullptr : findByPath(info->lastPlayedPath);
+	if (game == nullptr && orChefPick && mPanelVideo)
+		game = getSuggestedGame();
+	if (game == nullptr && orChefPick && !info->chefPickPath.empty())
+		game = findByPath(info->chefPickPath);
+
+	return game;
+}
+
+static std::mt19937& homeRandom()
+{
+	static std::random_device device;
+	static std::mt19937 engine(device());
+	return engine;
+}
+
+// The games of the system and of the systems grouped in it, each keyed by its own system and its path
+// in that system's folder (as the gamelist and the theme variable "systemslides" write it), with their
+// capture and their video. Games of tools, emulators and screenshots are left out (a collection never offers
+// one to X, as getGameCountInfo). Memory only: the worker reads the files' sizes.
+void SystemData::getHomeCandidates(std::vector<HomeSlides::Candidate>& images, std::vector<HomeSlides::Candidate>& videos)
+{
+	if (mRootFolder == nullptr)
+		return;
+
+	for (auto game : mRootFolder->getFilesRecursive(GAME, true))
+	{
+		FileData* source = game->getSourceFileData();
+		SystemData* system = source->getSystem();
+		if (system == nullptr || system->getRootFolder() == nullptr || isUtilitySystem(system))
+			continue;
+
+		HomeSlides::Candidate candidate;
+		candidate.key = HomeSlides::key(system->getName(), Utils::FileSystem::createRelativePath(source->getPath(), system->getRootFolder()->getPath(), false));
+		candidate.id = game->getPath();
+		candidate.name = game->getName();
+		candidate.rating = Utils::String::toFloat(game->getMetadata(MetaDataId::Rating));
+		candidate.favorite = game->getFavorite();
+
+		candidate.media = game->getImagePath();
+		images.push_back(candidate);
+
+		candidate.media = game->getVideoPath();
+		videos.push_back(candidate);
+	}
+}
+
+// The home's lists of a system, made by one worker thread so the UI thread never waits for the card: the
+// UI thread reads the candidates from memory, the worker drops media under 1 KB (an empty or broken file:
+// one stat per file, slow on a cold SD card) and orders them, and SystemView polls each frame
+// (pollHomeLists) to bind the cards and the panel when they arrive.
+struct SystemData::HomeJob
+{
+	std::vector<HomeSlides::Candidate> images, videos;
+	HomeSlides::Rules rules;
+	int generation;
+
+	std::vector<std::string> slides, pool;
+	std::atomic<bool> done;
+
+	HomeJob() : generation(0), done(false) { }
+};
+
+namespace
+{
+	// Never destroyed: the worker outlives main's statics
+	struct HomeWorker
+	{
+		std::mutex lock;
+		std::condition_variable wake;
+		std::deque<std::shared_ptr<SystemData::HomeJob>> jobs;
+		bool started = false;
+	};
+
+	HomeWorker& homeWorker()
+	{
+		static HomeWorker* worker = new HomeWorker();
+		return *worker;
+	}
+
+	void runHomeJobs()
+	{
+		HomeWorker& worker = homeWorker();
+		for (;;)
+		{
+			std::shared_ptr<SystemData::HomeJob> job;
+			{
+				std::unique_lock<std::mutex> lock(worker.lock);
+				worker.wake.wait(lock, [&worker] { return !worker.jobs.empty(); });
+
+				// The newest first: what was asked for last is what the screen shows
+				job = worker.jobs.back();
+				worker.jobs.pop_back();
+			}
+
+			for (auto list : { &job->images, &job->videos })
+				for (auto& candidate : *list)
+					if (!candidate.media.empty() && Utils::FileSystem::getFileSize(candidate.media) < 1024)
+						candidate.media.clear();
+
+			job->slides = HomeSlides::orderSlides(job->images, job->rules, 12);
+			job->pool = HomeSlides::pickPool(job->videos, job->rules, 12);
+			job->done = true;
+		}
+	}
+}
+
+void SystemData::startHomeJob()
+{
+	if (mHomeJob != nullptr || !mHomeDirty || mTheme == nullptr)
+		return;
+
+	auto job = std::make_shared<HomeJob>();
+	job->generation = mHomeGeneration;
+	job->rules = HomeSlides::parseRules(mTheme->getVariable("systemslides"));
+	if (!isCollection() && !isUtilitySystem(this))
+		getHomeCandidates(job->images, job->videos);
+
+	mHomeJob = job;
+
+	HomeWorker& worker = homeWorker();
+	std::unique_lock<std::mutex> lock(worker.lock);
+	if (!worker.started)
+	{
+		worker.started = true;
+		std::thread(runHomeJobs).detach();
+	}
+
+	worker.jobs.push_back(job);
+	worker.wake.notify_one();
+}
+
+bool SystemData::pollHomeLists()
+{
+	if (mHomeJob == nullptr || !mHomeJob->done)
+		return false;
+
+	auto job = mHomeJob;
+	mHomeJob = nullptr;
+
+	bool changed = false;
+	if (job->slides != mSlides || !mSlidesReady)
+	{
+		mSlides = job->slides;
+		mSlidesVersion++;
+		changed = true;
+	}
+
+	// The first pool starts on the game the panel shows meanwhile (the best-rated favorite) when it is in it,
+	// so the panel does not jump to another; a later one keeps the current suggestion (Deck::reset)
+	std::string shown;
+	if (mSuggestions.empty() && mGameCountInfo != nullptr)
+		shown = mGameCountInfo->chefPickPath;
+
+	auto before = mSuggestions.current();
+	mSuggestions.reset(job->pool, homeRandom(), shown);
+	if (!mSuggestionsReady || mSuggestions.current() != before)
+		changed = true;
+
+	mSlidesReady = true;
+	mSuggestionsReady = true;
+
+	// Changed again while it was being made: once more
+	if (job->generation == mHomeGeneration)
+		mHomeDirty = false;
+	else
+		startHomeJob();
+
+	return changed;
+}
+
+const std::vector<std::string>& SystemData::getSlides()
+{
+	// Without its theme yet, the list waits: it is made once the theme (and its "systemslides") is there
+	startHomeJob();
+	return mSlides;
+}
+
+int SystemData::getSlidesVersion()
+{
+	return mSlidesVersion;
+}
+
+void SystemData::setPanelVideo(bool value)
+{
+	mPanelVideo = value;
+}
+
+FileData* SystemData::getSuggestedGame()
+{
+	if (mRootFolder == nullptr || !mPanelVideo || isUtilitySystem(this))
+		return nullptr;
+
+	startHomeJob();
+
+	if (!mSuggestionsReady || mSuggestions.empty())
+		return nullptr;
+
+	return findByPath(mSuggestions.current());
+}
+
+FileData* SystemData::getRecentItem(size_t index)
+{
+	if (mRootFolder == nullptr || !isUtilitySystem(this))
+		return nullptr;
+
+	// Made again when the files change (a new screenshot, a tool run: updateDisplayedGameCount)
+	auto files = mRootFolder->getFilesRecursive(GAME, true);
+	if (files.size() != mRecentCount)
+	{
+		bool screenshots = hasPlatformId(PlatformIds::IMAGEVIEWER) || getName() == "imageviewer";
+
+		std::vector<HomeSlides::Dated> items;
+		for (auto file : files)
+		{
+			HomeSlides::Dated item;
+			item.id = file->getPath();
+			item.name = file->getName();
+
+			if (screenshots)
+			{
+				auto date = Utils::FileSystem::getFileModificationDate(file->getPath());
+				if (date.getTime() > 0)
+					item.date = date.getIsoString();
+			}
+			else
+			{
+				item.date = file->getMetadata(MetaDataId::LastPlayed);
+				if (item.date.size() < 15)	// "0" or unset: never run
+					item.date.clear();
+			}
+
+			items.push_back(item);
+		}
+
+		mRecent = HomeSlides::newestFirst(items, 8);
+		mRecentCount = files.size();
+	}
+
+	if (index >= mRecent.size())
+		return nullptr;
+
+	return findByPath(mRecent[index]);
+}
+
+bool SystemData::hasOtherSuggestion()
+{
+	return getSuggestedGame() != nullptr && mSuggestions.size() > 1;
+}
+
+bool SystemData::nextSuggestion()
+{
+	if (getSuggestedGame() == nullptr)
+		return false;
+
+	return mSuggestions.next(homeRandom());
+}
+
+bool SystemData::usesRandomCollectionPreview()
+{
+	return isCollection() && (getName() == "all" || getName() == "favorites") &&
+		mTheme && mTheme->getVariable("esRandomCollectionPreview") == "true";
+}
+
+bool SystemData::rotatesHomePreview()
+{
+	if (!mTheme)
+		return false;
+	if (isCollection())
+		return (getName() == "all" || getName() == "favorites" || getName() == "recent") &&
+			mTheme->getVariable("esRotateCollectionPreview") == "true";
+	if (mTheme->getVariable("esRotateConsolePreview") != "true" || !isGameSystem() || isUtilitySystem(this))
+		return false;
+	auto info = getGameCountInfo();
+	return info && !info->lastPlayedPath.empty();
+}
+
+bool SystemData::hasOtherHomePreview() const
+{
+	return mHistoryPreviews.size() > 1 || mCollectionPreviews.size() > 1;
+}
+
+void SystemData::enterHomePreview()
+{
+	if (getName() == "recent" || !isCollection())
+	{
+		homePreview(false);
+		mHistoryPreviewIndex = 0;
+		return;
+	}
+
+	auto pick = homePreview(true);
+	if (pick && pick->getPath() == mCollectionLatestPath && hasOtherHomePreview())
+		homePreview(true);
+}
+
+// The deck stores collection paths, never pointers. Refresh only when the library changes.
+FileData* SystemData::homePreview(bool advance)
+{
+	if (mRootFolder == nullptr)
+		return nullptr;
+
+	bool history = getName() == "recent" || !isCollection();
+	if (mCollectionPreviewsDirty)
+	{
+		std::vector<std::string> candidates;
+		std::vector<HomeSlides::Dated> dated;
+		std::unordered_set<std::string> seen;
+		FileData* latest = history ? nullptr : getConsoleLastPlayedGame();
+		mCollectionLatestPath.clear();
+		for (auto game : mRootFolder->getFilesRecursive(GAME, true))
+		{
+			auto source = game->getSourceFileData();
+			if (source == nullptr || isUtilitySystem(source->getSystem()) ||
+				(getName() == "favorites" && !source->getFavorite()) || !seen.insert(source->getPath()).second)
+				continue;
+			if (history)
+			{
+				auto date = source->getMetadata(MetaDataId::LastPlayed);
+				if (date.size() >= 15 && date[8] == 'T')
+					dated.push_back({game->getPath(), source->getName(), date});
+				else if (!isCollection())
+					candidates.push_back(game->getPath());
+			}
+			else if (latest && source->getPath() == latest->getPath())
+				mCollectionLatestPath = game->getPath();
+			else
+				candidates.push_back(game->getPath());
+		}
+		if (history)
+		{
+			auto previousFirst = mHistoryPreviews.empty() ? std::string() : mHistoryPreviews.front();
+			auto previous = mHistoryPreviews.empty() ? std::string() : mHistoryPreviews[mHistoryPreviewIndex];
+			mHistoryPreviews = HomeSlides::newestFirst(dated, dated.size());
+			auto last = getLastPlayedGame();
+			if (last)
+			{
+				auto first = std::find(mHistoryPreviews.begin(), mHistoryPreviews.end(), last->getPath());
+				if (first != mHistoryPreviews.end())
+					std::rotate(mHistoryPreviews.begin(), first, first + 1);
+			}
+			if (!isCollection() && mHistoryPreviews.size() < 2)
+			{
+				std::shuffle(candidates.begin(), candidates.end(), homeRandom());
+				mHistoryPreviews.insert(mHistoryPreviews.end(), candidates.begin(), candidates.end());
+			}
+			auto it = std::find(mHistoryPreviews.begin(), mHistoryPreviews.end(), previous);
+			mHistoryPreviewIndex = it == mHistoryPreviews.end() || previousFirst != mHistoryPreviews.front() ? 0 : it - mHistoryPreviews.begin();
+		}
+		else
+		{
+			if (!mCollectionLatestPath.empty() && (candidates.empty() || rotatesHomePreview()))
+				candidates.push_back(mCollectionLatestPath);
+			mCollectionPreviews.reset(candidates, homeRandom());
+		}
+		mCollectionPreviewsDirty = false;
+	}
+	if (history)
+	{
+		if (mHistoryPreviews.empty())
+			return nullptr;
+		if (advance)
+			mHistoryPreviewIndex = (mHistoryPreviewIndex + 1) % mHistoryPreviews.size();
+		return findByPath(mHistoryPreviews[mHistoryPreviewIndex]);
+	}
+	if (advance)
+		mCollectionPreviews.next(homeRandom());
+	return mCollectionPreviews.empty() ? nullptr : findByPath(mCollectionPreviews.current());
+}
+
+FileData* SystemData::getContinueGame()
+{
+	if (usesRandomCollectionPreview() || rotatesHomePreview())
+		return homePreview(false);
+	return isUtilitySystem(this) ? nullptr : getLastPlayedGame(true);
+}
+
+// Tools, emulators and the screenshot viewer (a group's systems count as their group's): what they ran
+// is shown, but X does not run it again, and the last played list and the game counts leave them out. By
+// name, by an explicit tool or emulator hardware type, or the image viewer's platform; a group made from
+// its systems alone gets the hardware type "system" and is no utility.
+bool SystemData::isUtilitySystem(SystemData* system)
+{
+	if (system == nullptr)
+		return false;
+
+	for (SystemData* s : { system, system->getParentGroupSystem() })
+	{
+		if (s == nullptr)
+			continue;
+
+		const std::string& hardware = s->getSystemMetadata().hardwareType;
+		if (hardware == "tool" || hardware == "emulator" || s->hasPlatformId(PlatformIds::IMAGEVIEWER) ||
+			s->getName() == "tools" || s->getName() == "emulators" || s->getName() == "imageviewer")
+			return true;
+	}
+
+	return false;
+}
+
+static int sFindPasses = 0;
+static std::vector<SystemData*> sFoundIn;
+
+SystemData::FindPass::FindPass()
+{
+	sFindPasses++;
+}
+
+SystemData::FindPass::~FindPass()
+{
+	if (--sFindPasses > 0)
+		return;
+
+	for (auto system : sFoundIn)
+		system->mFound.clear();
+
+	sFoundIn.clear();
+}
+
+FileData* SystemData::findByPath(const std::string& path)
+{
+	if (mRootFolder == nullptr)
+		return nullptr;
+
+	if (sFindPasses == 0)
+		return mRootFolder->FindByPath(path);
+
+	auto it = mFound.find(path);
+	if (it != mFound.cend())
+		return it->second;
+
+	if (mFound.empty())
+		sFoundIn.push_back(this);
+
+	FileData* found = mRootFolder->FindByPath(path);
+	mFound[path] = found;
+	return found;
+}
+
+FileData* SystemData::getConsoleLastPlayedGame()
+{
+	FileData* last = nullptr;
+	std::string lastDate;
+
+	for (auto system : sSystemVector)
+	{
+		// Games only, as the last played list and the systems' counts (tools, emulators, the screenshot viewer)
+		if (system->isCollection() || !system->isGameSystem() || isUtilitySystem(system))
+			continue;
+
+		FileData* game = system->getLastPlayedGame();
+		if (game == nullptr)
+			continue;
+
+		std::string date = game->getMetadata(MetaDataId::LastPlayed);
+		if (date > lastDate)
+		{
+			lastDate = date;
+			last = game;
+		}
+	}
+
+	return last;
+}
+
 BindableProperty SystemData::getProperty(const std::string& name)
 {
 	auto it = properties.find(name);
@@ -2146,6 +2661,18 @@ BindableProperty SystemData::getProperty(const std::string& name)
 		}
 	}
 
+	if (name == "alphabetical")
+		return getSortId() <= FileSorts::FILENAME_DESCENDING;
+	if (name == "prevTab" || name == "nextTab")
+		return SystemView::adjacentTabName(this, name == "prevTab" ? -1 : 1);
+	if (name == "prevConsole" || name == "nextConsole")
+	{
+		auto target = SystemView::adjacentConsole(this, name == "prevConsole" ? -1 : 1);
+		return target ? target->getFullName() : std::string();
+	}
+	if (name == "tab")
+		return SystemView::getSystemTab(this);
+
 	if (name == "subSystems")
 	{
 		if (this == CollectionSystemManager::get()->getCustomCollectionsBundle())
@@ -2158,6 +2685,11 @@ BindableProperty SystemData::getProperty(const std::string& name)
 	GameCountInfo* info = getGameCountInfo();
 	if (info == nullptr)
 		return BindableProperty::Null;
+
+	if (name == "visibleGameCount")
+		return info->visibleGames;
+	if (name == "libraryGameCount")
+		return info->totalGames;
 
 	if (name == "total")
 	{
@@ -2202,6 +2734,38 @@ BindableProperty SystemData::getProperty(const std::string& name)
 
 		return timeText;
 	}
+
+	if (name == "slides")
+		return Utils::String::join(getSlides(), "\n");
+
+	if (name.size() == 7 && Utils::String::startsWith(name, "recent") && name[6] >= '1' && name[6] <= '8')
+	{
+		FileData* item = getRecentItem(name[6] - '1');
+		return item != nullptr ? BindableProperty((IBindable*)item) : BindableProperty::Null;
+	}
+
+	if (name == "lastPlayed" || name == "continue")
+	{
+		FileData* game = name == "continue" ? getContinueGame() : getLastPlayedGame();
+		return game != nullptr ? BindableProperty((IBindable*)game) : BindableProperty::Null;
+	}
+
+	// Only a game that still resolves: the panel never offers a game X cannot start
+	if (name == "hasLastPlayed")
+		return getLastPlayedGame() != nullptr;
+
+	if (name == "previewIsLatest")
+	{
+		auto latest = getLastPlayedGame();
+		auto shown = getContinueGame();
+		return latest && shown && latest->getPath() == shown->getPath();
+	}
+
+	if (name == "randomCollectionPreview")
+		return usesRandomCollectionPreview();
+
+	if (name == "hasContinue")
+		return getContinueGame() != nullptr;
 
 	if (name == "lastPlayedDate")
 	{

@@ -1,7 +1,11 @@
 #include "guis/GuiTextEditPopupKeyboard.h"
+#include "guis/GuiTextEditPopup.h"
 #include "components/MenuComponent.h"
 #include "utils/StringUtil.h"
 #include "Log.h"
+#include "Window.h"
+#include "utils/HtmlColor.h"
+
 #include "LocaleES.h"
 #include "SystemConf.h"
 
@@ -96,9 +100,53 @@ std::vector<std::vector<const char*>> kbKr{
 	{ "SHIFT", "-colspan-", "SPACE", "-colspan-", "-colspan-", "-colspan-", "-colspan-", "-colspan-", "-colspan-", "RESET", "-colspan-", "CANCEL", "-colspan-" }
 };
 
+// A word as a key shows it: its first letter a capital
+static std::string capitalize(const std::string& text)
+{
+	std::string lower = Utils::String::toLower(text);
+	if (lower.empty())
+		return lower;
+
+	size_t next = Utils::String::nextCursor(lower, 0);
+	return Utils::String::toUpper(lower.substr(0, next)) + lower.substr(next);
+}
+
+// What a key shows. The theme's word keys (menuKeyboard wordKeys) name delete, space and accept instead of
+// their glyphs (a blank for space), and write every word key as a word.
+static std::string keyLabel(const std::string& key)
+{
+	auto theme = ThemeData::getMenuTheme();
+	if (theme->Keyboard.path.empty() || !theme->Keyboard.wordKeys)
+		return key;
+
+	if (key == _U("\uF177"))
+		return capitalize(_("DELETE"));
+	if (key == _U("\uF058"))
+		return capitalize(_("ACCEPT"));
+	if (key == " " || key == "SPACE")
+		return capitalize(_("SPACE"));
+	if (key == _("RESET") || key == _("CANCEL"))
+		return capitalize(key);
+
+	return key;
+}
+
+void GuiTextEditPopupKeyboard::openSearch(Window* window, const std::shared_ptr<ThemeData>& theme,
+	const std::string& scope, const std::string& title, const std::string& value,
+	const std::function<void(const std::string&)>& apply)
+{
+	const bool styled = theme && theme->getElement("menu", "searchKeys", "menuKeyboard");
+	const auto caption = styled ? theme->getVariable("esSearchTitle") : title;
+	if (Settings::getInstance()->getBool("UseOSK"))
+		window->pushGui(new GuiTextEditPopupKeyboard(window, caption, value, apply, false, "OK", styled ? theme : nullptr, scope));
+	else
+		window->pushGui(new GuiTextEditPopup(window, caption, value, apply, false));
+}
+
 GuiTextEditPopupKeyboard::GuiTextEditPopupKeyboard(Window* window, const std::string& title, const std::string& initValue,
-	const std::function<void(const std::string&)>& okCallback, bool multiLine, const std::string acceptBtnText)
-	: GuiComponent(window), mBackground(window, ":/frame.png"), mGrid(window, Vector2i(1, 6)), mMultiLine(multiLine)
+	const std::function<void(const std::string&)>& okCallback, bool multiLine, const std::string acceptBtnText,
+	const std::shared_ptr<ThemeData>& searchTheme, const std::string& scope)
+	: GuiComponent(window), mBackground(window, ":/frame.png"), mGrid(window, Vector2i(1, 6)), mSearchTheme(searchTheme), mMultiLine(multiLine)
 {
 	setTag("popup");
 
@@ -114,11 +162,20 @@ GuiTextEditPopupKeyboard::GuiTextEditPopupKeyboard(Window* window, const std::st
 	addChild(&mBackground);
 	addChild(&mGrid);
 
-	mTitle = std::make_shared<TextComponent>(mWindow, Utils::String::toUpper(title), theme->Title.font, theme->Title.color, ALIGN_CENTER);
+	mTitle = std::make_shared<TextComponent>(mWindow, mSearchTheme ? title : Utils::String::toUpper(title), theme->Title.font, theme->Title.color, mSearchTheme ? ALIGN_LEFT : ALIGN_CENTER);
 	
 	mKeyboardGrid = std::make_shared<ComponentGrid>(mWindow, Vector2i(kbUs[0].size(), kbUs.size() / BUTTON_LAYER_SIZE));
 
-	mText = std::make_shared<TextEditComponent>(mWindow);
+	mText = std::make_shared<TextEditComponent>(mWindow, mSearchTheme ? theme->Keyboard.font : nullptr);
+	if (mSearchTheme)
+	{
+		mScope = std::make_shared<TextComponent>(window, scope, theme->Text.font, theme->TextSmall.color, ALIGN_RIGHT);
+		mHint = std::make_shared<TextComponent>(window, mSearchTheme->getVariable("esSearchHint"), theme->Text.font, theme->TextSmall.color, ALIGN_LEFT);
+		mShortcuts = std::make_shared<TextComponent>(window, mSearchTheme->getVariable("esSearchShortcuts"), theme->TextSmall.font, theme->TextSmall.color, ALIGN_CENTER);
+		addChild(mScope.get());
+		addChild(mHint.get());
+		addChild(mShortcuts.get());
+	}
 	mText->setValue(initValue);
 
 	if (!multiLine)
@@ -128,7 +185,7 @@ GuiTextEditPopupKeyboard::GuiTextEditPopupKeyboard(Window* window, const std::st
 	mGrid.setEntry(mTitle, Vector2i(0, 0), false, true);
 
 	// Text edit add
-	mGrid.setEntry(mText, Vector2i(0, 1), true, false, Vector2i(1, 1), GridFlags::BORDER_TOP);
+	mGrid.setEntry(mText, Vector2i(0, 1), true, false, Vector2i(1, 1), mSearchTheme ? GridFlags::BORDER_NONE : GridFlags::BORDER_TOP);
 
 	std::vector< std::vector< std::shared_ptr<ButtonComponent> > > buttonList;
 
@@ -217,8 +274,14 @@ GuiTextEditPopupKeyboard::GuiTextEditPopupKeyboard(Window* window, const std::st
 				else
 					button = makeButton(lower, upper, lowerAlted, upperAlted);
 
-				button->setPadding(Vector4f(BUTTON_GRID_HORIZ_PADDING / 4.0f, BUTTON_GRID_HORIZ_PADDING / 4.0f, BUTTON_GRID_HORIZ_PADDING / 4.0f, BUTTON_GRID_HORIZ_PADDING / 4.0f));
-				button->setRenderNonFocusedBackground(false);
+				if (theme->Keyboard.path.empty())
+				{
+					button->setPadding(Vector4f(BUTTON_GRID_HORIZ_PADDING / 4.0f, BUTTON_GRID_HORIZ_PADDING / 4.0f, BUTTON_GRID_HORIZ_PADDING / 4.0f, BUTTON_GRID_HORIZ_PADDING / 4.0f));
+					button->setRenderNonFocusedBackground(false);
+				}
+				else
+					styleKey(button, button->getText());
+
 				buttons.push_back(button);
 
 				int colSpan = 1;
@@ -249,6 +312,13 @@ GuiTextEditPopupKeyboard::GuiTextEditPopupKeyboard(Window* window, const std::st
 
 	// Add keyboard keys
 	mGrid.setEntry(mKeyboardGrid, Vector2i(0, 2), true, true, Vector2i(2, 4));
+
+	// A pad has no use for the text field: open on the first letter key, the caret still in the field
+	if (!theme->Keyboard.path.empty() && theme->Keyboard.focusKeys)
+	{
+		mGrid.setCursorTo(mKeyboardGrid);
+		mKeyboardGrid->setCursorTo(Vector2i(0, 1));
+	}
 
 	// Determine size from text size
 	float textHeight = mText->getFont()->getHeight();
@@ -293,7 +363,13 @@ GuiTextEditPopupKeyboard::GuiTextEditPopupKeyboard(Window* window, const std::st
 
 	
 	// If multiline, set all diminsions back to default, else draw size for keyboard.
-	if (mMultiLine) 
+	if (mSearchTheme)
+	{
+		const float scale = Math::min(Renderer::getScreenWidth() / 640.0f, Renderer::getScreenHeight() / 480.0f);
+		setSize(Math::round(600 * scale), Math::round(320 * scale));
+		setPosition(Math::round((Renderer::getScreenWidth() - mSize.x()) / 2), Math::round((Renderer::getScreenHeight() - mSize.y()) / 2));
+	}
+	else if (mMultiLine)
 	{
 		if (Renderer::ScreenSettings::fullScreenMenus())
 			setSize(OSK_WIDTH, Renderer::getScreenHeight());
@@ -317,6 +393,42 @@ void GuiTextEditPopupKeyboard::onSizeChanged()
 
 	mBackground.fitTo(mSize, Vector3f::Zero(), Vector2f(-32, -32));
 
+	if (mSearchTheme)
+	{
+		const float s = mSize.x() / 600.0f;
+		mGrid.setSize(mSize);
+		mTitle->setSize(300*s, 32*s);
+		mTitle->setPosition(19*s, 9*s);
+		mScope->setSize(245*s, 32*s);
+		mScope->setPosition(334*s, 9*s);
+		mText->setSize(562*s, mText->getFont()->getHeight()+2);
+		mText->setPosition(19*s, 48*s);
+		mHint->setSize(540*s, mText->getSize().y());
+		mHint->setPosition(30*s, 48*s);
+		mShortcuts->setSize(562*s, 24*s);
+		const float extra = mVocabulary ? 62*s : 0;
+		mShortcuts->setPosition(19*s, 287*s+extra);
+		if (mVocabulary)
+		{
+			mMatchHeader->setSize(562*s, 18*s);
+			mMatchHeader->setPosition(20*s, 79*s);
+			for (int i = 0; i < suggestionLimit; ++i)
+			{
+				const float x = (19+190*i)*s;
+				mWordCards[i]->setSize(182*s, 34*s);
+				mWordCards[i]->setPosition(x, 99*s);
+				mWordLabels[i]->setSize(168*s, 34*s);
+				mWordLabels[i]->setPosition(x+7*s, 99*s);
+			}
+		}
+		mKeyboardGrid->setColWidthPerc(12, 0.103f, false);
+		mKeyboardGrid->setRowHeightPerc(0, 0.17f, false);
+		mKeyboardGrid->setRowHeightPerc(4, 0.19f, false);
+		mKeyboardGrid->setSize(568*s, 197*s);
+		mKeyboardGrid->setPosition(16*s, 83*s+extra);
+		return;
+	}
+
 	mText->setSize(mSize.x() - (2 * OSK_PADDINGX), mText->getSize().y());
 
 	// update grid
@@ -332,8 +444,134 @@ void GuiTextEditPopupKeyboard::onSizeChanged()
 	mKeyboardGrid->setPosition(OSK_PADDINGX, pos.y());	
 }
 
+void GuiTextEditPopupKeyboard::enableWords(WordCompletion vocabulary)
+{
+	mVocabulary.reset(new WordCompletion(std::move(vocabulary)));
+	auto theme = ThemeData::getMenuTheme();
+	mMatchHeader = std::make_shared<TextComponent>(mWindow, "", theme->TextSmall.font, theme->TextSmall.color);
+	addChild(mMatchHeader.get());
+	for (int i = 0; i < suggestionLimit; ++i)
+	{
+		mWordCards[i] = std::make_shared<NinePatchComponent>(mWindow);
+		mWordCards[i]->setCornerSize(6, 6);
+		mWordLabels[i] = std::make_shared<TextComponent>(mWindow, "", theme->Text.font, theme->Text.color, ALIGN_CENTER);
+		mWordLabels[i]->setMultiLine(TextComponent::SINGLELINE);
+		addChild(mWordCards[i].get());
+		addChild(mWordLabels[i].get());
+	}
+	const float scale = mSize.x()/600.0f;
+	setSize(mSize.x(), Math::round(382*scale));
+	setPosition(mPosition.x(), Math::round((Renderer::getScreenHeight()-mSize.y())/2));
+	refreshMatches();
+}
+
+void GuiTextEditPopupKeyboard::refreshMatches()
+{
+	mLastQuery = mText->getValue();
+	mLastCursor = mText->getCursor();
+	mChoices = mVocabulary->suggest(mLastQuery, mLastCursor, suggestionLimit);
+	focusMatch(-1);
+}
+
+void GuiTextEditPopupKeyboard::acceptWord(size_t index)
+{
+	if (mLastQuery != mText->getValue() || mLastCursor != mText->getCursor())
+	{
+		refreshMatches();
+		return;
+	}
+	if (index >= mChoices.words.size()) return;
+	auto query = mLastQuery;
+	const auto cursor = mChoices.insert(query, index);
+	mText->setValue(query);
+	mText->setCursor(cursor);
+	refreshMatches();
+}
+
+void GuiTextEditPopupKeyboard::styleMatches()
+{
+	const auto keys = mSearchTheme->getElement("menu", "searchKeys", "menuKeyboard");
+	mMatchHeader->setText(mSearchTheme->getVariable(mChoices.words.empty() ? "esWordEmpty" :
+		mChoices.completing ? "esWordComplete" : mLastQuery.empty() ? "esWordStart" : "esWordNext"));
+	for (int i = 0; i < suggestionLimit; ++i)
+	{
+		bool visible = i < (int)mChoices.words.size();
+		mWordCards[i]->setVisible(visible);
+		mWordLabels[i]->setVisible(visible);
+		if (!visible) continue;
+		bool selected = mSelectedMatch == i;
+		mWordCards[i]->setImagePath(keys->get<std::string>(selected ? "focusedPath" : "path"));
+		mWordLabels[i]->setText(mChoices.words[i]);
+		mWordLabels[i]->setAutoScroll(selected ? TextComponent::HORIZONTAL : TextComponent::NONE);
+		mWordLabels[i]->setColor(keys->get<unsigned int>(selected ? "selectedColor" : "color"));
+	}
+	mShortcuts->setText(mSearchTheme->getVariable(mSelectedMatch >= 0 ? "esWordControls" :
+		mChoices.words.empty() ? "esNoPickControls" : "esSearchShortcuts"));
+}
+
+void GuiTextEditPopupKeyboard::focusMatch(int row)
+{
+	if (mSelectedMatch < 0 && row >= 0) mGrid.onFocusLost();
+	if (mSelectedMatch >= 0 && row < 0) mGrid.onFocusGained();
+	mSelectedMatch = row;
+	mPickPressed = false;
+	styleMatches();
+}
+
+bool GuiTextEditPopupKeyboard::matchInput(InputConfig* config, Input input)
+{
+	if (config->isMappedTo("l2", input))
+	{
+		if (input.value) mQuickPressed = !mChoices.words.empty();
+		else if (mQuickPressed)
+		{
+			mQuickPressed = false;
+			acceptWord(0);
+		}
+		return true;
+	}
+	const bool toggle = config->isMappedTo("r2", input);
+	const bool up = config->isMappedLike("up", input);
+	const bool down = config->isMappedLike("down", input);
+	if (mSelectedMatch < 0)
+	{
+		if (mChoices.words.empty() || (!toggle && !(up && mGrid.getSelectedComponent() == mKeyboardGrid && mKeyboardGrid->getCursor().y() == 0)))
+			return false;
+		if (input.value) focusMatch(0);
+		return true;
+	}
+	if (config->isMappedTo(BUTTON_OK, input))
+	{
+		if (input.value) mPickPressed = true;
+		else if (mPickPressed) acceptWord(mSelectedMatch);
+		return true;
+	}
+	if (toggle || down || config->isMappedTo(BUTTON_BACK, input))
+	{
+		if (input.value) focusMatch(-1);
+		return true;
+	}
+	const bool left = config->isMappedLike("left", input);
+	const bool right = config->isMappedLike("right", input);
+	if (input.value && (left || right))
+	{
+		const int count = (int)mChoices.words.size();
+		focusMatch((mSelectedMatch + count + (right ? 1 : -1)) % count);
+	}
+	return !config->isMappedTo("start", input) && !config->isMappedTo("x", input);
+}
+
+void GuiTextEditPopupKeyboard::update(int deltaTime)
+{
+	GuiComponent::update(deltaTime);
+	if (mVocabulary && (mText->getValue() != mLastQuery || mText->getCursor() != mLastCursor)) refreshMatches();
+	if (mHint)
+		mHint->setVisible(mText->getValue().empty());
+}
+
 bool GuiTextEditPopupKeyboard::input(InputConfig* config, Input input)
 {
+	if (mVocabulary && matchInput(config, input)) return true;
 	if (GuiComponent::input(config, input))
 		return true;
 
@@ -426,10 +664,62 @@ void GuiTextEditPopupKeyboard::updateKeyboardButtons()
 			: (mShift) ? kb.shiftedKey
 			: kb.key;
 
+		if (!ThemeData::getMenuTheme()->Keyboard.path.empty())
+		{
+			setKeyLabel(kb.button, text);
+			continue;
+		}
+
 		auto sz = kb.button->getSize();
 		kb.button->setText(text, text, false);
 		kb.button->setSize(sz);
 	}
+}
+
+// The theme's key (menuKeyboard): its images untinted, the spacing as padding, its label colours and font
+void GuiTextEditPopupKeyboard::styleKey(const std::shared_ptr<ButtonComponent>& button, const std::string& key)
+{
+	auto& keyboard = ThemeData::getMenuTheme()->Keyboard;
+
+	if (mSearchTheme)
+	{
+		const auto keys = mSearchTheme->getElement("menu", "searchKeys", "menuKeyboard");
+		const auto actions = mSearchTheme->getElement("menu", "searchActions", "menuKeyboard");
+		const bool command = key == " " || key == _("RESET") || key == _("CANCEL") ||
+			key == _U("\uF177") || key == _U("\uF058") || button == mShiftButton || button == mAltButton;
+		const auto skin = command && actions ? actions : keys;
+		float pad = skin->get<float>("spacing") / 2.0f;
+		button->setPadding(Vector4f(pad, pad, pad, pad));
+		button->setImages(skin->get<std::string>("path"), skin->get<std::string>("focusedPath"),
+			skin->get<std::string>("activePath"), skin->get<Vector2f>("cornerSize"));
+		button->setTextColors(skin->get<unsigned int>("color"), skin->get<unsigned int>("selectedColor"));
+		setKeyLabel(button, key);
+		return;
+	}
+	float pad = keyboard.spacing / 2.0f;
+	button->setPadding(Vector4f(pad, pad, pad, pad));
+	button->setImages(keyboard.path, keyboard.focusedPath, keyboard.activePath, keyboard.cornerSize);
+	button->setTextColors(keyboard.color, keyboard.selectedColor);
+	setKeyLabel(button, key);
+}
+
+// A key's label: one character in the keyboard's font, a word in the menu's small text font
+void GuiTextEditPopupKeyboard::setKeyLabel(const std::shared_ptr<ButtonComponent>& button, const std::string& key)
+{
+	auto theme = ThemeData::getMenuTheme();
+
+	std::string label = keyLabel(key);
+	if (mSearchTheme)
+	{
+		if (key == _U("\uF058")) label = mSearchTheme->getVariable("esSearchSubmit");
+		if (key == _("RESET")) label = mSearchTheme->getVariable("esSearchClear");
+	}
+	bool word = !label.empty() && Utils::String::nextCursor(label, 0) < label.size();
+
+	auto sz = button->getSize();
+	button->setFont(word ? (mSearchTheme ? theme->Text.font : theme->TextSmall.font) : theme->Keyboard.font);
+	button->setText(label, label, false);
+	button->setSize(sz);
 }
 
 // Shifts the keys when user hits the shift button.

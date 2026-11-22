@@ -1,4 +1,5 @@
 #include "components/VideoComponent.h"
+#include <algorithm>
 
 #include "resources/ResourceManager.h"
 #include "utils/FileSystemUtil.h"
@@ -8,6 +9,8 @@
 #include <SDL_timer.h>
 #include "LocaleES.h"
 #include "Paths.h"
+#include <map>
+#include <mutex>
 
 #define FADE_TIME_MS	400
 
@@ -65,8 +68,11 @@ VideoComponent::VideoComponent(Window* window) :
 	mIsTopWindow(true),
 	mEnabled(true),
 	mScreensaverMode(false),
+	mIdlePause(false),
+	mIdleStopped(false),
 	mTargetIsMax(false),
 	mTargetIsMin(false),
+	mKeepOrientation(false),
 	mTargetSize(0, 0),
 	mPlayAudio(true)
 {
@@ -209,15 +215,76 @@ void VideoComponent::render(const Transform4x4f& parentTrans)
 	handleLooping();
 }
 
+static std::map<std::string, unsigned long long> sUnplayableVideos;
+static std::mutex sUnplayableVideosLock;
+
+void VideoComponent::markUnplayable(const std::string& path)
+{
+	if (path.empty())
+		return;
+
+	std::unique_lock<std::mutex> lock(sUnplayableVideosLock);
+	sUnplayableVideos[path] = Utils::FileSystem::getFileSize(path);
+}
+
+bool VideoComponent::isUnplayable(const std::string& path)
+{
+	if (path.empty())
+		return false;
+
+	std::unique_lock<std::mutex> lock(sUnplayableVideosLock);
+	auto it = sUnplayableVideos.find(path);
+	if (it == sUnplayableVideos.cend())
+		return false;
+
+	// Replaced since (a new size): try it again
+	if (Utils::FileSystem::getFileSize(path) != it->second)
+	{
+		sUnplayableVideos.erase(it);
+		return false;
+	}
+
+	return true;
+}
+
 void VideoComponent::renderSnapshot(const Transform4x4f& parentTrans)
 {
+	if (mExclusiveSnapshot)
+	{
+		if (!drawsExclusiveFrame() && (mConfig.showSnapshotDelay || mConfig.showSnapshotNoVideo))
+		{
+			mStaticImage.setOpacity(getOpacity());
+			mStaticImage.render(parentTrans);
+		}
+		return;
+	}
+
+	// Out of view (a view still drawn while it slides away, or before it is shown), the stopped video leaves its
+	// snapshot in its place instead of a hole
+	if ((!isShowing() || !mInView) && !mIsPlaying && !mIsWaitingForVideoToStart && !isPaused() && (mConfig.showSnapshotNoVideo || mConfig.showSnapshotDelay))
+	{
+		if (!mStaticImage.isStoryBoardRunning("snapshot"))
+		{
+			mStaticImage.setOpacity(getOpacity());
+			if (!currentStoryBoardHasProperty("scale"))
+				mStaticImage.setScale(getScale());
+		}
+
+		mStaticImage.render(parentTrans);
+		return;
+	}
+
 	// This is the case where the video is not currently being displayed. Work out
 	// if we need to display a static image
-	if ((mConfig.showSnapshotNoVideo && mVideoPath.empty()) || ((mStartDelayed || mFadeIn < 1.0) && mConfig.showSnapshotDelay))
+	if ((mConfig.showSnapshotNoVideo && (mVideoPath.empty() || isUnplayable(mVideoPath) || mIdleStopped)) || ((mStartDelayed || mFadeIn < 1.0 || mIdleStopped) && mConfig.showSnapshotDelay))
 	{
 		float t = 1.0 - mFadeIn;
 		t -= 1; // cubic ease out
 		t = Math::lerp(0, 1, t*t*t + 1);
+
+		// a crossfade: the video comes in over the whole snapshot, which goes only once the video is in
+		if (mIsPlaying && coversSnapshot())
+			t = 1.0f;
 
 		if (hasStoryBoard())
 			t = (t * 255.0f);
@@ -247,6 +314,8 @@ void VideoComponent::renderSnapshot(const Transform4x4f& parentTrans)
 
 void VideoComponent::applyTheme(const std::shared_ptr<ThemeData>& theme, const std::string& view, const std::string& element, unsigned int properties)
 {
+	mIdlePause = true;
+
 	using namespace ThemeFlags;
 
 	const ThemeData::ThemeElement* elem = theme->getElement(view, element, "video");
@@ -257,6 +326,14 @@ void VideoComponent::applyTheme(const std::shared_ptr<ThemeData>& theme, const s
 	{
 		Vector4f clientRectangle = getParent() ? getParent()->getClientRect() : Vector4f(0, 0, (float)Renderer::getScreenWidth(), (float)Renderer::getScreenHeight());
 		Vector2f scale = Vector2f(clientRectangle.z(), clientRectangle.w());
+
+		// A size's shape, turned to the video's (or the snapshot's) orientation (a TV game's 4:3, 3:4 upright)
+		if (elem->has("keepOrientation"))
+			setKeepOrientation(elem->get<bool>("keepOrientation"));
+
+		// How long the video takes to come in over its snapshot, a crossfade
+		if (elem->has("fadeTime"))
+			mFadeTimeMs = std::max(1, (int)(elem->get<float>("fadeTime") * 1000.0f));
 
 		if (elem->has("size"))
 		{
@@ -280,6 +357,8 @@ void VideoComponent::applyTheme(const std::shared_ptr<ThemeData>& theme, const s
 
 	if ((properties & ThemeFlags::DELAY) && elem->has("delay"))
 		mConfig.startDelay = (unsigned)(elem->get<float>("delay") * 1000.0f);
+
+	mExclusiveSnapshot = elem->has("exclusiveSnapshot") && elem->get<bool>("exclusiveSnapshot");
 
 	if (elem->has("showSnapshotNoVideo"))
 		mConfig.showSnapshotNoVideo = elem->get<bool>("showSnapshotNoVideo");
@@ -340,6 +419,20 @@ void VideoComponent::applyTheme(const std::shared_ptr<ThemeData>& theme, const s
 
 	if (elem->has("defaultSnapshot"))
 		mStaticImage.setDefaultImage(elem->get<std::string>("defaultSnapshot"));
+
+	// The theme's snapshot (a capture, usually bound to the game): shown until the video plays, and in its
+	// place when there is none, with the video's colour and saturation; once the video plays it replaces it
+	if (elem->has("snapshot"))
+	{
+		if (!elem->has("snapshot_binding"))
+			setImage(elem->get<std::string>("snapshot"));
+
+		if (elem->has("color"))
+			mStaticImage.setColorShift(elem->get<unsigned int>("color"));
+
+		if (elem->has("saturation"))
+			mStaticImage.setSaturation(Math::clamp(elem->get<float>("saturation"), 0.0f, 1.0f));
+	}
 
 	mStaticImage.applyStoryboard(elem, "snapshot");
 }
@@ -440,9 +533,9 @@ void VideoComponent::update(int deltaTime)
 			if (mStartTime > ticks)
 			{
 				Uint32 diff = mStartTime - ticks;
-				if (diff < FADE_TIME_MS)
+				if (diff < (Uint32)mFadeTimeMs)
 				{
-					mFadeIn = (float)diff / (float)FADE_TIME_MS;
+					mFadeIn = (float)diff / (float)mFadeTimeMs;
 					return;
 				}
 			}
@@ -451,7 +544,7 @@ void VideoComponent::update(int deltaTime)
 		// If the fade in is less than 1 then increment it
 		if (mFadeIn < 1.0f)
 		{
-			mFadeIn += deltaTime / (float)FADE_TIME_MS;
+			mFadeIn += deltaTime / (float)mFadeTimeMs;
 			if (mFadeIn > 1.0f)
 				mFadeIn = 1.0f;
 		}
@@ -467,9 +560,18 @@ void VideoComponent::manageState()
 
 	// We will only show if the component is on display and the screensaver
 	// is not active
-	bool show = isShowing() && !mScreensaverActive && mIsTopWindow && mVisible && mEnabled;
+	bool show = isShowing() && mInView && !mScreensaverActive && mIsTopWindow && mVisible && mEnabled;
 	if (!show)
 		mStartDelayed = false;
+
+	// Stopped by the idle pause at the end of a loop: it starts again on input, or as another video
+	if (mIdleStopped)
+	{
+		if (show && mVideoPath == mPlayingVideoPath && mWindow->isIdlePaused(Window::IDLE_VIDEO))
+			return;
+
+		mIdleStopped = false;
+	}
 
 	// See if we're already playing
 	if (mIsPlaying || mIsWaitingForVideoToStart)
@@ -497,6 +599,11 @@ void VideoComponent::manageState()
 			}
 		}
 	}
+	// A video paused under a menu whose view is hidden (a game starts from that menu) stops: a paused player
+	// keeps its sound and video outputs, and the wait before the game (Window::deinit) waits for it too
+	if (!show && !isShowing() && isPaused())
+		stopVideo();
+
 	// Need to recheck variable rather than 'else' because it may be modified above
 	if (!mIsPlaying)
 	{
@@ -572,6 +679,9 @@ ThemeData::ThemeElement::Property VideoComponent::getProperty(const std::string 
 	if (name == "path")
 		return mVideoPath;
 
+	if (name == "snapshot")
+		return mStaticImagePath;
+
 	if (name == "enabled")
 		return mEnabled;
 
@@ -595,8 +705,18 @@ void VideoComponent::setProperty(const std::string name, const ThemeData::ThemeE
 
 		mThemedPath = mVideoPath;
 	}
+	else if (value.type == ThemeData::ThemeElement::Property::PropertyType::String && name == "snapshot")
+	{
+		// The same picture bound again (the cursor moved, the game stayed) keeps the video as it plays
+		if (value.s != mStaticImagePath)
+			setImage(value.s);
+	}
 	else if (value.type == ThemeData::ThemeElement::Property::PropertyType::Bool && name == "enabled")
 	{
+		// Bound again to the same value (each binding pass): nothing changes, a start under way goes on
+		if (value.b == mEnabled)
+			return;
+
 		mEnabled = value.b;
 
 		if (!mEnabled)

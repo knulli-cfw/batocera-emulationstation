@@ -77,6 +77,9 @@ protected:
 	virtual void populateList(const std::vector<FileData*>& files) = 0;
 	
 	bool cursorHasSaveStatesEnabled();
+	bool usesSavedGamesButton() const;
+	bool hasPlayableSelection();
+	void openSavedGames();
 
 	TextComponent mHeaderText;
 	ImageComponent mHeaderImage;

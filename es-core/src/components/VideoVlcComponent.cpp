@@ -1,13 +1,26 @@
 #include "components/VideoVlcComponent.h"
+#include "components/ImageAspectCheck.h"
+#include "components/ScreenShape.h"
+#include "components/VideoLight.h"
+#include "components/VideoLeadIn.h"
 
 #include "renderers/Renderer.h"
 #include "resources/TextureResource.h"
 #include "utils/StringUtil.h"
 #include "PowerSaver.h"
 #include "Settings.h"
+#include "Window.h"
 #include <vlc/vlc.h>
 #include <SDL_mutex.h>
 #include <cmath>
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <deque>
+#include <functional>
+#include <map>
+#include <set>
+#include <thread>
 #include "SystemConf.h"
 #include "ThemeData.h"
 #include <SDL_timer.h>
@@ -18,10 +31,21 @@
 #endif
 
 #include "ImageIO.h"
+#include "Log.h"
 
 #define MATHPI          3.141592653589793238462643383279502884L
 
 libvlc_instance_t* VideoVlcComponent::mVLC = NULL;
+
+// How long VLC may take to read a video's tracks; VLC counts it from when its reader takes the file, which
+// may wait behind others
+static const int PARSE_TIMEOUT_MS = 2000;
+// How long ES waits for an answer, counted from the request (VLC never answering)
+static const unsigned int PARSE_WAIT_MS = 10000;
+// A file that timed out is not read again for a while, and counts as no video after this many timeouts: a
+// timeout may come from a busy system, not from the file
+static const unsigned int PARSE_RETRY_MS = 30000;
+static const int PARSE_TIMEOUTS = 3;
 
 // VLC prepares to render a video frame.
 static void *lock(void *data, void **p_pixels) 
@@ -48,19 +72,233 @@ static void unlock(void *data, void* /*id*/, void *const* /*p_pixels*/)
 	c->mutexes[frame].unlock();
 }
 
-// VLC wants to display a video frame.
+// VLC wants to display a video frame. This runs on VLC's thread: it only tells the UI thread
+// (VideoVlcComponent::checkDisplayed), which may be freeing the component's texture.
 static void display(void* data, void* id)
 {
 	if (data == NULL)
 		return;
 
-	struct VideoContext *c = (struct VideoContext *)data;
-	if (c->valid && c->component != NULL && !c->component->isPlaying() && c->component->isWaitingForVideoToStart())
-		c->component->onVideoStarted();
+	((struct VideoContext *)data)->displayed = true;
+}
+
+// The players start and stop on one worker thread: making a VLC player opens its audio output (ALSA reads its
+// configuration and probes every card, hundreds of ms on a handheld) and stopping one waits for its threads,
+// so the UI thread only hands them over. A start sets the frame callbacks before it plays; a start its
+// component gave up on before its turn (it stopped, or started another video) makes no player, and a player
+// whose component stopped while it was made is stopped at once. The context goes with the player until it is
+// released. The worker also releases every media: the last release of one VLC still reads waits for it.
+struct PlayerStart
+{
+	libvlc_media_t*					media;
+	std::shared_ptr<VideoContext>	context;
+	unsigned int					width, height;
+	bool							mute;
+
+	std::mutex						lock;
+	libvlc_media_player_t*			player;
+	bool							ready;
+	bool							cancelled;
+
+	PlayerStart() : media(nullptr), width(0), height(0), mute(false), player(nullptr), ready(false), cancelled(false) { }
+};
+
+namespace
+{
+	class PlayerWorker
+	{
+	public:
+		// The players' worker, and the one that drops parses VLC never answered: stopping such a parse waits
+		// for VLC's reader, maybe for long, and must not hold the players' starts and stops. Never destroyed:
+		// the workers outlive main's statics.
+		static PlayerWorker* players()
+		{
+			static PlayerWorker* worker = new PlayerWorker();
+			return worker;
+		}
+
+		static PlayerWorker* parses()
+		{
+			static PlayerWorker* worker = new PlayerWorker();
+			return worker;
+		}
+
+		// false when the worker already has max tasks waiting (one stuck): the task is not taken
+		bool post(const std::function<void()>& task, size_t max = 0)
+		{
+			std::unique_lock<std::mutex> lock(mLock);
+			if (max > 0 && mTasks.size() >= max)
+				return false;
+
+			if (!mStarted)
+			{
+				mStarted = true;
+				std::thread([this] { run(); }).detach();
+			}
+
+			mTasks.push_back(task);
+			mWake.notify_one();
+			return true;
+		}
+
+		// Waits until the tasks handed over so far ran, at most ms: false when some still run
+		bool drain(int ms)
+		{
+			{
+				std::unique_lock<std::mutex> lock(mLock);
+				if (!mStarted)
+					return true;
+			}
+
+			struct Done
+			{
+				std::mutex lock;
+				std::condition_variable wake;
+				bool done = false;
+			};
+
+			auto done = std::make_shared<Done>();
+			post([done]
+			{
+				std::unique_lock<std::mutex> lock(done->lock);
+				done->done = true;
+				done->wake.notify_all();
+			});
+
+			std::unique_lock<std::mutex> lock(done->lock);
+			return done->wake.wait_for(lock, std::chrono::milliseconds(ms), [done] { return done->done; });
+		}
+
+	private:
+		PlayerWorker() : mStarted(false) { }
+
+		void run()
+		{
+			for (;;)
+			{
+				std::function<void()> task;
+				{
+					std::unique_lock<std::mutex> lock(mLock);
+					mWake.wait(lock, [this] { return !mTasks.empty(); });
+					task = mTasks.front();
+					mTasks.pop_front();
+				}
+
+				task();
+			}
+		}
+
+		std::mutex mLock;
+		std::condition_variable mWake;
+		std::deque<std::function<void()>> mTasks;
+		bool mStarted;
+	};
+
+	// The players alive (made and not yet released), in the debug log when it changes (tests)
+	std::atomic<int> sPlayers(0);
+
+	void countPlayers(int change)
+	{
+		int players = (sPlayers += change);
+		LOG(LogDebug) << "VideoVlcComponent: " << players << " players";
+	}
+
+	void stopOnWorker(libvlc_media_player_t* player, std::shared_ptr<VideoContext> context)
+	{
+		PlayerWorker::players()->post([player, context]
+		{
+			libvlc_media_player_stop(player);
+			libvlc_media_player_release(player);
+			countPlayers(-1);
+		});
+	}
+
+	void releaseOnWorker(libvlc_media_t* media)
+	{
+		PlayerWorker::players()->post([media] { libvlc_media_release(media); });
+	}
+
+	// Stopping a parse waits for VLC's reader: on the parses' worker. Should VLC never let go of one, at most 16
+	// wait behind it; any more are left to VLC as they are (not stopped, not released)
+	void stopParseOnWorker(libvlc_media_t* media)
+	{
+		bool taken = PlayerWorker::parses()->post([media]
+		{
+			libvlc_media_parse_stop(media);
+			libvlc_media_release(media);
+		}, 16);
+
+		if (!taken)
+			LOG(LogWarning) << "VideoVlcComponent: VLC's reader does not stop; a parse is left to it";
+	}
+
+	// Files whose parse timed out: how many times, and when they may be read again (SDL ticks). UI thread.
+	std::map<std::string, std::pair<int, unsigned int>> sParseTimeouts;
+
+	bool waitsAfterTimeout(const std::string& path)
+	{
+		auto it = sParseTimeouts.find(path);
+		return it != sParseTimeouts.cend() && (int)(it->second.second - SDL_GetTicks()) > 0;
+	}
+
+	void startOnWorker(std::shared_ptr<PlayerStart> start)
+	{
+		PlayerWorker::players()->post([start]
+		{
+			{
+				std::unique_lock<std::mutex> lock(start->lock);
+				if (start->cancelled)
+				{
+					libvlc_media_release(start->media);
+					start->media = nullptr;
+					start->context = nullptr;
+					return;
+				}
+			}
+
+			libvlc_media_player_t* player = libvlc_media_player_new_from_media(start->media);
+			libvlc_media_release(start->media);
+			start->media = nullptr;
+
+			if (player != nullptr)
+				countPlayers(1);
+
+			if (player != nullptr)
+			{
+				if (start->mute)
+					libvlc_audio_set_mute(player, 1);
+
+				if (start->width > 1)
+				{
+					libvlc_video_set_callbacks(player, lock, unlock, display, (void*)start->context.get());
+					libvlc_video_set_format(player, "RGBA", (int)start->width, (int)start->height, (int)start->width * 4);
+				}
+
+				libvlc_media_player_play(player);
+			}
+
+			std::unique_lock<std::mutex> lock(start->lock);
+			if (start->cancelled)
+			{
+				if (player != nullptr)
+				{
+					libvlc_media_player_stop(player);
+					libvlc_media_player_release(player);
+					countPlayers(-1);
+				}
+
+				start->context = nullptr;
+				return;
+			}
+
+			start->player = player;
+			start->ready = true;
+		});
+	}
 }
 
 VideoVlcComponent::VideoVlcComponent(Window* window) : VideoComponent(window), 
-	mMediaPlayer(nullptr), mMedia(nullptr),
+	mMediaPlayer(nullptr), mMedia(nullptr), mParsing(false), mParseEnd(0),
 	mTopLeftCrop(0.0f, 0.0f), mBottomRightCrop(1.0f, 1.0f)
 {
 	mSaturation = 1.0f;
@@ -79,9 +317,37 @@ VideoVlcComponent::VideoVlcComponent(Window* window) : VideoComponent(window),
 	init();
 }
 
+// The videos showing their frames (main thread): a screen shows one at most, so a second one is logged
+static std::set<VideoVlcComponent*> sShownVideos;
+
+static void videoShown(VideoVlcComponent* video, bool shown)
+{
+	if (!shown)
+	{
+		if (sShownVideos.erase(video) > 0)
+			LOG(LogInfo) << "VideoCheck: " << sShownVideos.size() << (sShownVideos.size() == 1 ? " video plays" : " videos play");
+		return;
+	}
+
+	bool added = sShownVideos.insert(video).second;
+	if (sShownVideos.size() < 2)
+	{
+		if (added)
+			LOG(LogInfo) << "VideoCheck: 1 video plays: " << video->getVideoPath();
+		return;
+	}
+
+	std::string paths;
+	for (auto v : sShownVideos)
+		paths += (paths.empty() ? "" : ", ") + v->getVideoPath();
+
+	LOG(LogWarning) << "VideoCheck: " << sShownVideos.size() << " videos play at once: " << paths;
+}
+
 VideoVlcComponent::~VideoVlcComponent()
 {
 	stopVideo();
+	videoShown(this, false);
 }
 
 Vector2f VideoVlcComponent::getSize() const
@@ -108,7 +374,16 @@ void VideoVlcComponent::setResize(float width, float height)
 	mSize = mTargetSize;
 	mTargetIsMax = false;
 	mTargetIsMin = false;
-	mStaticImage.setMaxSize(width, height);
+
+	// the snapshot takes the same shape as the video: the size's, turned to its own orientation
+	if (mKeepOrientation)
+	{
+		mStaticImage.setKeepOrientation(true);
+		mStaticImage.setResize(width, height);
+	}
+	else
+		mStaticImage.setMaxSize(width, height);
+
 	resize();
 }
 
@@ -142,6 +417,8 @@ void VideoVlcComponent::onVideoStarted()
 {
 	VideoComponent::onVideoStarted();
 	resize();
+	videoShown(this, true);
+	releaseHeldAudio();
 }
 
 void VideoVlcComponent::crop(float left, float top, float right, float bot)
@@ -223,6 +500,9 @@ void VideoVlcComponent::resize()
 		// if both components are set, we just stretch
 		// if no components are set, we don't resize at all
 		mSize = targetSize == Vector2f::Zero() ? textureSize : targetSize;
+
+		if (mKeepOrientation && targetSize.x() > 0 && targetSize.y() > 0)
+			mSize = ScreenShape::fit(targetSize, textureSize);
 
 		// if only one component is set, we resize in a way that maintains aspect ratio
 		// for SVG rasterization, we always calculate width from rounded height (see comment above)
@@ -412,16 +692,33 @@ void VideoVlcComponent::updateRoundCorners()
 	mRoundCornerStencil = Renderer::createRoundRect(x, y, size_x, size_y, radius);
 }
 
+bool VideoVlcComponent::drawsExclusiveFrame()
+{
+	return mExclusiveSnapshot && isVisible() && isShowing() && mInView && hasVisibleFrame() &&
+		!mVideoPath.empty() && mVideoPath == mPlayingVideoPath && mTexture->isLoaded();
+}
+
 void VideoVlcComponent::render(const Transform4x4f& parentTrans)
 {
-	if (!isShowing() || !isVisible())
+	if (!isVisible())
 		return;
 
+	// Out of view but drawn (a view sliding away or in, a column panning away): its snapshot, not the stopped player
+	if (!isShowing() || !mInView)
+	{
+		VideoComponent::render(parentTrans);
+		return;
+	}
+
+	// Both layers choose from the same pre-render state. The base render may start VLC.
+	const bool waitingForFrame = mExclusiveSnapshot && !drawsExclusiveFrame();
 	VideoComponent::render(parentTrans);
+	if (waitingForFrame)
+		return;
 
 	bool initFromPixels = true;
 
-	if (!mIsPlaying || !mContext.valid)
+	if (!mIsPlaying || mContext == nullptr || !mContext->valid)
 	{
 		// If video is still attached to the path & texture is initialized, we suppose it had just been stopped (onhide, ondisable, screensaver...)
 		// still render the last frame
@@ -454,28 +751,18 @@ void VideoVlcComponent::render(const Transform4x4f& parentTrans)
 
 	// Build a texture for the video frame
 	if (initFromPixels)
-	{		
-		int frame = mContext.surfaceId;
-		if (mContext.hasFrame[frame])
-		{
-			if (mTexture == nullptr)
-			{
-				mTexture = TextureResource::get("", false, mLinearSmooth);
-
-				resize();
-				trans = parentTrans * getTransform();
-			}
-
+	{
 #ifdef _RPI_
-			// Rpi : A lot of videos are encoded in 60fps on screenscraper
-			// Try to limit transfert to opengl textures to 30fps to save CPU
-			if (!Settings::getInstance()->getBool("OptimizeVideo") || mElapsed >= 40) // 40ms = 25fps, 33.33 = 30 fps
+		// Rpi : A lot of videos are encoded in 60fps on screenscraper
+		// Try to limit transfert to opengl textures to 30fps to save CPU
+		if (!Settings::getInstance()->getBool("OptimizeVideo") || mElapsed >= 40) // 40ms = 25fps, 33.33 = 30 fps
 #endif
+		{
+			bool created = (mTexture == nullptr);
+			if (uploadFrame())
 			{
-				mContext.mutexes[frame].lock();
-				mTexture->updateFromExternalPixels(mContext.surfaces[frame], mVideoWidth, mVideoHeight);
-				mContext.hasFrame[frame] = false;
-				mContext.mutexes[frame].unlock();
+				if (created)
+					trans = parentTrans * getTransform();
 
 				mElapsed = 0;
 			}
@@ -530,6 +817,7 @@ void VideoVlcComponent::render(const Transform4x4f& parentTrans)
 	
 	if (mTexture->bind())
 	{
+		ImageAspectCheck::check(this, mVideoPath, mVertices, mTexture->getSize(), trans);
 		Renderer::setMatrix(trans);
 
 		beginCustomClipRect();
@@ -560,22 +848,25 @@ void VideoVlcComponent::render(const Transform4x4f& parentTrans)
 
 void VideoVlcComponent::setupContext()
 {
-	if (mContext.valid)
+	// The frames' buffers are made for one size
+	if (mContext != nullptr && mContext->valid && mContext->width == mVideoWidth && mContext->height == mVideoHeight)
 		return;
-	
+
+	freeContext();
+
 	// Create an RGBA surface to render the video into
-	mContext.surfaces[0] = new unsigned char[mVideoWidth * mVideoHeight * 4];
-	mContext.surfaces[1] = new unsigned char[mVideoWidth * mVideoHeight * 4];
-	mContext.hasFrame[0] = false;	
-	mContext.hasFrame[1] = false;
-	mContext.component = this;
-	mContext.valid = true;	
+	mContext = std::make_shared<VideoContext>();
+	mContext->surfaces[0] = new unsigned char[mVideoWidth * mVideoHeight * 4];
+	mContext->surfaces[1] = new unsigned char[mVideoWidth * mVideoHeight * 4];
+	mContext->width = mVideoWidth;
+	mContext->height = mVideoHeight;
+	mContext->valid = true;
 	resize();	
 }
 
 void VideoVlcComponent::freeContext()
 {
-	if (!mContext.valid)
+	if (mContext == nullptr || !mContext->valid)
 		return;
 
 	if (mIsTopWindow)
@@ -584,14 +875,9 @@ void VideoVlcComponent::freeContext()
 		mTexture = nullptr;
 	}
 
-	delete[] mContext.surfaces[0];
-	delete[] mContext.surfaces[1];
-	mContext.surfaces[0] = nullptr;
-	mContext.surfaces[1] = nullptr;	
-	mContext.hasFrame[0] = false;
-	mContext.hasFrame[1] = false;
-	mContext.component = NULL;
-	mContext.valid = false;			
+	// The player may still draw into its buffers until the worker stopped it: they go with the last of them
+	mContext->valid = false;
+	mContext = nullptr;
 }
 
 #if WIN32
@@ -679,8 +965,109 @@ void VideoVlcComponent::init()
 	delete[] theArgs;
 }
 
+bool VideoVlcComponent::waitForPlayers(int ms)
+{
+	int start = SDL_GetTicks();
+	bool done = PlayerWorker::players()->drain(ms);
+	done = done && sPlayers.load() == 0;
+	if (done)
+		LOG(LogDebug) << "VideoVlcComponent: players stopped in " << (SDL_GetTicks() - start) << " ms";
+	else
+		LOG(LogWarning) << "VideoVlcComponent: players still stopping after " << ms << " ms";
+
+	return done;
+}
+
+// Copies the newest whole frame into the texture, under that frame's lock: the player writes into a buffer only
+// while it holds its lock, so the texture never gets a frame half written. False when there was no new frame.
+bool VideoVlcComponent::uploadFrame()
+{
+	if (mContext == nullptr || !mContext->valid)
+		return false;
+
+	int frame = mContext->surfaceId;
+	if (!mContext->hasFrame[frame])
+		return false;
+
+	std::unique_lock<std::mutex> lock(mContext->mutexes[frame]);
+	if (!mContext->hasFrame[frame])
+		return false;
+
+	if (mTexture == nullptr)
+	{
+		mTexture = TextureResource::get("", false, mLinearSmooth);
+		resize();
+	}
+
+	mTexture->updateFromExternalPixels(mContext->surfaces[frame], mVideoWidth, mVideoHeight);
+	mContext->hasFrame[frame] = false;
+
+	// While the video waits to show (checkDisplayed): how lit this frame is
+	if (mIsWaitingForVideoToStart)
+	{
+		mContext->lastLight = mContext->light;
+		mContext->light = VideoLight::frameLight(mContext->surfaces[frame], mVideoWidth, mVideoHeight);
+	}
+
+	return true;
+}
+
+// The first frame VLC displayed: the video shows from now on, once that frame is whole in the texture (until
+// then the snapshot, or what is under the video, stays). A video that comes in over its snapshot waits for its
+// picture to be lit (VideoLight), its sound with it.
+void VideoVlcComponent::checkDisplayed()
+{
+	if (mContext == nullptr || !mContext->valid || !mContext->displayed || mIsPlaying || !mIsWaitingForVideoToStart)
+		return;
+
+	bool fresh = uploadFrame();
+	if (!fresh && (mTexture == nullptr || !mTexture->isLoaded()))
+		return;
+
+	if (mAudioHeld || waitsForLight())
+	{
+		// its player taken first: the sound held back is let go when the video shows
+		if (mMediaPlayer == nullptr)
+			return;
+
+		Uint32 now = SDL_GetTicks();
+		if (!mContext->firstShown)
+		{
+			mContext->firstShown = true;
+			mContext->firstShownTicks = now;
+		}
+
+		unsigned int since = now - mContext->firstShownTicks;
+		if (since < VideoLight::VIDEO_LIGHT_WAIT_MS && (!fresh || !VideoLight::mayShow(mContext->light, mContext->lastLight, since)))
+			return;
+	}
+
+	onVideoStarted();
+}
+
+// A video that replaces its snapshot in place (no effect) after a delay waits for its picture's light
+bool VideoVlcComponent::waitsForLight()
+{
+	return mEffect == VideoVlcFlags::VideoVlcEffect::NONE && mConfig.startDelay > 0 && !mScreensaverMode && PowerSaver::getMode() != PowerSaver::INSTANT;
+}
+
+// The sound held back while the video waited for its light plays from now on
+void VideoVlcComponent::releaseHeldAudio()
+{
+	if (!mAudioHeld)
+		return;
+
+	mAudioHeld = false;
+	if (mMediaPlayer != nullptr)
+		libvlc_audio_set_mute(mMediaPlayer, 0);
+}
+
 void VideoVlcComponent::handleLooping()
 {
+	checkParse();
+	checkStart();
+	checkDisplayed();
+
 	if (mIsPlaying && mMediaPlayer)
 	{
 		libvlc_state_t state = libvlc_media_player_get_state(mMediaPlayer);
@@ -698,6 +1085,15 @@ void VideoVlcComponent::handleLooping()
 					mVideoPath = "";
 					return;
 				}
+			}
+
+			// The idle pause: a view's video ends its loop on its capture, and the panel moves on to no other
+			if (mIdlePause && !mScreensaverMode && mWindow->isIdlePaused(Window::IDLE_VIDEO))
+			{
+				stopVideo();
+				mFadeIn = 0.0;
+				mIdleStopped = true;
+				return;
 			}
 
 			if (mPlaylist != nullptr)
@@ -737,8 +1133,15 @@ void VideoVlcComponent::handleLooping()
 
 void VideoVlcComponent::startVideo()
 {
-	if (mIsPlaying)
+	// Not again while VLC reads the file (checkParse goes on)
+	if (mIsPlaying || mParsing)
 		return;
+
+	// A start before this one may still hold a player being made, a player, its media or its frames (the
+	// component was asked to start again before the first one showed): they go first, so no player is left
+	// without its component and no buffer is reused for another size
+	if (mStart != nullptr || mMediaPlayer != nullptr || mMedia != nullptr || mContext != nullptr)
+		releasePlayback();
 
 	if (hasStoryBoard("", true) && mConfig.startDelay > 0)
 		startStoryboard();
@@ -753,8 +1156,8 @@ void VideoVlcComponent::startVideo()
 #else
 	std::string path(mVideoPath);
 #endif
-	// Make sure we have a video path
-	if (mVLC && (path.size() > 0))
+	// Make sure we have a video path, and not one VLC could not read before
+	if (mVLC && (path.size() > 0) && !isUnplayable(mVideoPath) && !waitsAfterTimeout(mVideoPath))
 	{
 		// Set the video that we are going to be playing so we don't attempt to restart it
 		mPlayingVideoPath = mVideoPath;
@@ -779,123 +1182,296 @@ void VideoVlcComponent::startVideo()
 			if (mPlaylist != nullptr && mConfig.startDelay == 0 && !mConfig.showSnapshotDelay && !mConfig.showSnapshotNoVideo)
 				libvlc_media_add_option(mMedia, ":start-time=0.7");			
 
-			bool hasAudioTrack = false;
+			// A video that comes in over its snapshot starts after its fade from black, measured once
+			// (VideoLeadIn): its first frame is lit and the crossfade can start at once. Not measured yet, it
+			// is measured now for the next time, and this time the snapshot waits for the light (checkDisplayed)
+			if (mPlaylist == nullptr && waitsForLight())
+			{
+				int leadIn = VideoLeadIn::find(mVideoPath);
+				if (leadIn > 0)
+				{
+					char option[32];
+					snprintf(option, sizeof(option), ":start-time=%.3f", leadIn / 1000.0f);
+					libvlc_media_add_option(mMedia, option);
+				}
+				else if (leadIn < 0)
+					VideoLeadIn::request(mVideoPath, true);
+			}
 
-			unsigned track_count;
-			// Get the media metadata so we can find the aspect ratio
+			Probe probe;
+			if (findProbe(mVideoPath, probe))
+			{
+				startPlayback(probe);
+				return;
+			}
+
 #ifdef WIN32
 			// It looks like an older version of the library is being used on Windows.
 			libvlc_media_parse(mMedia);
+			mParsing = true;
+			mParseEnd = SDL_GetTicks();
+			checkParse();
 #else
-			libvlc_media_parse_with_options(mMedia, libvlc_media_parse_local, 0);
-			while (libvlc_media_get_parsed_status(mMedia) != libvlc_media_parsed_status_done)
-				std::this_thread::sleep_for(std::chrono::milliseconds(10));
+			// VLC reads the tracks on its own thread, with a time limit: checkParse looks each frame, and a file
+			// VLC cannot read (empty, truncated, not a video) fails, is skipped or times out
+			libvlc_media_parse_with_options(mMedia, libvlc_media_parse_local, PARSE_TIMEOUT_MS);
+			mParsing = true;
+			mParseEnd = SDL_GetTicks() + PARSE_WAIT_MS;
 #endif
-			libvlc_media_track_t** tracks;
-			track_count = libvlc_media_tracks_get(mMedia, &tracks);
-			for (unsigned track = 0; track < track_count; ++track)
-			{
-				if (tracks[track]->i_type == libvlc_track_audio)
-					hasAudioTrack = true;
-				else if (tracks[track]->i_type == libvlc_track_video)
-				{
-					mVideoWidth = tracks[track]->video->i_width;
-					mVideoHeight = tracks[track]->video->i_height;		
-
-					if (hasAudioTrack)
-						break;
-				}
-			}
-			libvlc_media_tracks_release(tracks, track_count);
-
-			if (mVideoWidth == 0 && mVideoHeight == 0 && Utils::FileSystem::isAudio(path))
-			{
-				if (getPlayAudio() && !mScreensaverMode && Settings::getInstance()->getBool("VideoAudio"))
-				{
-					// Make fake dimension to play audio files
-					mVideoWidth = 1;
-					mVideoHeight = 1;
-				}
-			}
-
-			// Make sure we found a valid video track
-			if ((mVideoWidth > 0) && (mVideoHeight > 0))
-			{			
-				if (mVideoWidth > 1 && Settings::getInstance()->getBool("OptimizeVideo"))
-				{
-					// Avoid videos bigger than resolution
-					Vector2f maxSize(Renderer::getScreenWidth(), Renderer::getScreenHeight());
-										
-#ifdef _RPI_
-					// Temporary -> RPI -> Try to limit videos to 400x300 for performance benchmark
-					if (!Renderer::isSmallScreen())
-						maxSize = Vector2f(400, 300);
-#endif
-
-					if (!mTargetSize.empty() && (mTargetSize.x() < maxSize.x() || mTargetSize.y() < maxSize.y()))
-						maxSize = mTargetSize;
-
-					
-
-					// If video is bigger than display, ask VLC for a smaller image
-					auto sz = ImageIO::adjustPictureSize(Vector2i(mVideoWidth, mVideoHeight), Vector2i(maxSize.x(), maxSize.y()), mTargetIsMin);
-					if (sz.x() < mVideoWidth || sz.y() < mVideoHeight)
-					{
-						mVideoWidth = sz.x();
-						mVideoHeight = sz.y();
-					}
-				}
-
-				PowerSaver::pause();
-				setupContext();
-
-				// Setup the media player
-				mMediaPlayer = libvlc_media_player_new_from_media(mMedia);
-			
-				if (hasAudioTrack)
-				{
-					if (!getPlayAudio() || (!mScreensaverMode && !Settings::getInstance()->getBool("VideoAudio")) || (Settings::getInstance()->getBool("ScreenSaverVideoMute") && mScreensaverMode))
-						libvlc_audio_set_mute(mMediaPlayer, 1);
-					else
-						AudioManager::setVideoPlaying(true);
-				}
-
-				libvlc_media_player_play(mMediaPlayer);
-
-				if (mVideoWidth > 1)
-				{
-					libvlc_video_set_callbacks(mMediaPlayer, lock, unlock, display, (void*)&mContext);
-					libvlc_video_set_format(mMediaPlayer, "RGBA", (int)mVideoWidth, (int)mVideoHeight, (int)mVideoWidth * 4);
-				}
-			}
 		}
 	}
 }
 
+static std::map<std::string, std::pair<std::string, VideoVlcComponent::Probe>> sProbes;	// path: size and date, probe
+
+// The file's size and date, so a replaced file is read again
+static std::string fileStamp(const std::string& path)
+{
+	return std::to_string(Utils::FileSystem::getFileSize(path)) + " " + Utils::FileSystem::getFileModificationDate(path).getIsoString();
+}
+
+bool VideoVlcComponent::findProbe(const std::string& path, Probe& probe)
+{
+	auto it = sProbes.find(path);
+	if (it == sProbes.cend() || it->second.first != fileStamp(path))
+	{
+		// read already by the lead-in's measure (its streams): no parse to wait for
+		unsigned int width = 0, height = 0;
+		bool audio = false;
+		if (!VideoLeadIn::findStreams(path, width, height, audio))
+			return false;
+
+		probe.readable = true;
+		probe.width = width;
+		probe.height = height;
+		probe.audio = audio;
+		keepProbe(path, probe);
+		return true;
+	}
+
+	probe = it->second.second;
+	return true;
+}
+
+void VideoVlcComponent::keepProbe(const std::string& path, const Probe& probe)
+{
+	sProbes[path] = std::make_pair(fileStamp(path), probe);
+}
+
+void VideoVlcComponent::checkParse()
+{
+	if (!mParsing || mMedia == nullptr)
+		return;
+
+	libvlc_media_parsed_status_t parsed = libvlc_media_get_parsed_status(mMedia);
+#ifndef WIN32
+	bool answered = parsed == libvlc_media_parsed_status_done || parsed == libvlc_media_parsed_status_failed ||
+		parsed == libvlc_media_parsed_status_timeout || parsed == libvlc_media_parsed_status_skipped;
+
+	if (!answered && (int)(mParseEnd - SDL_GetTicks()) > 0)
+		return;
+#endif
+
+	mParsing = false;
+
+	Probe probe = { false, 0, 0, false };
+#ifndef WIN32
+	// Anything but a parsed file is no video now: the snapshot shows. A file VLC failed on is not tried again
+	// (while it keeps its size), so there is no restart loop; one that timed out waits PARSE_RETRY_MS, and
+	// counts as no video only after PARSE_TIMEOUTS timeouts
+	if (parsed != libvlc_media_parsed_status_done)
+	{
+		bool timedOut = !answered || parsed == libvlc_media_parsed_status_timeout;
+		LOG(LogWarning) << "VideoVlcComponent: cannot read " << mPlayingVideoPath << " (parse status " << (int)parsed << (answered ? "" : ", no answer") << ")";
+
+		if (timedOut)
+		{
+			auto& timeouts = sParseTimeouts[mPlayingVideoPath];
+			timeouts.first++;
+			timeouts.second = SDL_GetTicks() + PARSE_RETRY_MS;
+			if (timeouts.first >= PARSE_TIMEOUTS)
+				markUnplayable(mPlayingVideoPath);
+		}
+		else
+			markUnplayable(mPlayingVideoPath);
+
+		if (answered)
+			releaseOnWorker(mMedia);
+		else
+			stopParseOnWorker(mMedia);
+
+		mMedia = NULL;
+		return;
+	}
+
+	sParseTimeouts.erase(mPlayingVideoPath);
+#endif
+
+	probe.readable = true;
+
+	libvlc_media_track_t** tracks;
+	unsigned track_count = libvlc_media_tracks_get(mMedia, &tracks);
+	for (unsigned track = 0; track < track_count; ++track)
+	{
+		if (tracks[track]->i_type == libvlc_track_audio)
+			probe.audio = true;
+		else if (tracks[track]->i_type == libvlc_track_video && probe.width == 0)
+		{
+			probe.width = tracks[track]->video->i_width;
+			probe.height = tracks[track]->video->i_height;
+		}
+	}
+	libvlc_media_tracks_release(tracks, track_count);
+
+	keepProbe(mPlayingVideoPath, probe);
+	startPlayback(probe);
+}
+
+void VideoVlcComponent::startPlayback(const Probe& probe)
+{
+	std::string path(mPlayingVideoPath);
+	bool hasAudioTrack = probe.audio;
+	mVideoWidth = probe.width;
+	mVideoHeight = probe.height;
+
+	if (mVideoWidth == 0 && mVideoHeight == 0 && Utils::FileSystem::isAudio(path))
+	{
+		if (getPlayAudio() && !mScreensaverMode && Settings::getInstance()->getBool("VideoAudio"))
+		{
+			// Make fake dimension to play audio files
+			mVideoWidth = 1;
+			mVideoHeight = 1;
+		}
+	}
+
+	// Make sure we found a valid video track
+	if ((mVideoWidth > 0) && (mVideoHeight > 0))
+	{
+		if (mVideoWidth > 1 && Settings::getInstance()->getBool("OptimizeVideo"))
+		{
+			// Avoid videos bigger than resolution
+			Vector2f maxSize(Renderer::getScreenWidth(), Renderer::getScreenHeight());
+
+#ifdef _RPI_
+			// Temporary -> RPI -> Try to limit videos to 400x300 for performance benchmark
+			if (!Renderer::isSmallScreen())
+				maxSize = Vector2f(400, 300);
+#endif
+
+			if (!mTargetSize.empty() && (mTargetSize.x() < maxSize.x() || mTargetSize.y() < maxSize.y()))
+				maxSize = mTargetSize;
+
+			// If video is bigger than display, ask VLC for a smaller image
+			auto sz = ImageIO::adjustPictureSize(Vector2i(mVideoWidth, mVideoHeight), Vector2i(maxSize.x(), maxSize.y()), mTargetIsMin);
+			if (sz.x() < mVideoWidth || sz.y() < mVideoHeight)
+			{
+				mVideoWidth = sz.x();
+				mVideoHeight = sz.y();
+			}
+		}
+
+		PowerSaver::pause();
+		setupContext();
+
+		// The player is made on the worker (checkStart takes it): the UI thread does not wait for VLC
+		auto start = std::make_shared<PlayerStart>();
+		libvlc_media_retain(mMedia);
+		start->media = mMedia;
+		start->context = mContext;
+		start->width = mVideoWidth;
+		start->height = mVideoHeight;
+
+		mAudioHeld = false;
+		if (hasAudioTrack)
+		{
+			if (!getPlayAudio() || (!mScreensaverMode && !Settings::getInstance()->getBool("VideoAudio")) || (Settings::getInstance()->getBool("ScreenSaverVideoMute") && mScreensaverMode))
+				start->mute = true;
+			else
+			{
+				AudioManager::setVideoPlaying(true);
+
+				// its sound starts with its picture (checkDisplayed)
+				if (waitsForLight())
+				{
+					start->mute = true;
+					mAudioHeld = true;
+				}
+			}
+		}
+
+		mStart = start;
+		startOnWorker(start);
+	}
+}
+
+void VideoVlcComponent::checkStart()
+{
+	if (mStart == nullptr)
+		return;
+
+	std::unique_lock<std::mutex> lock(mStart->lock);
+	if (!mStart->ready)
+		return;
+
+	mMediaPlayer = mStart->player;
+	lock.unlock();
+	mStart = nullptr;
+}
+
 void VideoVlcComponent::stopVideo()
 {
+	videoShown(this, false);
+
 	mIsPlaying = false;
 	mIsWaitingForVideoToStart = false;
 	mStartDelayed = false;
+	mAudioHeld = false;
 
-	// Release the media player so it stops calling back to us
+	releasePlayback();
+	PowerSaver::resume();
+	AudioManager::setVideoPlaying(false);
+}
+
+// Lets go of what a start made: its parse, its player (being made or made), its media and its frames
+void VideoVlcComponent::releasePlayback()
+{
+	// A parse under way is dropped with the media (on the worker: stopping it waits for VLC's reader)
+	if (mParsing && mMedia)
+	{
+		stopParseOnWorker(mMedia);
+		mMedia = NULL;
+	}
+
+	mParsing = false;
+
+	// A player still being made is stopped by the worker when it is; one made is taken to stop it too
+	if (mStart != nullptr)
+	{
+		std::unique_lock<std::mutex> lock(mStart->lock);
+		if (mStart->ready)
+			mMediaPlayer = mStart->player;
+		else
+			mStart->cancelled = true;
+
+		lock.unlock();
+		mStart = nullptr;
+	}
+
+	// The worker stops and releases the player (it waits for VLC's threads); the frames' buffers go with it
 	if (mMediaPlayer)
 	{
-		libvlc_media_player_stop(mMediaPlayer);
-		libvlc_media_player_release(mMediaPlayer);
+		stopOnWorker(mMediaPlayer, mContext);
 		mMediaPlayer = NULL;
 	}
 
 	// Release the media
 	if (mMedia)
 	{
-		libvlc_media_release(mMedia); 
+		releaseOnWorker(mMedia);
 		mMedia = NULL;
-	}		
-		
+	}
+
 	freeContext();
-	PowerSaver::resume();	
-	AudioManager::setVideoPlaying(false);
 }
 
 void VideoVlcComponent::applyTheme(const std::shared_ptr<ThemeData>& theme, const std::string& view, const std::string& element, unsigned int properties)
@@ -955,7 +1531,8 @@ void VideoVlcComponent::update(int deltaTime)
 	if (mConfig.showSnapshotNoVideo || mConfig.showSnapshotDelay)
 		mStaticImage.update(deltaTime);
 
-	VideoComponent::update(deltaTime);	
+	checkDisplayed();
+	VideoComponent::update(deltaTime);
 }
 
 void VideoVlcComponent::onShow()
@@ -1033,6 +1610,7 @@ void VideoVlcComponent::pauseVideo()
 	mIsPlaying = false;
 	mIsWaitingForVideoToStart = false;
 	mStartDelayed = false;
+	videoShown(this, false);
 
 	if (mMediaPlayer == NULL)
 		stopVideo();
@@ -1058,6 +1636,7 @@ void VideoVlcComponent::resumeVideo()
 
 	mIsPlaying = true;
 	libvlc_media_player_play(mMediaPlayer);
+	releaseHeldAudio();
 	PowerSaver::pause();
 	AudioManager::setVideoPlaying(true);
 }

@@ -14,7 +14,7 @@ auto array_deleter = [](unsigned char* p) { delete[] p; };
 
 std::shared_ptr<ResourceManager> ResourceManager::sInstance = nullptr;
 
-ResourceManager::ResourceManager()
+ResourceManager::ResourceManager() : mAddedSincePrune(0)
 {
 }
 
@@ -224,6 +224,14 @@ void ResourceManager::reloadAll()
 
 void ResourceManager::addReloadable(std::weak_ptr<IReloadable> reloadable)
 {
+	// Released textures stay listed until the next unload or reload (a game launch); a view that keeps making
+	// new ones (a slideshow) would grow the list for as long as it shows, so drop them every 64 additions
+	if (++mAddedSincePrune >= 64)
+	{
+		mAddedSincePrune = 0;
+		mReloadables.remove_if([](const std::shared_ptr<ReloadableInfo>& info) { return info->data.expired(); });
+	}
+
 	std::shared_ptr<ReloadableInfo> info = std::make_shared<ReloadableInfo>();
 	info->data = reloadable;
 	info->reload = false;

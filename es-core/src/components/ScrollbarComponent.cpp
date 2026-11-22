@@ -96,7 +96,7 @@ void ScrollbarComponent::update(int deltaTime)
 
 void ScrollbarComponent::render(const Transform4x4f& parentTrans)
 {
-	if (!mEnabled || !mVisible || mMin == mMax || mColor == 0)
+	if (!mEnabled || (!mVisible && !hasTrack()) || mMin == mMax || mColor == 0)
 		return;
 
 	if (mPage >= mMax)
@@ -116,19 +116,28 @@ void ScrollbarComponent::render(const Transform4x4f& parentTrans)
 
 
 	int reference = mVertical ? getSize().y() : getSize().x();
-	int thumbHeight = (reference * mPage) / (mMax + 1);
+	// Legacy lists use inclusive pixel ranges. Grids with a track supply row extents.
+	const float extent = mMax - mMin + (hasTrack() ? 0.0f : 1.0f);
+	if (reference <= 0 || extent <= mPage)
+		return;
+	if (hasTrack())
+	{
+		Renderer::drawRect(0, 0, mSize.x(), mSize.y(), mTrackColor);
+		minHeight = std::max(minHeight, int(3 * (mVertical ? mSize.x() : mSize.y())));
+	}
+	int thumbHeight = (reference * mPage) / extent;
 	if (thumbHeight < minHeight)
 		thumbHeight = minHeight;
 
 	float radius = (mVertical ? mSize.x() : mSize.y()) * mCornerSize;
 	
-	float top = 0;	
-	if (((mMax - mPage) + 1) > 0)
-		top = ((reference - thumbHeight) * mPosition) / ((mMax - mPage) + 1);
+	thumbHeight = std::min(reference, thumbHeight);
+	const float progress = Math::clamp(0.0f, 1.0f, (mPosition - mMin) / (extent - mPage));
+	float top = (reference - thumbHeight) * progress;
 	
 	int bottom = Math::min( mVertical ? getSize().y() : getSize().x(), top + thumbHeight);
 
-	float opacity = mFadeOutTime == 0 ? 1.0 : (float)mFadeOutTime / (float)FADEOUT_TIME;
+	float opacity = hasTrack() || mFadeOutTime == 0 ? 1.0 : (float)mFadeOutTime / (float)FADEOUT_TIME;
 	
 	const unsigned int color = (mColor & 0xFFFFFF00) | (unsigned char)((mColor & 0xFF) * opacity);
 
@@ -152,10 +161,14 @@ void ScrollbarComponent::render(const Transform4x4f& parentTrans)
 
 void ScrollbarComponent::fromTheme(const std::shared_ptr<ThemeData>& theme, const std::string& view, const std::string& element, const std::string& containerType)
 {
+	mTrackColor = 0;
 	const ThemeData::ThemeElement* elem = theme->getElement(view, element, containerType);
 	if (!elem)
 		return;
 	
+	if (elem->has("scrollbarTrackColor"))
+		mTrackColor = elem->get<unsigned int>("scrollbarTrackColor");
+
 	if (elem->has("scrollbarColor"))
 	{
 		mEnabled = true;
@@ -184,7 +197,8 @@ void ScrollbarComponent::fromTheme(const std::shared_ptr<ThemeData>& theme, cons
 }
 
 void ScrollbarComponent::loadFromMenuTheme()
-{ 
+{
+	mTrackColor = 0;
 	auto theme = ThemeData::getMenuTheme();
 	if (theme == nullptr || theme->Background.scrollbarColor == 0)
 	{

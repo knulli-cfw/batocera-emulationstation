@@ -83,6 +83,7 @@ protected:
 
 	const ScrollTierList& mTierList;
 	const ListLoopType mLoopType;
+	bool mWrapSingleSteps = false;
 
 	std::vector<Entry> mEntries;
 	
@@ -263,8 +264,9 @@ protected:
 	}
 
 
-	bool listInput(int velocity) // a velocity of 0 = stop scrolling
+	bool listInput(int velocity, bool wrapSingleSteps = false) // a velocity of 0 = stop scrolling
 	{
+		mWrapSingleSteps = wrapSingleSteps;
 		PowerSaver::lock(velocity == 0);
 
 		bool sendCursorChanged = false;
@@ -383,8 +385,8 @@ protected:
 		// stop at the end if we've been holding down the button for a long time or
 		// we're scrolling faster than one item at a time (e.g. page up/down)
 		// otherwise, loop around
-		if((mLoopType == LIST_PAUSE_AT_END && (mScrollTier > 0 || absAmt > 1)) ||
-			mLoopType == LIST_NEVER_LOOP)
+		if (!(mWrapSingleSteps && absAmt == 1) &&
+			((mLoopType == LIST_PAUSE_AT_END && (mScrollTier > 0 || absAmt > 1)) || mLoopType == LIST_NEVER_LOOP))
 		{
 			if(cursor < 0)
 			{

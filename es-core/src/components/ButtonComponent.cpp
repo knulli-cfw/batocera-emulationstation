@@ -82,6 +82,36 @@ void ButtonComponent::setText(const std::string& text, const std::string& helpTe
 	updateHelpPrompts();
 }
 
+void ButtonComponent::setImages(const std::string& path, const std::string& focusedPath, const std::string& activePath, const Vector2f& cornerSize)
+{
+	mImagePath = path;
+	mFocusedImagePath = focusedPath;
+	mActiveImagePath = activePath;
+	mBox.setCornerSize(cornerSize);
+	updateImage();
+	onSizeChanged();
+}
+
+void ButtonComponent::setFont(const std::shared_ptr<Font>& font)
+{
+	if (font == nullptr || font == mFont)
+		return;
+
+	auto size = mSize;
+	mFont = font;
+	setText(mText, mHelpText, false);
+	setSize(size);
+}
+
+void ButtonComponent::setTextColors(unsigned int color, unsigned int focusedColor)
+{
+	mTextColorUnfocused = color;
+	mTextColorFocused = focusedColor;
+
+	if (mTextCache)
+		mTextCache->setColor(getCurTextColor());
+}
+
 void ButtonComponent::onFocusGained()
 {
 	if (mFocused)
@@ -118,6 +148,16 @@ void ButtonComponent::updateImage()
 		return;
 	}
 
+	if (!mImagePath.empty())
+	{
+		bool active = mNewColor && !mActiveImagePath.empty();
+		unsigned int color = (mNewColor && !active) ? mModdedColor : Utils::HtmlColor::applyColorOpacity(0xFFFFFFFF, getOpacity());
+		mBox.setImagePath(active ? mActiveImagePath : (mFocused ? mFocusedImagePath : mImagePath));
+		mBox.setCenterColor(color);
+		mBox.setEdgeColor(color);
+		return;
+	}
+
 	if (mNewColor)
 	{
 		mBox.setImagePath(ThemeData::getMenuTheme()->Button.filledPath);
@@ -135,7 +175,7 @@ void ButtonComponent::render(const Transform4x4f& parentTrans)
 {
 	Transform4x4f trans = parentTrans * getTransform();
 
-	if (mRenderNonFocusedBackground || mFocused)
+	if (mRenderNonFocusedBackground || mFocused || !mImagePath.empty())
 		mBox.render(trans);
 	else
 	{

@@ -13,7 +13,11 @@
 #include "utils/StringUtil.h"
 
 #include <SDL.h>
+#include <atomic>
+#include <mutex>
+#include <set>
 #include <stack>
+#include <thread>
 
 #if WIN32
 #include <Windows.h>
@@ -410,8 +414,24 @@ namespace Renderer
 	}
 
 
+	// GL and the frame cache live on the thread that made the window. A texture freed on another thread (the
+	// last reference to an image dropped by a loader) waits for it.
+	// Written at each window's start, read by loader threads freeing a texture
+	static std::atomic<std::thread::id> renderThread;
+	static std::mutex                pendingLock;
+	static std::vector<unsigned int> pendingTextures;
+
+	static void destroyPendingTextures();
+
 	bool init()
 	{
+		renderThread.store(std::this_thread::get_id());
+		{
+			// The textures of an earlier window went with its context
+			std::unique_lock<std::mutex> lock(pendingLock);
+			pendingTextures.clear();
+		}
+
 		if (!createWindow())
 			return false;
 
@@ -422,6 +442,7 @@ namespace Renderer
 
 	void deinit()
 	{
+		destroyPendingTextures();
 		destroyWindow();
 
 	} // deinit
@@ -822,6 +843,307 @@ namespace Renderer
 	}
 
 	//////////////////////////////////////////////////////////////////////////
+	// A frame drawn only when it changes (beginFrame, endFrame): its drawing is kept as commands, and
+	// sent and shown only when they differ from the frame on screen or use a texture that changed since.
+	// Texture changes always run at once; the commands kept before one are sent first, so the order of
+	// the drawing never changes, and the frame is then shown whatever it holds.
+
+	namespace FrameCache
+	{
+		struct Command
+		{
+			enum Type { BIND, LINES, STRIPS, FAN, SOLID, MATRIX, PROJECTION, VIEWPORT, SCISSOR, STENCIL, NO_STENCIL, READ_BACK };
+
+			Type          type;
+			unsigned int  texture;		// BIND
+			Blend::Factor src, dst;		// LINES, STRIPS, FAN
+			size_t        first, count;	// LINES, STRIPS, FAN, STENCIL: Frame::vertices
+			float         values[16];	// MATRIX, PROJECTION; SOLID: x y w h borderWidth cornerRadius
+			unsigned int  colors[2];	// SOLID
+			Rect          rect;			// VIEWPORT, SCISSOR
+			std::string   shader;		// READ_BACK: what it ran (it ran at once)
+		};
+
+		// The state a frame starts in: its first commands may rely on it
+		struct State
+		{
+			unsigned int texture;
+			float        matrix[16];
+			bool         hasMatrix;
+		};
+
+		struct Frame
+		{
+			State                start;
+			std::vector<Command> commands;
+			std::vector<Vertex>  vertices;
+		};
+
+		static bool                   recording = false;
+		static size_t                 sent = 0;			// commands of the frame already sent
+		static bool                   mustShow = false;	// part of it was sent, or it cannot be compared
+		static bool                   shownValid = false;
+		static unsigned int           shownAt = 0;		// SDL ticks
+		// The frame on screen is drawn again at least this often, in case something else changed the screen
+		// (a display that lost its contents)
+		static const unsigned int     REFRESH_MS = 1000;
+		static Frame                  frame, shown;
+		static std::set<unsigned int> changedTextures;		// created, updated or deleted since the shown frame
+		static State                  state = { 0, { 0 }, false };
+
+		static void copyMatrix(float* out, const Transform4x4f& matrix)
+		{
+			memcpy(out, &matrix, sizeof(float) * 16);
+		}
+
+		static bool sameVertex(const Vertex& a, const Vertex& b)
+		{
+			return memcmp(&a.pos, &b.pos, sizeof(Vector2f)) == 0 && memcmp(&a.tex, &b.tex, sizeof(Vector2f)) == 0 && a.col == b.col &&
+				memcmp(&a.saturation, &b.saturation, sizeof(float)) == 0 && memcmp(&a.cornerRadius, &b.cornerRadius, sizeof(float)) == 0;
+		}
+
+		static bool sameCommand(const Command& a, const Frame& fa, const Command& b, const Frame& fb)
+		{
+			if (a.type != b.type)
+				return false;
+
+			switch (a.type)
+			{
+			case Command::BIND:
+				return a.texture == b.texture;
+
+			case Command::LINES:
+			case Command::STRIPS:
+			case Command::FAN:
+			case Command::STENCIL:
+				if (a.count != b.count || a.src != b.src || a.dst != b.dst)
+					return false;
+
+				for (size_t i = 0; i < a.count; i++)
+					if (!sameVertex(fa.vertices[a.first + i], fb.vertices[b.first + i]))
+						return false;
+
+				return true;
+
+			case Command::MATRIX:
+			case Command::PROJECTION:
+				return memcmp(a.values, b.values, sizeof(float) * 16) == 0;
+
+			case Command::SOLID:
+				return memcmp(a.values, b.values, sizeof(float) * 6) == 0 && a.colors[0] == b.colors[0] && a.colors[1] == b.colors[1];
+
+			case Command::VIEWPORT:
+			case Command::SCISSOR:
+				return a.rect.x == b.rect.x && a.rect.y == b.rect.y && a.rect.w == b.rect.w && a.rect.h == b.rect.h;
+
+			case Command::NO_STENCIL:
+				return true;
+
+			case Command::READ_BACK:
+				return false;
+			}
+
+			return false;
+		}
+
+		static bool sameAsShown()
+		{
+			if (!shownValid || frame.commands.size() != shown.commands.size())
+				return false;
+
+			if (frame.start.texture != shown.start.texture || frame.start.hasMatrix != shown.start.hasMatrix ||
+				memcmp(frame.start.matrix, shown.start.matrix, sizeof(float) * 16) != 0)
+				return false;
+
+			for (size_t i = 0; i < frame.commands.size(); i++)
+				if (!sameCommand(frame.commands[i], frame, shown.commands[i], shown))
+					return false;
+
+			return true;
+		}
+
+		static bool usesChangedTexture()
+		{
+			if (changedTextures.empty())
+				return false;
+
+			if (changedTextures.find(frame.start.texture) != changedTextures.cend())
+				return true;
+
+			for (auto& command : frame.commands)
+				if (command.type == Command::BIND && changedTextures.find(command.texture) != changedTextures.cend())
+					return true;
+
+			return false;
+		}
+
+		static Command& add(Command::Type type)
+		{
+			frame.commands.push_back(Command());
+			Command& command = frame.commands.back();
+			command.type = type;
+			command.texture = 0;
+			command.src = Blend::SRC_ALPHA;
+			command.dst = Blend::ONE_MINUS_SRC_ALPHA;
+			command.first = 0;
+			command.count = 0;
+			return command;
+		}
+
+		static void addVertices(Command& command, const Vertex* vertices, unsigned int count)
+		{
+			command.first = frame.vertices.size();
+			command.count = count;
+			frame.vertices.insert(frame.vertices.end(), vertices, vertices + count);
+
+			// A custom shader is given the frame's number: the same commands do not draw the same frame
+			for (unsigned int i = 0; i < count; i++)
+				if (vertices[i].customShader != nullptr)
+					mustShow = true;
+		}
+
+		// Sends the commands not sent yet, in order
+		static void send()
+		{
+			for (; sent < frame.commands.size(); sent++)
+			{
+				const Command& c = frame.commands[sent];
+				const Vertex* vertices = c.count ? &frame.vertices[c.first] : nullptr;
+
+				switch (c.type)
+				{
+				case Command::BIND:       Instance()->bindTexture(c.texture); break;
+				case Command::LINES:      Instance()->drawLines(vertices, c.count, c.src, c.dst); break;
+				case Command::STRIPS:     Instance()->drawTriangleStrips(vertices, c.count, c.src, c.dst, true); break;
+				case Command::FAN:        Instance()->drawTriangleFan(vertices, c.count, c.src, c.dst); break;
+				case Command::SOLID:      Instance()->drawSolidRectangle(c.values[0], c.values[1], c.values[2], c.values[3], c.colors[0], c.colors[1], c.values[4], c.values[5]); break;
+				case Command::MATRIX:     Instance()->setMatrix(*(const Transform4x4f*)c.values); break;
+				case Command::PROJECTION: Instance()->setProjection(*(const Transform4x4f*)c.values); break;
+				case Command::VIEWPORT:   Instance()->setViewport(c.rect); break;
+				case Command::SCISSOR:    Instance()->setScissor(c.rect); break;
+				case Command::STENCIL:    Instance()->setStencil(vertices, c.count); break;
+				case Command::NO_STENCIL: Instance()->disableStencil(); break;
+				case Command::READ_BACK:  break;
+				}
+			}
+		}
+
+		// Before anything that must run at once: what was kept is sent, and the frame will be shown
+		static void sendNow()
+		{
+			if (!recording)
+				return;
+
+			send();
+			mustShow = true;
+		}
+
+		static void textureChanged(unsigned int texture)
+		{
+			sendNow();
+			changedTextures.insert(texture);
+		}
+
+		// The check of the cache (Settings "RenderOnChangeVerify", for tests): every frame is drawn and read
+		// back, and a frame the cache would have left out must have the pixels of the frame before it
+		static bool                       verify = false;
+		static std::vector<unsigned char> lastPixels, pixels;
+		static int                        judgedSame = 0, differed = 0, drawnSame = 0, checked = 0;
+
+		static void verifyFrame(bool same)
+		{
+			int w = getWindowWidth(), h = getWindowHeight();
+			pixels.resize((size_t)w * h * 4);
+			if (!Instance()->readPixels(0, 0, w, h, pixels.data()))
+				return;
+
+			if (lastPixels.size() == pixels.size())
+			{
+				size_t changed = 0;
+				for (size_t i = 0; i < pixels.size(); i += 4)
+					if (memcmp(&pixels[i], &lastPixels[i], 4) != 0)
+						changed++;
+
+				if (same)
+					judgedSame++;
+				else if (changed == 0)
+					drawnSame++;
+
+				if (same && changed > 0)
+				{
+					differed++;
+					LOG(LogError) << "RenderOnChangeVerify: a frame left out would have changed " << changed << " pixels";
+				}
+			}
+
+			std::swap(pixels, lastPixels);
+
+			if (++checked % 300 == 0)
+				LOG(LogInfo) << "RenderOnChangeVerify: " << checked << " frames, " << judgedSame << " left out, " << differed << " of them changed; " << drawnSame << " drawn the same as the one before";
+		}
+	}
+
+	static void destroyPendingTextures()
+	{
+		std::vector<unsigned int> textures;
+		{
+			std::unique_lock<std::mutex> lock(pendingLock);
+			textures.swap(pendingTextures);
+		}
+
+		for (auto texture : textures)
+		{
+			FrameCache::textureChanged(texture);
+			Instance()->destroyTexture(texture);
+		}
+	}
+
+	void beginFrame()
+	{
+		using namespace FrameCache;
+
+		destroyPendingTextures();
+
+		frame.commands.clear();
+		frame.vertices.clear();
+		frame.start = state;
+		sent = 0;
+		mustShow = false;
+		recording = true;
+		verify = Settings::getInstance()->getBool("RenderOnChangeVerify");
+	}
+
+	bool endFrame()
+	{
+		using namespace FrameCache;
+
+		if (!recording)
+			return false;
+
+		recording = false;
+
+		bool same = !mustShow && SDL_GetTicks() - shownAt < REFRESH_MS && sameAsShown() && !usesChangedTexture();
+		if (same && !verify)
+			return false;
+
+		send();
+
+		if (verify)
+			verifyFrame(same);
+
+		swapBuffers();
+		std::swap(frame, shown);
+		shownValid = true;
+		shownAt = SDL_GetTicks();
+		return true;
+	}
+
+	void invalidateFrame()
+	{
+		FrameCache::shownValid = false;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
 	std::string getDriverName()
 	{
 		return Instance()->getDriverName();
@@ -859,42 +1181,95 @@ namespace Renderer
 
 	unsigned int createTexture(const Texture::Type _type, const bool _linear, const bool _repeat, const unsigned int _width, const unsigned int _height, void* _data)
 	{
-		return Instance()->createTexture(_type, _linear, _repeat, _width, _height, _data);
+		FrameCache::sendNow();
+
+		unsigned int texture = Instance()->createTexture(_type, _linear, _repeat, _width, _height, _data);
+		FrameCache::changedTextures.insert(texture);
+		FrameCache::state.texture = texture;	// left bound
+		return texture;
 	}
 
 	void  destroyTexture(const unsigned int _texture)
 	{
+		if (std::this_thread::get_id() != renderThread.load())
+		{
+			std::unique_lock<std::mutex> lock(pendingLock);
+			pendingTextures.push_back(_texture);
+			return;
+		}
+
+		FrameCache::textureChanged(_texture);
 		Instance()->destroyTexture(_texture);
 	}
 
 	void updateTexture(const unsigned int _texture, const Texture::Type _type, const unsigned int _x, const unsigned _y, const unsigned int _width, const unsigned int _height, void* _data)
 	{
+		FrameCache::textureChanged(_texture);
 		Instance()->updateTexture(_texture, _type, _x, _y, _width, _height, _data);
+		FrameCache::state.texture = 0;	// left unbound
 	}
 
 	void bindTexture(const unsigned int _texture)
 	{
-		Instance()->bindTexture(_texture);
+		FrameCache::state.texture = _texture;
+
+		if (FrameCache::recording)
+			FrameCache::add(FrameCache::Command::BIND).texture = _texture;
+		else
+			Instance()->bindTexture(_texture);
 	}
 
 	void drawLines(const Vertex* _vertices, const unsigned int _numVertices, const Blend::Factor _srcBlendFactor, const Blend::Factor _dstBlendFactor)
 	{
-		Instance()->drawLines(_vertices, _numVertices, _srcBlendFactor, _dstBlendFactor);
+		if (FrameCache::recording)
+		{
+			auto& command = FrameCache::add(FrameCache::Command::LINES);
+			command.src = _srcBlendFactor;
+			command.dst = _dstBlendFactor;
+			FrameCache::addVertices(command, _vertices, _numVertices);
+		}
+		else
+			Instance()->drawLines(_vertices, _numVertices, _srcBlendFactor, _dstBlendFactor);
 	}
 
 	void drawTriangleStrips(const Vertex* _vertices, const unsigned int _numVertices, const Blend::Factor _srcBlendFactor, const Blend::Factor _dstBlendFactor, bool verticesChanged)
 	{
-		Instance()->drawTriangleStrips(_vertices, _numVertices, _srcBlendFactor, _dstBlendFactor, verticesChanged);
+		if (FrameCache::recording)
+		{
+			auto& command = FrameCache::add(FrameCache::Command::STRIPS);
+			command.src = _srcBlendFactor;
+			command.dst = _dstBlendFactor;
+			FrameCache::addVertices(command, _vertices, _numVertices);
+		}
+		else
+			Instance()->drawTriangleStrips(_vertices, _numVertices, _srcBlendFactor, _dstBlendFactor, verticesChanged);
 	}
 
 	void drawSolidRectangle(const float _x, const float _y, const float _w, const float _h, const unsigned int _fillColor, const unsigned int _borderColor, float borderWidth, float cornerRadius)
 	{
-		Instance()->drawSolidRectangle(_x, _y, _w, _h, _fillColor, _borderColor, borderWidth, cornerRadius);
+		if (FrameCache::recording)
+		{
+			auto& command = FrameCache::add(FrameCache::Command::SOLID);
+			float values[6] = { _x, _y, _w, _h, borderWidth, cornerRadius };
+			memcpy(command.values, values, sizeof(values));
+			command.colors[0] = _fillColor;
+			command.colors[1] = _borderColor;
+		}
+		else
+			Instance()->drawSolidRectangle(_x, _y, _w, _h, _fillColor, _borderColor, borderWidth, cornerRadius);
 	}
 
 	void drawTriangleFan(const Vertex* _vertices, const unsigned int _numVertices, const Blend::Factor _srcBlendFactor, const Blend::Factor _dstBlendFactor)
 	{
-		Instance()->drawTriangleFan(_vertices, _numVertices, _srcBlendFactor, _dstBlendFactor);
+		if (FrameCache::recording)
+		{
+			auto& command = FrameCache::add(FrameCache::Command::FAN);
+			command.src = _srcBlendFactor;
+			command.dst = _dstBlendFactor;
+			FrameCache::addVertices(command, _vertices, _numVertices);
+		}
+		else
+			Instance()->drawTriangleFan(_vertices, _numVertices, _srcBlendFactor, _dstBlendFactor);
 	}
 
 	bool shaderSupportsCornerSize(const std::string& shader)
@@ -909,23 +1284,40 @@ namespace Renderer
 
 	void setProjection(const Transform4x4f& _projection)
 	{
-		Instance()->setProjection(_projection);
+		if (FrameCache::recording)
+			FrameCache::copyMatrix(FrameCache::add(FrameCache::Command::PROJECTION).values, _projection);
+		else
+			Instance()->setProjection(_projection);
 	}
 
 	void setMatrix(const Transform4x4f& _matrix)
 	{
-		Instance()->setMatrix(_matrix);
+		FrameCache::copyMatrix(FrameCache::state.matrix, _matrix);
+		FrameCache::state.hasMatrix = true;
+
+		if (FrameCache::recording)
+			FrameCache::copyMatrix(FrameCache::add(FrameCache::Command::MATRIX).values, _matrix);
+		else
+			Instance()->setMatrix(_matrix);
 	}
 
 	void blurBehind(const float _x, const float _y, const float _w, const float _h, const float blurSize)
 	{
 		std::map<std::string, std::string> map;
 		map["blur"] = std::to_string(blurSize);
-		Instance()->postProcessShader(":/shaders/blur.glsl", _x, _y, _w, _h, map);		
+		postProcessShader(":/shaders/blur.glsl", _x, _y, _w, _h, map);
 	}
 
 	void postProcessShader(const std::string& path, const float _x, const float _y, const float _w, const float _h, const std::map<std::string, std::string>& parameters, unsigned int* data)
 	{
+		// It reads back what is drawn: it runs at once, after what was kept
+		if (FrameCache::recording)
+		{
+			FrameCache::sendNow();
+			FrameCache::add(FrameCache::Command::READ_BACK).shader = path;
+			FrameCache::sent = FrameCache::frame.commands.size();
+		}
+
 		Instance()->postProcessShader(path, _x, _y, _w, _h, parameters, data);
 	}
 
@@ -937,22 +1329,35 @@ namespace Renderer
 	void setViewport(const Rect& _viewport)
 	{
 		viewPort = _viewport;
-		Instance()->setViewport(_viewport);
+
+		if (FrameCache::recording)
+			FrameCache::add(FrameCache::Command::VIEWPORT).rect = _viewport;
+		else
+			Instance()->setViewport(_viewport);
 	}
 
 	void setScissor(const Rect& _scissor)
 	{
-		Instance()->setScissor(_scissor);
+		if (FrameCache::recording)
+			FrameCache::add(FrameCache::Command::SCISSOR).rect = _scissor;
+		else
+			Instance()->setScissor(_scissor);
 	}
 
 	void setStencil(const Vertex* _vertices, const unsigned int _numVertices)
 	{
-		Instance()->setStencil(_vertices, _numVertices);
+		if (FrameCache::recording)
+			FrameCache::addVertices(FrameCache::add(FrameCache::Command::STENCIL), _vertices, _numVertices);
+		else
+			Instance()->setStencil(_vertices, _numVertices);
 	}
 
 	void disableStencil()
 	{
-		Instance()->disableStencil();
+		if (FrameCache::recording)
+			FrameCache::add(FrameCache::Command::NO_STENCIL);
+		else
+			Instance()->disableStencil();
 	}
 
 	void setSwapInterval()
@@ -962,6 +1367,22 @@ namespace Renderer
 
 	void swapBuffers() 
 	{
+		// A swap inside a frame (a splash screen): what was kept is shown with it, and the frame after it
+		if (FrameCache::recording)
+		{
+			FrameCache::sendNow();
+			FrameCache::add(FrameCache::Command::READ_BACK).shader = "swap";
+			FrameCache::sent = FrameCache::frame.commands.size();
+		}
+		else
+		{
+			destroyPendingTextures();
+
+			// What is on screen now: the textures it uses are as they are
+			FrameCache::shownValid = false;
+			FrameCache::changedTextures.clear();
+		}
+
 		currentFrame++;
 		Instance()->swapBuffers();
 	}

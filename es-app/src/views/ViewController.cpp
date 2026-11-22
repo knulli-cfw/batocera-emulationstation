@@ -28,6 +28,7 @@
 #include "guis/GuiMsgBox.h"
 #include "utils/ThreadPool.h"
 #include <SDL_timer.h>
+#include <algorithm>
 #include "TextToSpeech.h"
 #include "VolumeControl.h"
 
@@ -161,6 +162,7 @@ void ViewController::goToSystemView(std::string& systemName, bool forceImmediate
 
 void ViewController::goToSystemView(SystemData* system, bool forceImmediate)
 {
+	mCycleFrom.reset();
 	SystemData* dest = system;
 
 	int systemId = getSystemId(dest);
@@ -172,8 +174,13 @@ void ViewController::goToSystemView(SystemData* system, bool forceImmediate)
 			dest = bundle;
 	}
 
+	// Columns: back from a game list, the home slides in again beside it
+	std::shared_ptr<IGameListView> columnList;
+	if (!forceImmediate && mState.viewing == GAME_LIST)
+		columnList = std::dynamic_pointer_cast<IGameListView>(mCurrentView);
+
 	// Tell any current view it's about to be hidden
-	if (mCurrentView)
+	if (mCurrentView && columnList == nullptr)
 		mCurrentView->onHide();
 
 	// Realign system view
@@ -196,6 +203,14 @@ void ViewController::goToSystemView(SystemData* system, bool forceImmediate)
 	Scripting::fireEvent("system-selected", dest->getName());
 
 	systemList->goToSystem(dest, false);
+
+	if (columnList != nullptr)
+	{
+		if (startColumnSlide(columnList, false))
+			return;
+
+		mCurrentView->onHide();
+	}
 
 	mCurrentView = systemList;
 
@@ -230,11 +245,36 @@ bool ViewController::goToGameList(const std::string& systemName, bool forceImmed
 	return false;
 }
 
+// Both lists stay in screen coordinates, including on category boundaries and wraparound.
+void ViewController::cycleGameList(SystemData* system, int direction)
+{
+	if (!system || mState.viewing != GAME_LIST || mState.system == system)
+		return;
+	if (mColumnSlide.list)
+	{
+		getSystemListView()->setColumnFade(1);
+		mColumnSlide.list->setColumnFade(1);
+		mColumnSlide.list.reset();
+	}
+	auto previous = getGameListView(mState.system, false);
+	goToGameList(system, true);
+	cancelAnimation(0);
+	mFadeOpacity = 0;
+	mCamera.translation() = -mCurrentView->getPosition();
+	if (Settings::PowerSaverMode() != "instant")
+	{
+		mCycleFrom = previous;
+		mCycleElapsed = 0;
+		mCycleDirection = direction;
+	}
+}
+
 void ViewController::goToGameList(SystemData* system, bool forceImmediate)
 {
 	if (system == nullptr)
 		return;
 
+	mCycleFrom.reset();
 	SystemData* destinationSystem = system;
 	FolderData* collectionFolder = nullptr;
 
@@ -255,8 +295,14 @@ void ViewController::goToGameList(SystemData* system, bool forceImmediate)
 		}
 	}
 
+	// Direct boot into a column list needs the same tab destinations as entry from Home.
+	if (!mSystemListView && destinationSystem->getTheme() &&
+	    !destinationSystem->getTheme()->getVariable("esColumnPan").empty())
+		getSystemListView();
+
 	std::shared_ptr<IGameListView> view = getGameListView(destinationSystem);
 
+	bool fromHome = mState.viewing == SYSTEM_SELECT;
 
 	if (mState.viewing == SYSTEM_SELECT)
 	{
@@ -330,6 +376,10 @@ void ViewController::goToGameList(SystemData* system, bool forceImmediate)
 
 	mDeferPlayViewTransitionTo = nullptr;
 
+	// Columns: the game list slides in beside the home's grid
+	if (!forceImmediate && fromHome && startColumnSlide(view, true))
+		return;
+
 	if (forceImmediate || Settings::TransitionStyle() == "fade")
 	{
 		if (mCurrentView)
@@ -342,6 +392,105 @@ void ViewController::goToGameList(SystemData* system, bool forceImmediate)
 	{
 		cancelAnimation(0);
 		mDeferPlayViewTransitionTo = view;
+	}
+}
+
+// Columns (ColumnLayout): the home at level 2 and a game list side by side slide by the layout's width, eased
+// out (moving in the frame after the press); the header and the shared column crossfade (the leaving view's
+// over the first 35 % of the way, the coming one's from 30 to 70 %), as the theme's design does
+static const int COLUMN_SLIDE_MS = 360;
+
+// (Math::clamp takes its bounds first in its definition, not as declared: not used here)
+static float smoothStep(float a, float b, float t)
+{
+	float x = std::max(0.0f, std::min(1.0f, (t - a) / (b - a)));
+	return x * x * (3.0f - 2.0f * x);
+}
+
+bool ViewController::startColumnSlide(std::shared_ptr<IGameListView> list, bool toList)
+{
+	auto home = getSystemListView();
+	if (list == nullptr || home == nullptr || !home->hasColumns() || !home->getColumnLayout().hasSlide() || Settings::PowerSaverMode() == "instant")
+		return false;
+
+	// A slide turned back halfway goes back from where it is
+	float p = mColumnSlide.list == list ? mColumnSlide.p : (toList ? 0.0f : 1.0f);
+	if (mColumnSlide.list != nullptr && mColumnSlide.list != list)
+	{
+		home->setColumnFade(1.0f);
+		mColumnSlide.list->setColumnFade(1.0f);
+	}
+
+	home->setColumnLevel(2, false);
+
+	cancelAnimation(0);
+	mDeferPlayViewTransitionTo = nullptr;
+
+	mColumnSlide.list = list;
+	mColumnSlide.from = p;
+	mColumnSlide.to = toList ? 1.0f : 0.0f;
+	mColumnSlide.p = p;
+	mColumnSlide.time = 0;
+	mColumnSlide.pending = true;
+
+	if (mCurrentView)
+		mCurrentView->onHide();
+
+	if (toList)
+		mCurrentView = list;
+	else
+		mCurrentView = home;
+
+	mCurrentView->onShow();
+
+	// The camera already shows the destination; the slide draws both views until it ends
+	mCamera.translation() = -mCurrentView->getPosition();
+
+	applyColumnFades(0);
+	updateHelpPrompts();
+	return true;
+}
+
+void ViewController::updateColumnSlide(int deltaTime)
+{
+	if (mColumnSlide.list == nullptr)
+		return;
+
+	// The first step waits for the frame after the one that made the view
+	if (mColumnSlide.pending)
+		mColumnSlide.pending = false;
+	else
+		mColumnSlide.time += deltaTime;
+
+	float t = Math::min(1.0f, (float)mColumnSlide.time / (float)COLUMN_SLIDE_MS);
+	float e = Math::easeOutCubic(t);
+
+	mColumnSlide.p = Math::lerp(mColumnSlide.from, mColumnSlide.to, e);
+	applyColumnFades(e);
+
+	if (t >= 1.0f)
+	{
+		getSystemListView()->setColumnFade(1.0f);
+		mColumnSlide.list->setColumnFade(1.0f);
+		mColumnSlide.list = nullptr;
+	}
+}
+
+void ViewController::applyColumnFades(float t)
+{
+	auto home = getSystemListView();
+	float leaving = 1.0f - smoothStep(0.0f, 0.35f, t);
+	float coming = smoothStep(0.3f, 0.7f, t);
+
+	if (mColumnSlide.to > 0.5f)
+	{
+		home->setColumnFade(leaving);
+		mColumnSlide.list->setColumnFade(coming);
+	}
+	else
+	{
+		mColumnSlide.list->setColumnFade(leaving);
+		home->setColumnFade(coming);
 	}
 }
 
@@ -423,6 +572,10 @@ void ViewController::playViewTransition(bool forceImmediate)
 
 void ViewController::onFileChanged(FileData* file, FileChangeType change)
 {
+	// The system view shows counts and last games too (back from a game launched there, say)
+	if (mSystemListView != nullptr)
+		mSystemListView->refreshBindings();
+
 	std::string key = file->getFullPath();
 	auto sourceSystem = file->getSourceFileData()->getSystem();
 
@@ -537,13 +690,23 @@ void ViewController::launch(FileData* game, LaunchGameOptions options, Vector3f 
 			GuiImageViewer::showCbz(mWindow, game->getPath());
 		else if (!Utils::FileSystem::isAudio(game->getPath()))
 		{
-			auto gameImage = game->getImagePath();
+			const auto galleryImage = [](FileData* entry) -> std::string {
+				auto file = entry->getSourceFileData();
+				const auto path = file->getPath();
+				if (file->getType() != GAME || Utils::FileSystem::isVideo(path) || Utils::FileSystem::isAudio(path))
+					return {};
+				const auto ext = Utils::String::toLower(Utils::FileSystem::getExtension(path));
+				if (ext == ".pdf" || ext == ".cbz")
+					return {};
+				return Utils::FileSystem::isImage(path) || ext == ".bmp" ? path : file->getImagePath();
+			};
+			auto gameImage = galleryImage(game);
 			if (Utils::FileSystem::exists(gameImage))
 			{
-				auto imgViewer = new GuiImageViewer(mWindow);
+				auto imgViewer = new GuiImageViewer(mWindow, false, true);
 
 				for (auto sibling : game->getParent()->getChildrenListToDisplay())
-					imgViewer->add(sibling->getImagePath());
+					imgViewer->add(galleryImage(sibling));
 
 				imgViewer->setCursor(gameImage);
 				mWindow->pushGui(imgViewer);
@@ -571,6 +734,15 @@ void ViewController::launch(FileData* game, LaunchGameOptions options, Vector3f 
 		mWindow->setCustomSplashScreen(game->getImagePath(), game->getName(), game);
 
 	std::string transition_style = Settings::GameTransitionStyle();
+	auto system = game->getSourceFileData()->getSystem();
+	const auto theme = system->getTheme();
+	const bool stationaryLaunch = theme && !SystemData::isUtilitySystem(system) &&
+		theme->getVariable("esGameLaunchTransition") == "shortFade";
+	const bool useShortFade = stationaryLaunch &&
+		(transition_style.empty() || transition_style == "auto" || transition_style == "fade" || transition_style == "fast fade");
+	if (useShortFade)
+		transition_style = "fast fade";
+
 	if (transition_style.empty() || transition_style == "auto")
 		transition_style = Settings::TransitionStyle();
 
@@ -590,13 +762,16 @@ void ViewController::launch(FileData* game, LaunchGameOptions options, Vector3f 
 	//if (transition_style == "slide" && mCurrentView->isKindOf<GridGameListView>())
 		//transition_style = "fade";
 
-	if (transition_style == "fade" || transition_style == "fast fade")
+	const bool instantFade = stationaryLaunch && transition_style == "instant";
+	if (instantFade || transition_style == "fade" || transition_style == "fast fade")
 	{
-		int fadeDuration = (transition_style == "fast fade") ? 400 : 800; // Halve the duration for fast fade
-		// fade out, launch game, fade back in
-		auto fadeFunc = [this](float t) { mFadeOpacity = Math::lerp(0.0f, 1.0f, t); };
+		const int fadeDuration = instantFade ? 1 : useShortFade ? 220 : (transition_style == "fast fade" ? 400 : 800);
+		const int returnDuration = instantFade ? 1 : useShortFade ? 180 : 800;
+		auto fadeFunc = [this, useShortFade](float t) {
+			mFadeOpacity = useShortFade ? t * t * (3.0f - 2.0f * t) : t;
+		};
 
-		setAnimation(new LambdaAnimation(fadeFunc, fadeDuration), 0, [this, game, fadeFunc, options]
+		setAnimation(new LambdaAnimation(fadeFunc, fadeDuration), 0, [this, game, fadeFunc, options, returnDuration]
 		{
 			if (doLaunchGame(game, options))
 			{
@@ -607,7 +782,7 @@ void ViewController::launch(FileData* game, LaunchGameOptions options, Vector3f 
 			}
 			else
 			{
-				setAnimation(new LambdaAnimation(fadeFunc, 800), 0, [this] { GuiComponent::isLaunchTransitionRunning = false; mLockInput = false; mWindow->closeSplashScreen(); }, true, 3);
+				setAnimation(new LambdaAnimation(fadeFunc, returnDuration), 0, [this] { GuiComponent::isLaunchTransitionRunning = false; mLockInput = false; mWindow->closeSplashScreen(); }, true, 3);
 				this->onFileChanged(game, FILE_METADATA_CHANGED);
 			}
 		});
@@ -676,6 +851,9 @@ std::shared_ptr<IGameListView> ViewController::getGameListView(SystemData* syste
 
 		if (!loadIfnull)
 			return nullptr;
+
+		// The view's elements and its games' media check the same files again and again: once each
+		Utils::FileSystem::FileSystemCacheActivator fsc;
 
 		system->setUIModeFilters();
 		system->updateDisplayedGameCount();
@@ -904,6 +1082,11 @@ bool ViewController::input(InputConfig* config, Input input)
 		return true;
 	}
 
+	if (mState.viewing == GAME_LIST)
+	{
+		auto grid = dynamic_cast<GridGameListView*>(mCurrentView.get());
+		if (grid && grid->handleLetterAxis(config, input)) return true;
+	}
 	if (config->isMappedTo("joystick2up", input) && input.value != 0)
 	{
 		changeVolume(5);
@@ -932,6 +1115,9 @@ void ViewController::update(int deltaTime)
 	if (mCurrentView)
 		mCurrentView->update(deltaTime);
 
+	updateColumnSlide(deltaTime);
+	if (mCycleFrom && ((mCycleElapsed += deltaTime) >= 165 || mState.viewing != GAME_LIST || mColumnSlide.list))
+		mCycleFrom.reset();
 	updateSelf(deltaTime);
 
 	if (mDeferPlayViewTransitionTo != nullptr)
@@ -948,6 +1134,8 @@ void ViewController::update(int deltaTime)
 
 void ViewController::render(const Transform4x4f& parentTrans)
 {
+	mScreenTransform = parentTrans;
+
 	Transform4x4f trans = mCamera * parentTrans;
 	Transform4x4f transInverse;
 	transInverse.invert(trans);
@@ -956,7 +1144,36 @@ void ViewController::render(const Transform4x4f& parentTrans)
 	Vector3f viewStart = transInverse.translation();
 	Vector3f viewEnd = transInverse * Vector3f((float)Renderer::getScreenWidth(), (float)Renderer::getScreenHeight(), 0);
 
-	if (!isAnimationPlaying(0) && mCurrentView != nullptr)
+	if (mColumnSlide.list != nullptr)
+	{
+		// The home and the game list side by side, wherever their positions are
+		auto home = getSystemListView();
+		float slide = home->getColumnLayout().slide;
+		float offset = mColumnSlide.p * slide;
+
+		Transform4x4f homeTrans = parentTrans;
+		homeTrans.translate(Vector3f(-offset, 0, 0) - home->getPosition());
+		home->render(homeTrans);
+
+		Transform4x4f listTrans = parentTrans;
+		listTrans.translate(Vector3f(slide - offset, 0, 0) - mColumnSlide.list->getPosition());
+		mColumnSlide.list->render(listTrans);
+	}
+	else if (mCycleFrom && mCurrentView)
+	{
+		Transform4x4f from = parentTrans;
+		from.translate(-mCycleFrom->getPosition());
+		mCycleFrom->render(from);
+		const int w = Renderer::getScreenWidth();
+		const int reveal = Math::round(w * Math::easeOutCubic(mCycleElapsed / 165.0f));
+		if (reveal > 0)
+		{
+			Renderer::pushClipRect(Vector2i(mCycleDirection > 0 ? w - reveal : 0, 0), Vector2i(reveal, Renderer::getScreenHeight()));
+			mCurrentView->render(trans);
+			Renderer::popClipRect();
+		}
+	}
+	else if (!isAnimationPlaying(0) && mCurrentView != nullptr)
 	{
 		mCurrentView->render(trans);
 	}

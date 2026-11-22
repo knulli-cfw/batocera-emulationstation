@@ -18,6 +18,7 @@
 #include "CustomFeatures.h"
 #include "utils/VectorEx.h"
 #include "BindingManager.h"
+#include "HomeSlides.h"
 
 class FileData;
 class FolderData;
@@ -36,6 +37,8 @@ struct GameCountInfo
 	long playTime;
 	std::string mostPlayed;
 	std::string lastPlayedDate;
+	std::string lastPlayedPath;	// the game played last, if any
+	std::string chefPickPath;	// the best-rated favorite (else best-rated game), for systems never played
 };
 
 struct SystemMetadata
@@ -109,6 +112,55 @@ public:
 
 	GameCountInfo* getGameCountInfo();
 	void updateDisplayedGameCount();
+
+	// The game played last (nullptr if none); with orChefPick, else the suggested game, else the best-rated
+	// favorite or game
+	FileData* getLastPlayedGame(bool orChefPick = false);
+	// What X continues: getLastPlayedGame(true), nothing on a utility system
+	FileData* getContinueGame();
+	bool usesRandomCollectionPreview();
+	bool rotatesHomePreview();
+	void enterHomePreview();
+	bool hasOtherHomePreview() const;
+	FileData* homePreview(bool advance);
+	static bool isUtilitySystem(SystemData* system);
+	// The game played last on the console (tools and screenshots left out)
+	static FileData* getConsoleLastPlayedGame();
+
+	// A game by its path. While a FindPass lives (a view binding its elements: a panel asks for
+	// {system:continue:...} and {global:lastPlayed:...} dozens of times), each one is searched for once
+	FileData* findByPath(const std::string& path);
+	class FindPass
+	{
+	public:
+		FindPass();
+		~FindPass();
+	};
+
+	// The tabbed home. The captures the system's card slides through ({system:slides}): its favorites
+	// with one, else its best-rated games, as the theme variable "systemslides" orders and filters them
+	// (HomeSlides::Rules); none on collections and utilities.
+	const std::vector<std::string>& getSlides();
+	// Changes each time the system's slides change (to bind the cards again)
+	int getSlidesVersion();
+	// The slides and the suggestions are made off the UI thread (empty until then, the ones before them while
+	// they are made again): true when new ones arrived, to bind the cards and the panel again. SystemView calls
+	// it each frame.
+	bool pollHomeLists();
+	struct HomeJob;
+	// On a system never played, the game the panel suggests: a random favorite with a preview video, each
+	// one once before any repeats; on a system with no favorite, a best-rated game with one; nullptr without
+	// any, and unless the system view plays {system:continue:video} (setPanelVideo): any other theme keeps
+	// {system:continue} on the best-rated favorite
+	FileData* getSuggestedGame();
+	void setPanelVideo(bool value);
+	// A utility's items for the home's panel ({system:recent1} to {system:recent8}): tools and emulators by
+	// last run, screenshots newest first, the never run by name; none on other systems
+	FileData* getRecentItem(size_t index);
+	// More than one suggestion to move on to
+	bool hasOtherSuggestion();
+	// The next suggestion (when its video ends); false when there is no other one
+	bool nextSuggestion();
 
 	static bool IsManufacturerSupported;
 	static bool hasDirtySystems();
@@ -275,6 +327,27 @@ private:
 
 	GameCountInfo* mGameCountInfo;
 	SaveStateRepository* mSaveRepository;
+
+	void getHomeCandidates(std::vector<HomeSlides::Candidate>& images, std::vector<HomeSlides::Candidate>& videos);
+	void startHomeJob();
+
+	std::vector<std::string> mSlides;
+	bool mSlidesReady;
+	int mSlidesVersion;
+	HomeSlides::Deck mSuggestions;
+	HomeSlides::Deck mCollectionPreviews;
+	std::vector<std::string> mHistoryPreviews;
+	size_t mHistoryPreviewIndex = 0;
+	std::string mCollectionLatestPath;
+	bool mCollectionPreviewsDirty = true;
+	bool mSuggestionsReady;
+	bool mHomeDirty;		// to be made (again)
+	int mHomeGeneration;	// counts the changes, so a list made before the last one is made once more
+	std::shared_ptr<HomeJob> mHomeJob;
+	std::unordered_map<std::string, FileData*> mFound;	// FindPass
+	std::vector<std::string> mRecent;
+	size_t mRecentCount;	// the files it was made from
+	bool mPanelVideo;
 
 	bool mHidden;
 };

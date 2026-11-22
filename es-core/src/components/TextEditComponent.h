@@ -12,7 +12,7 @@ class TextCache;
 class TextEditComponent : public GuiComponent
 {
 public:
-	TextEditComponent(Window* window);
+	TextEditComponent(Window* window, const std::shared_ptr<Font>& font = nullptr);
 	
 	void textInput(const char* text) override;
 	bool input(InputConfig* config, Input input) override;
@@ -30,6 +30,7 @@ public:
 	inline bool isEditing() const { return mEditing; };
 	inline const std::shared_ptr<Font>& getFont() const { return mFont; }
 
+	size_t getCursor() const { return mCursor; }
 	void setCursor(size_t pos);
 
 	virtual std::vector<HelpPrompt> getHelpPrompts() override;

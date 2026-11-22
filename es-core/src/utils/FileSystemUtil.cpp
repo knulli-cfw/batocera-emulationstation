@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <algorithm>
+#include <atomic>
 #include <set>
 
 #if defined(_WIN32)
@@ -138,10 +139,11 @@ namespace Utils
 				mFileCacheMutex.unlock();
 			}
 
-			static FileCache* get(const std::string& key)
+			// A copy: another thread may add to the cache (and move its entries) once the lock is left
+			static bool get(const std::string& key, FileCache& out)
 			{
 				if (!mEnabled)
-					return nullptr;
+					return false;
 
 				std::unique_lock<std::mutex> lock(mFileCacheMutex);
 
@@ -149,17 +151,21 @@ namespace Utils
 				{
 					auto it = mFileCache.find(key);
 					if (it != mFileCache.cend())
-						return &it->second;
+					{
+						out = it->second;
+						return true;
+					}
 
 					it = mFileCache.find(Utils::FileSystem::getParent(key) + "/*");
 					if (it != mFileCache.cend())
 					{
-						mFileCache[key] = FileCache(false, false);
-						return &mFileCache[key];
+						out = FileCache(false, false);
+						mFileCache[key] = out;
+						return true;
 					}
 				}
 
-				return nullptr;
+				return false;
 			}
 
 			static void resetCache()
@@ -175,33 +181,30 @@ namespace Utils
 		private:
 			static std::unordered_map<std::string, FileCache> mFileCache;
 			static std::mutex mFileCacheMutex;
-			static bool mEnabled;
+			static std::atomic<bool> mEnabled;
 		};
 
 		std::unordered_map<std::string, FileCache> FileCache::mFileCache;
 		std::mutex FileCache::mFileCacheMutex;
-		bool FileCache::mEnabled = false;
+		std::atomic<bool> FileCache::mEnabled(false);
 
 	// FileSystemCacheActivator
 
-		int FileSystemCacheActivator::mReferenceCount = 0;
+		// Activators may live on several threads at once (a view's and a loader's)
+		static std::atomic<int> activatorCount(0);
 
 		FileSystemCacheActivator::FileSystemCacheActivator()
 		{
-			if (mReferenceCount == 0)
+			if (activatorCount++ == 0)
 			{
 				FileCache::setEnabled(true);
 				FileCache::resetCache();
 			}
-
-			mReferenceCount++;
 		}
 
 		FileSystemCacheActivator::~FileSystemCacheActivator()
 		{
-			mReferenceCount--;
-
-			if (mReferenceCount <= 0)
+			if (--activatorCount <= 0)
 			{
 				FileCache::setEnabled(false);
 				FileCache::resetCache();
@@ -961,9 +964,9 @@ namespace Utils
 			if (_path.empty())
 				return false;
 
-			auto it = FileCache::get(_path);
-			if (it != nullptr)
-				return it->exists;
+			FileCache cached;
+			if (FileCache::get(_path, cached))
+				return cached.exists;
 
 #ifdef WIN32			
 			if (!FileCache::isEnabled())
@@ -1000,9 +1003,9 @@ namespace Utils
 
 		bool isRegularFile(const std::string& _path)
 		{
-			auto it = FileCache::get(_path);
-			if (it != nullptr)
-				return it->exists && !it->directory && !it->isSymLink;
+			FileCache cached;
+			if (FileCache::get(_path, cached))
+				return cached.exists && !cached.directory && !cached.isSymLink;
 
 			std::string path = getGenericPath(_path);
 			struct stat64 info;
@@ -1018,9 +1021,9 @@ namespace Utils
 
 		bool isDirectory(const std::string& _path)
 		{
-			auto it = FileCache::get(_path);
-			if (it != nullptr)
-				return it->exists && it->directory;
+			FileCache cached;
+			if (FileCache::get(_path, cached))
+				return cached.exists && cached.directory;
 
 #ifdef WIN32
 			// check for symlink attribute
@@ -1049,9 +1052,9 @@ namespace Utils
 		bool isSymlink(const std::string& _path)
 		{
 		
-			auto it = FileCache::get(_path);
-			if (it != nullptr)
-				return it->exists && it->isSymLink;
+			FileCache cached;
+			if (FileCache::get(_path, cached))
+				return cached.exists && cached.isSymLink;
 				
 			std::string path = getGenericPath(_path);
 
@@ -1079,9 +1082,9 @@ namespace Utils
 
 		bool isHidden(const std::string& _path)
 		{
-			auto it = FileCache::get(_path);
-			if (it != nullptr)
-				return it->exists && it->hidden;
+			FileCache cached;
+			if (FileCache::get(_path, cached))
+				return cached.exists && cached.hidden;
 
 			std::string path = getGenericPath(_path);
 

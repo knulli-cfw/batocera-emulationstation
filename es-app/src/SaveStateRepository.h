@@ -17,6 +17,9 @@ public:
 	~SaveStateRepository();
 
 	static bool isEnabled(FileData* game);
+	// The game's own emulator and core keep save states: a game (not a folder) whose configured emulator, and
+	// core where the states are kept per core, has a save state configuration
+	static bool isEnabledForGame(FileData* game);
 	static int	getNextFreeSlot(FileData* game, std::shared_ptr<SaveStateConfig> config);
 	static void renumberSlots(FileData* game, std::shared_ptr<SaveStateConfig> config);
 

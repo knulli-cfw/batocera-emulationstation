@@ -355,7 +355,7 @@ std::shared_ptr<TextComponent> GuiGeneralScreensaverOptions::addEditableTextComp
 	row.addElement(ed, true);
 
 	auto spacer = std::make_shared<GuiComponent>(mWindow);
-	spacer->setSize(Renderer::getScreenWidth() * 0.005f, 0);
+	spacer->setSize(ThemeData::getMenuTheme()->Row.valueSpacing, 0);
 	row.addElement(spacer, false);
 
 	auto bracket = std::make_shared<ImageComponent>(mWindow);
@@ -392,7 +392,7 @@ std::shared_ptr<TextComponent> GuiGeneralScreensaverOptions::addBrowsablePath(co
 	row.addElement(ed, true);
 
 	auto spacer = std::make_shared<GuiComponent>(mWindow);
-	spacer->setSize(Renderer::getScreenWidth() * 0.005f, 0);
+	spacer->setSize(ThemeData::getMenuTheme()->Row.valueSpacing, 0);
 	row.addElement(spacer, false);
 
 	auto bracket = std::make_shared<ImageComponent>(mWindow);

@@ -21,6 +21,8 @@ public:
 	virtual std::vector<HelpPrompt> getHelpPrompts() override;
 	virtual HelpStyle getHelpStyle() override;
 
+	static void openGameSearch(Window* window, SystemData* system, const std::string& title,
+		const std::string& value, const std::function<void(const std::string&)>& apply);
 	static std::vector<std::string> gridSizes;
 
 	virtual bool onMouseClick(int button, bool pressed, int x, int y);

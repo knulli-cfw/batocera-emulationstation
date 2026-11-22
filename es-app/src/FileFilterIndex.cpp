@@ -625,7 +625,7 @@ float jw_distance(std::string s1, std::string s2, bool caseSensitive = true) {
 	return weight;
 }
 
-int FileFilterIndex::showFile(FileData* game)
+int FileFilterIndex::showFile(FileData* game, bool ignoreText)
 {
 	// this shouldn't happen, but just in case let's get it out of the way
 	if (!isFiltered())
@@ -639,7 +639,7 @@ int FileFilterIndex::showFile(FileData* game)
 		// iterate through all of the children, until there's a match
 
 		for (std::vector<FileData*>::const_iterator it = children.cbegin(); it != children.cend(); ++it )
-			if (showFile(*it))
+			if (showFile(*it, ignoreText))
 				return 1;
 
 		return 0;
@@ -649,7 +649,7 @@ int FileFilterIndex::showFile(FileData* game)
 	
 	int textScore = 0;
 
-	if (!mTextFilter.empty())
+	if (!ignoreText && !mTextFilter.empty())
 	{
 		auto name = game->getSourceFileData()->getName();
 		std::string language = SystemConf::getInstance()->get("system.language");
@@ -946,6 +946,9 @@ int FileFilterIndex::showFile(FileData* game)
 
 		keepGoing = true;
 	}
+
+	if (ignoreText)
+		return !hasFilter || keepGoing;
 
 	if (keepGoing && !mTextFilter.empty())
 		return textScore;
@@ -1302,7 +1305,7 @@ bool CollectionFilter::isFiltered()
 	return mSystemFilter.size() > 0 || FileFilterIndex::isFiltered();
 }
 
-int CollectionFilter::showFile(FileData* game)
+int CollectionFilter::showFile(FileData* game, bool ignoreText)
 {
 	if (game == nullptr)
 		return 0;
@@ -1314,7 +1317,7 @@ int CollectionFilter::showFile(FileData* game)
 			return 0;
 	}
 	
-	return FileFilterIndex::showFile(game);
+	return FileFilterIndex::showFile(game, ignoreText);
 }
 
 bool CollectionFilter::isSystemSelected(const std::string name)

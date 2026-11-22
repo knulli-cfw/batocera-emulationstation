@@ -1,4 +1,5 @@
 #include "GridTileComponent.h"
+#include "components/VideoLeadIn.h"
 
 #include "resources/TextureResource.h"
 #include "ThemeData.h"
@@ -19,7 +20,7 @@
 
 #define VIDEODELAY	100
 
-GridTileComponent::GridTileComponent(Window* window) : GuiComponent(window), mBackground(window), mLabel(window), mVideo(nullptr), mVideoPlaying(false), mHasItemTemplate(false)
+GridTileComponent::GridTileComponent(Window* window) : GuiComponent(window), mBackground(window), mLabel(window), mVideo(nullptr), mPreviewVisible(false), mHasItemTemplate(false)
 {
 	mHasStandardMarquee = false;
 	mSelectedZoomPercent = 1.0f;
@@ -245,7 +246,13 @@ void GridTileComponent::resize()
 		{
 			mVideo->setOrigin(0.5, 0.5);			
 			mVideo->setPosition(imageOffset.x() + imageSize.x() / 2.0f, imageOffset.y() + imageSize.y() / 2.0f);
-			mVideo->setMinSize(imageSize.x(), imageSize.y());
+
+			// A picture fitted in the tile (maxSize) keeps its own place: the video fills that place, cut to it, so
+			// the swap from the picture to the video moves nothing
+			if (currentProperties.Image.sizeMode == "maxSize" && mImage != nullptr && mImage->getSize().x() > 0 && mImage->getSize().y() > 0)
+				mVideo->setMinSize(mImage->getSize().x(), mImage->getSize().y());
+			else
+				mVideo->setMinSize(imageSize.x(), imageSize.y());
 
 			if (mImage != nullptr)
 				mVideo->setRoundCorners(mImage->getRoundCorners());
@@ -255,7 +262,12 @@ void GridTileComponent::resize()
 			mVideo->setOrigin(0.5f, 0.5f);
 			mVideo->setPosition(size.x() / 2.0f, (size.y() - height) / 2.0f);
 
-			if (currentProperties.Image.sizeMode == "size")
+			mVideo->setKeepOrientation(currentProperties.Image.keepOrientation);
+
+			// A screen's shape that keeps the video's orientation is worked out from the video's size (resize)
+			if (currentProperties.Image.sizeMode == "size" && currentProperties.Image.keepOrientation)
+				mVideo->setResize(imageSize.x(), size.y() - topPadding - bottomPadding);
+			else if (currentProperties.Image.sizeMode == "size")
 				mVideo->setSize(imageSize.x(), size.y() - topPadding - bottomPadding);
 			else
 				mVideo->setMaxSize(imageSize.x(), size.y() - topPadding - bottomPadding);
@@ -311,6 +323,7 @@ void GridTileComponent::resize()
 void GridTileComponent::update(int deltaTime)
 {
 	GuiComponent::update(deltaTime);
+	setPreviewVisible(mSelected && mVideo != nullptr && mVideo->hasVisibleFrame());
 	
 	if (hasStoryBoard() && !isStoryBoardRunning())
 		deselectStoryboard(false);
@@ -412,9 +425,12 @@ void GridTileComponent::renderContent(const Transform4x4f& parentTrans, bool ren
 		if (child->isVisible() && child->getExtraType() == ExtraType::EXTRACHILDREN && child->getZIndex() < refZindex)
 			child->render(trans);
 
-	if (mImage != NULL)
+	if (mImage != nullptr)
 	{
-		if (!isMinSize || !mSelected || mVideo == nullptr || !(mVideo->isPlaying() && !mVideo->isFading()))
+		const bool hideImage = mSelected && mVideo != nullptr && (mVideo->usesExclusiveSnapshot()
+			? mVideo->drawsExclusiveFrame()
+			: isMinSize && mVideo->isPlaying() && !mVideo->isFading());
+		if (!hideImage)
 			mImage->render(trans);
 	}
 
@@ -583,7 +599,12 @@ void GridTileComponent::applyThemeToProperties(const ThemeData::ThemeElement* el
 		properties.Image.color = properties.Image.colorEnd = elem->get<unsigned int>("imageColor");
 
 	if (elem && elem->has("imageSizeMode"))
+	{
 		properties.Image.sizeMode = elem->get<std::string>("imageSizeMode");
+		properties.Image.keepOrientation = properties.Image.sizeMode == "screen";
+		if (properties.Image.keepOrientation)
+			properties.Image.sizeMode = "size";
+	}
 }
 
 bool GridImageProperties::applyTheme(const ThemeData::ThemeElement* elem)
@@ -1088,6 +1109,10 @@ void GridTileComponent::setVideo(const std::string& path, float defaultDelay)
 
 	mVideoPath = path;
 
+	// the cards shown and those loaded around them: their videos' fades from black measured ahead
+	if (mVideo != nullptr && !mVideoPath.empty())
+		VideoLeadIn::request(mVideoPath, false);
+
 	if (mVideo != nullptr)
 	{
 		if (defaultDelay >= 0.0)
@@ -1142,6 +1167,41 @@ void GridTileComponent::handleStoryBoard(bool activate)
 	}
 }
 
+void GridTileComponent::playStoryboard(const std::string& event)
+{
+	if (!mHasItemTemplate)
+		return;
+
+	playExtraStoryboard(event);
+}
+
+void GridTileComponent::setPreviewVisible(bool visible)
+{
+	if (visible == mPreviewVisible)
+		return;
+
+	mPreviewVisible = visible;
+	playExtraStoryboard(visible ? "videoplaying" : "videostopped");
+}
+
+void GridTileComponent::playExtraStoryboard(const std::string& event)
+{
+	for (auto comp : enumerateExtraChildrens())
+	{
+		if (comp->getStoryBoards().find(event) == comp->getStoryBoards().cend())
+			continue;
+
+		if (comp->isStoryBoardRunning())
+			comp->deselectStoryboard(false);
+
+		if (comp->selectStoryboard(event))
+		{
+			comp->startStoryboard();
+			comp->update(0);
+		}
+	}
+}
+
 void GridTileComponent::onShow()
 {
 	GuiComponent::onShow();	
@@ -1167,6 +1227,7 @@ void GridTileComponent::onShow()
 
 void GridTileComponent::onHide()
 {
+	setPreviewVisible(false);
 	GuiComponent::onHide();		
 
 	if (mSelected)
@@ -1187,10 +1248,12 @@ void GridTileComponent::startVideo()
 	if (mVideo != nullptr)
 	{
 		// Inform video component about size before staring in order to be able to use OptimizeVideo parameter
+		mVideo->setKeepOrientation(mSelectedProperties.Image.keepOrientation);
+
 		if (mSelectedProperties.Image.sizeMode == "minSize")
-			mVideo->setMinSize(mSelectedProperties.Size);
+			mVideo->setMinSize(mSelectedProperties.Size.x(), mSelectedProperties.Size.y());
 		else
-			mVideo->setResize(mSelectedProperties.Size);
+			mVideo->setResize(mSelectedProperties.Size.x(), mSelectedProperties.Size.y());
 
 		mVideo->setVideo(mVideoPath, false);
 	}
@@ -1198,6 +1261,7 @@ void GridTileComponent::startVideo()
 
 void GridTileComponent::stopVideo()
 {
+	setPreviewVisible(false);
 	if (mVideo != nullptr)
 		mVideo->setVideo("");
 }
@@ -1388,6 +1452,7 @@ void GridImageProperties::mixProperties(GridImageProperties& def, GridImagePrope
 	colorEnd = mixColors(def.colorEnd, sel.colorEnd, percent);
 	reflexion = mixVectors(def.reflexion, sel.reflexion, percent);
 	roundCorners = mixFloat(def.roundCorners, sel.roundCorners, percent);
+	keepOrientation = def.keepOrientation || sel.keepOrientation;
 
 	customShader = percent >= 0.02f ? sel.customShader : def.customShader;
 }

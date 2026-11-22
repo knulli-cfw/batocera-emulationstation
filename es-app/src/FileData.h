@@ -242,7 +242,7 @@ public:
 	FileData* FindByPath(const std::string& path);
 
 	inline const std::vector<FileData*>& getChildren() const { return mChildren; }
-	const std::vector<FileData*> getChildrenListToDisplay();
+	const std::vector<FileData*> getChildrenListToDisplay(bool ignoreTextFilter = false);
 	std::shared_ptr<std::vector<FileData*>> findChildrenListToDisplayAtCursor(FileData* toFind, std::stack<FileData*>& stack);
 
 	std::vector<FileData*> getFilesRecursive(unsigned int typeMask, bool displayedOnly = false, SystemData* system = nullptr, bool includeVirtualStorage = true) const;
