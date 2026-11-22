@@ -20,6 +20,7 @@
 #include "guis/GuiTextEditPopupKeyboard.h"
 #include "SaveStateRepository.h"
 #include "guis/GuiSaveState.h"
+#include "guis/GuiMsgBox.h"
 #include "guis/GuiGamelistOptions.h"
 #include "BasicGameListView.h"
 #include "utils/Randomizer.h"
@@ -179,7 +180,7 @@ void ISimpleGameListView::update(const int deltaTime)
 
 	if (mOKButton.isLongPressed(deltaTime))
 	{
-		if (Settings::getInstance()->getBool("GameOptionsAtNorth"))
+		if (!usesSavedGamesButton() && Settings::getInstance()->getBool("GameOptionsAtNorth"))
 			showSelectedGameSaveSnapshots();
 		else
 			showSelectedGameOptions();
@@ -199,7 +200,7 @@ void ISimpleGameListView::update(const int deltaTime)
 		return;
 	}
 	
-	if (mXButton.isLongPressed(deltaTime))
+	if (!usesSavedGamesButton() && mXButton.isLongPressed(deltaTime))
 	{
 		if (UIModeController::getInstance()->isUIModeKid() && cursorHasSaveStatesEnabled())
 		{
@@ -267,7 +268,9 @@ bool ISimpleGameListView::input(InputConfig* config, Input input)
 
 	if (mXButton.isShortPressed(config, input))
 	{
-		if (Settings::getInstance()->getBool("GameOptionsAtNorth"))
+		if (usesSavedGamesButton())
+			openSavedGames();
+		else if (Settings::getInstance()->getBool("GameOptionsAtNorth"))
 			showSelectedGameOptions();
 		else if (cursorHasSaveStatesEnabled())
 			showSelectedGameSaveSnapshots();
@@ -348,6 +351,34 @@ void ISimpleGameListView::showSelectedGameOptions()
 
 	Sound::getFromTheme(mTheme, getName(), "menuOpen")->play();
 	mWindow->pushGui(new GuiGameOptions(mWindow, cursor));
+}
+
+bool ISimpleGameListView::usesSavedGamesButton() const
+{
+	return mTheme && mTheme->getVariable("esGameListXAction") == "savestates";
+}
+
+bool ISimpleGameListView::hasPlayableSelection()
+{
+	auto cursor = getCursor();
+	return cursor && cursor->getType() == GAME &&
+		!SystemData::isUtilitySystem(cursor->getSourceFileData()->getSystem());
+}
+
+void ISimpleGameListView::openSavedGames()
+{
+	if (!hasPlayableSelection())
+		return;
+
+	if (cursorHasSaveStatesEnabled())
+		showSelectedGameSaveSnapshots();
+	else
+	{
+		auto message = mTheme->getVariable("esNoSaveStatesText");
+		if (message.empty())
+			message = _("This emulator does not provide save states here. For games with in-game saves, load your progress from the game.");
+		mWindow->pushGui(new GuiMsgBox(mWindow, message, _("OK"), nullptr));
+	}
 }
 
 // The save states of the emulator and core the game runs with ({game:saveStatesSupported}): another emulator's
@@ -680,7 +711,7 @@ std::vector<HelpPrompt> ISimpleGameListView::getHelpPrompts()
 		prompts.push_back(HelpPrompt("up/down", _("CHOOSE")));
 	}
 
-	bool invertNorthButton = Settings::getInstance()->getBool("GameOptionsAtNorth");
+	bool invertNorthButton = !usesSavedGamesButton() && Settings::getInstance()->getBool("GameOptionsAtNorth");
 
 	prompts.push_back(HelpPrompt(BUTTON_BACK, _("BACK"), [&] { goBack(); }));
 
@@ -692,7 +723,12 @@ std::vector<HelpPrompt> ISimpleGameListView::getHelpPrompts()
 	if (!UIModeController::getInstance()->isUIModeKid())
 		prompts.push_back(HelpPrompt("select", _("OPTIONS"), [&] { showGamelistOptions(); }));
 
-	if (cursorHasSaveStatesEnabled())
+	if (usesSavedGamesButton())
+	{
+		if (hasPlayableSelection())
+			prompts.push_back(HelpPrompt("x", _("SAVE STATES"), [&] { openSavedGames(); }));
+	}
+	else if (cursorHasSaveStatesEnabled())
 	{
 		if (invertNorthButton)
 		{
